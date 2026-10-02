@@ -1,0 +1,54 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 20, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "msvc-x64", "displayName": "MSVC x64 (VS 2022 v143, 정적 런타임)",
+      "generator": "Visual Studio 17 2022", "architecture": "x64", "toolset": "v143",
+      "binaryDir": "${sourceDir}/build/msvc-x64",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "msvc-x86", "displayName": "MSVC x86 (VS 2022 v143, 정적 런타임)",
+      "generator": "Visual Studio 17 2022", "architecture": "Win32", "toolset": "v143",
+      "binaryDir": "${sourceDir}/build/msvc-x86",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "msvc-arm64", "displayName": "MSVC ARM64 (VS 2022 v143) — 빌드 구성만 제공, 미검증",
+      "generator": "Visual Studio 17 2022", "architecture": "ARM64", "toolset": "v143",
+      "binaryDir": "${sourceDir}/build/msvc-arm64",
+      "cacheVariables": { "MACCHG_BUILD_TESTS": "OFF", "MACCHG_BUILD_INTEGRATION_TESTS": "OFF" },
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "mingw-x64", "displayName": "MinGW-w64 x64 교차 빌드 (Linux 호스트)",
+      "generator": "Ninja", "binaryDir": "${sourceDir}/build/mingw-x64",
+      "toolchainFile": "${sourceDir}/cmake/toolchain-mingw-x64.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "mingw-x86", "displayName": "MinGW-w64 x86 교차 빌드 (Linux 호스트)",
+      "generator": "Ninja", "binaryDir": "${sourceDir}/build/mingw-x86",
+      "toolchainFile": "${sourceDir}/cmake/toolchain-mingw-x86.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "host-tests", "displayName": "호스트(Linux/macOS) 코어 단위 테스트",
+      "generator": "Ninja", "binaryDir": "${sourceDir}/build/host-tests",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "MACCHG_BUILD_GUI": "OFF" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "msvc-x64", "configurePreset": "msvc-x64", "configuration": "Release" },
+    { "name": "msvc-x86", "configurePreset": "msvc-x86", "configuration": "Release" },
+    { "name": "msvc-arm64", "configurePreset": "msvc-arm64", "configuration": "Release" },
+    { "name": "mingw-x64", "configurePreset": "mingw-x64" },
+    { "name": "mingw-x86", "configurePreset": "mingw-x86" },
+    { "name": "host-tests", "configurePreset": "host-tests" }
+  ],
+  "testPresets": [
+    { "name": "host-tests", "configurePreset": "host-tests", "output": { "outputOnFailure": true } },
+    { "name": "msvc-x64", "configurePreset": "msvc-x64", "configuration": "Release", "output": { "outputOnFailure": true } }
+  ]
+}

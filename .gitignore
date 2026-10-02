@@ -1,17 +1,17 @@
-# Build outputs
-bin/
-obj/
+# 빌드 출력
+build/
 out/
-*.exe
+*.obj
+*.o
 *.pdb
+*.ilk
 
-# Visual Studio
+# Visual Studio / IDE
 .vs/
 *.suo
 *.user
-*.userprefs
-*.sln.docstates
+CMakeUserPresets.json
 
-# Prebuilt binaries published for download (built with Roslyn against the .NET 4.0 reference assemblies)
-!dist/MacChanger.exe
-!dist/MacChanger-portable.zip
+# 배포용 미리 빌드한 EXE 는 dist/ 에만 둔다
+*.exe
+!dist/*.exe

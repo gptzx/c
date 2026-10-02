@@ -1,0 +1,33 @@
+#pragma code_page(65001)
+#include <windows.h>
+#include "resource.h"
+
+IDR_MANIFEST RT_MANIFEST "app.manifest"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "041204B0"
+        BEGIN
+            VALUE "FileDescription", "MacChanger - 포터블 MAC 주소 변경 도구"
+            VALUE "FileVersion", "1.0.0.0"
+            VALUE "InternalName", "MacChanger"
+            VALUE "OriginalFilename", "MacChanger.exe"
+            VALUE "ProductName", "MacChanger"
+            VALUE "ProductVersion", "1.0.0.0"
+            VALUE "LegalCopyright", "MIT License"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x412, 1200
+    END
+END
