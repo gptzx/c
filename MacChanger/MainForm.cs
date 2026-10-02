@@ -30,15 +30,15 @@ namespace MacChanger
         private string lastInfoGuid;
         /// <summary>선택한 어댑터에 대해 마지막으로 로그에 남긴 "실제 할당 IP"(169.254 제외, 정렬). 어댑터가 내려가거나 재시작되면 초기화한다.</summary>
         private string lastLoggedIp;
-        /// <summary>로그 상자를 숨겼을 때의 창 높이 (상태 라벨 아래까지)</summary>
-        private const int CollapsedClientHeight = 276;
-        private const int ExpandedClientHeight = 394;
+        /// <summary>로그 상자 아래쪽 여백 (DPI/글꼴 배율이 적용된 뒤의 실제 픽셀) — 로그 상자를 숨길 때 창 높이 계산에 사용</summary>
+        private int logBottomMargin;
         /// <summary>직전 RefreshIp 에서 발생한 로그 저장 오류 (없으면 null)</summary>
         private string ipLogError;
 
         public MainForm()
         {
             InitializeComponent();
+            logBottomMargin = ClientSize.Height - txtIpLog.Bottom;   // AutoScaleMode.Font 배율이 적용된 뒤의 값
             try
             {
                 // 실행 파일에 내장된 아이콘(그룹 아이콘 ID 32512)을 EXE 리소스에서 직접 읽어 창/작업표시줄 아이콘으로 쓴다.
@@ -197,7 +197,9 @@ namespace MacChanger
         private void chkShowLog_CheckedChanged(object sender, EventArgs e)
         {
             txtIpLog.Visible = chkShowLog.Checked;
-            ClientSize = new Size(ClientSize.Width, chkShowLog.Checked ? ExpandedClientHeight : CollapsedClientHeight);
+            // 고정 상수 대신 배율이 적용된 컨트롤 위치로 높이를 계산한다 (125%/150% DPI에서도 잘리지 않음)
+            int bottom = chkShowLog.Checked ? txtIpLog.Bottom : lblStatus.Bottom;
+            ClientSize = new Size(ClientSize.Width, bottom + logBottomMargin);
         }
 
         private void ipTimer_Tick(object sender, EventArgs e)
@@ -348,11 +350,12 @@ namespace MacChanger
             else text = ip;
             if (txtCurrentIp.Text != text) txtCurrentIp.Text = text;
 
-            if (assigned.Length == 0 || !up)
+            if (ip == null || ip.Length == 0 || !up)
             {
-                lastLoggedIp = null;   // 끊겼다가 다시 같은 IP를 받아도 새 할당으로 기록
+                lastLoggedIp = null;   // 어댑터가 내려갔거나 링크가 끊긴 경우만 기준 초기화 (다시 같은 IP를 받아도 새 할당으로 기록)
                 return;
             }
+            if (assigned.Length == 0) return;   // 169.254 만 있는 동안은 기준을 유지 — 같은 IP가 돌아오면 중복 기록하지 않음
             // 작업 중(busy)에는 기록하지 않는다: 어댑터가 올라온 직후의 IP는 작업 완료 후 새 MAC과 함께 기록된다.
             if (busy || assigned == lastLoggedIp) return;
 

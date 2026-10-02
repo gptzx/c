@@ -257,7 +257,7 @@
             this.txtIpLog.Multiline = true;
             this.txtIpLog.Name = "txtIpLog";
             this.txtIpLog.ReadOnly = true;
-            this.txtIpLog.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            this.txtIpLog.ScrollBars = System.Windows.Forms.ScrollBars.Both;
             this.txtIpLog.Size = new System.Drawing.Size(536, 110);
             this.txtIpLog.TabIndex = 20;
             this.txtIpLog.TabStop = false;
