@@ -1,0 +1,13 @@
+# Build outputs
+bin/
+obj/
+out/
+*.exe
+*.pdb
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userprefs
+*.sln.docstates
