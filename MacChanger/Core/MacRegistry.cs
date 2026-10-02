@@ -79,9 +79,9 @@ namespace MacChanger.Core
             }
         }
 
-        private static RegistryKey OpenAdapterClassKey(string interfaceGuid, bool writable, out string subKeyName)
+        private static RegistryKey OpenAdapterClassKey(string interfaceGuid, bool writable)
         {
-            subKeyName = FindClassSubKeyName(interfaceGuid);
+            string subKeyName = FindClassSubKeyName(interfaceGuid);
             if (subKeyName == null)
                 throw new InvalidOperationException("NetCfgInstanceId가 " + interfaceGuid + "인 클래스 하위 키(00XX)를 찾지 못했습니다.");
 
@@ -100,8 +100,7 @@ namespace MacChanger.Core
             string normalized = MacAddressUtil.Normalize(mac12);
             if (normalized == null) throw new ArgumentException("MAC 형식이 올바르지 않습니다.", "mac12");
 
-            string subKeyName;
-            using (RegistryKey key = OpenAdapterClassKey(interfaceGuid, true, out subKeyName))
+            using (RegistryKey key = OpenAdapterClassKey(interfaceGuid, true))
             {
                 key.SetValue(NetworkAddressValueName, normalized, RegistryValueKind.String);
                 key.Flush();
@@ -114,8 +113,7 @@ namespace MacChanger.Core
         /// <summary>NetworkAddress 값을 삭제하고 실제로 사라졌는지 확인한다. 값이 있었으면 true.</summary>
         public static bool DeleteNetworkAddress(string interfaceGuid)
         {
-            string subKeyName;
-            using (RegistryKey key = OpenAdapterClassKey(interfaceGuid, true, out subKeyName))
+            using (RegistryKey key = OpenAdapterClassKey(interfaceGuid, true))
             {
                 if (key.GetValue(NetworkAddressValueName) == null) return false;
                 // RegistryKey.DeleteValue는 호환성 때문에 일부 오류를 조용히 무시하므로 다시 읽어 확인한다.

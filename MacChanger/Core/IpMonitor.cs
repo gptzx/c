@@ -12,20 +12,28 @@ namespace MacChanger.Core
     {
         public const string LogFileName = "MacChanger-ip.log";
 
-        /// <summary>
-        /// 어댑터의 IPv4 주소 목록(쉼표 구분). 어댑터가 IP 스택에 없으면(비활성화 등) null, 주소가 아직 없으면 빈 문자열.
-        /// </summary>
-        public static string ReadIPv4(string interfaceGuid)
+        /// <summary>GetAdaptersAddresses(NetworkInterface) 목록에서 GUID가 일치하는 인터페이스. 없으면(비활성화 등) null.</summary>
+        public static NetworkInterface FindInterface(string interfaceGuid)
         {
             foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
-            {
-                if (!string.Equals(NetworkAdapterInfo.NormalizeGuid(ni.Id), interfaceGuid, StringComparison.OrdinalIgnoreCase)) continue;
-                List<string> ips = new List<string>();
-                foreach (UnicastIPAddressInformation u in ni.GetIPProperties().UnicastAddresses)
-                    if (u.Address.AddressFamily == AddressFamily.InterNetwork) ips.Add(u.Address.ToString());
-                return string.Join(", ", ips.ToArray());
-            }
+                if (string.Equals(NetworkAdapterInfo.NormalizeGuid(ni.Id), interfaceGuid, StringComparison.OrdinalIgnoreCase)) return ni;
             return null;
+        }
+
+        /// <summary>
+        /// 어댑터의 IPv4 주소 목록(쉼표 구분). 어댑터가 IP 스택에 없으면(비활성화 등) null, 주소가 아직 없으면 빈 문자열.
+        /// up = 링크가 올라와 있는지(OperationalStatus.Up).
+        /// </summary>
+        public static string ReadIPv4(string interfaceGuid, out bool up)
+        {
+            up = false;
+            NetworkInterface ni = FindInterface(interfaceGuid);
+            if (ni == null) return null;
+            up = ni.OperationalStatus == OperationalStatus.Up;
+            List<string> ips = new List<string>();
+            foreach (UnicastIPAddressInformation u in ni.GetIPProperties().UnicastAddresses)
+                if (u.Address.AddressFamily == AddressFamily.InterNetwork) ips.Add(u.Address.ToString());
+            return string.Join(", ", ips.ToArray());
         }
 
         /// <summary>169.254.x.x (DHCP 응답이 없을 때 Windows가 붙이는 자동 사설 주소)만 있는지</summary>
@@ -37,14 +45,12 @@ namespace MacChanger.Core
             return true;
         }
 
-        /// <summary>실행 파일 옆 로그 파일에 한 줄을 추가한다 (UTF-8). 로그 옵션이 켜져 있을 때만 호출된다.</summary>
-        public static string AppendAssignedIp(string exePath, string ipv4List, NetworkAdapterInfo adapter)
+        /// <summary>실행 파일 옆 로그 파일에 "시각(탭)IP(탭)MAC" 한 줄을 추가한다 (UTF-8). 로그 옵션이 켜져 있을 때만 호출된다.</summary>
+        public static void AppendAssignedIp(string exePath, string ipv4List, string mac)
         {
             string path = Path.Combine(Path.GetDirectoryName(exePath), LogFileName);
-            string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\t" + ipv4List + "\t"
-                + MacAddressUtil.Format(adapter.CurrentMac ?? "") + "\t" + adapter.Description + Environment.NewLine;
+            string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\t" + ipv4List + "\t" + MacAddressUtil.Format(mac ?? "") + Environment.NewLine;
             File.AppendAllText(path, line, new UTF8Encoding(true));
-            return path;
         }
     }
 }

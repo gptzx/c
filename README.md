@@ -16,10 +16,10 @@ Windows 7(.NET 4.0 설치됨) / 8 / 8.1 / 10 / 11에서 추가 런타임 설치 
 | Tcpip 값 자동 정리 | `Tcpip\Parameters\Interfaces\{GUID}`의 `EnableDHCP`가 **1**이면 그 키의 값을 `EnableDHCP`만 남기고 모두 삭제(하위 키는 유지)하고, 전역 `HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters`의 `DhcpDomain`·`DhcpNameServer` 값도 삭제. `EnableDHCP`가 **0**(고정 IP)이거나 값이 없으면 아무것도 지우지 않음. 변경 적용과 원상복구 모두에서 수행 |
 | 원상복구 | 확인 대화 상자 없이 바로 실행. `NetworkAddress` 값 삭제 → Tcpip 값 자동 정리 → 어댑터 재시작 → 공장 MAC과 비교 |
 | 재부팅 보류 처리 | 장치 관리자가 어댑터를 즉시 중지/재시작하지 못해 재부팅 필요 플래그(`DI_NEEDREBOOT`)를 설정하면, 잘못된 "드라이버 거부" 판정 대신 "재부팅 후 적용" 상태로 안내 |
-| 현재 IP 실시간 표시 | 선택한 어댑터의 IPv4 주소를 2초마다 다시 읽어 표시 (어댑터 비활성 / 할당 대기 / 169.254.x.x 자동 사설 주소 구분) |
-| 할당 IP 로그 저장 | 체크하면 선택한 어댑터에 새 IP가 할당될 때마다 실행 파일 옆 `MacChanger-ip.log`에 `시각  IP  MAC  어댑터` 한 줄을 추가 (기본 꺼짐, 켜지 않으면 어떤 파일도 만들지 않음) |
+| 현재 IP 실시간 표시 | 선택한 어댑터의 IPv4 주소를 2초마다 다시 읽어 표시 (어댑터 비활성 / 링크 없음 / 할당 대기 / 169.254.x.x 자동 사설 주소 구분) |
+| 할당 IP 로그 저장 | 체크하면 선택한 어댑터에 새 IP가 할당될 때마다 실행 파일 옆 `MacChanger-ip.log`에 `시각(탭)IP(탭)MAC` 한 줄을 추가 (기본 꺼짐, 켜지 않으면 어떤 파일도 만들지 않음). 작업 중에는 기록하지 않고 작업 완료 후 새 MAC과 함께 기록 |
 | 상태 표시 | 상태 라벨: `준비 / 진행 / 완료 / 실패` + 진행 단계 메시지 (전체 내용은 라벨 툴팁) |
-| 아이콘 | 실행 파일에 아이콘이 내장되어 있고, 창/작업표시줄 아이콘도 같은 아이콘을 사용 |
+| 아이콘 | 실행 파일에 아이콘이 내장되어 있고(16·32 BMP + 256 PNG), 창/작업표시줄 아이콘도 EXE 리소스에서 같은 아이콘을 읽어 사용 (UNC 경로에서도 동작) |
 
 ## 호환 / 권한
 
@@ -37,7 +37,7 @@ build.cmd                              ← Visual Studio 없이 빌드 (in-box c
 MacChanger/
   MacChanger.csproj                    ← .NET Framework 4.0, AnyCPU, 매니페스트·아이콘 포함
   app.manifest                         ← requireAdministrator, supportedOS(Win7~11), dpiAware
-  app.ico                              ← 실행 파일/창 아이콘 (16·32·48·256)
+  app.ico                              ← 실행 파일/창 아이콘 (16·32·256)
   Program.cs                           ← 진입점, 관리자 권한 확인, 전역 예외 처리
   MainForm.cs / MainForm.Designer.cs   ← UI (드롭다운, 원래/현재 MAC, 현재 IP, 새 MAC, 랜덤 생성, 변경 적용, 원상복구, 할당 IP 로그 저장, 상태 라벨)
   Properties/AssemblyInfo.cs
@@ -51,7 +51,7 @@ MacChanger/
     AdapterController.cs               ← SetupAPI DICS_DISABLE/ENABLE(재부팅 필요 플래그 보고), WMI Enable()/Disable() 폴백
     MacChangeService.cs                ← 변경 적용 / 원상복구 절차
   Native/
-    NativeMethods.cs                   ← kernel32 / setupapi P/Invoke
+    NativeMethods.cs                   ← kernel32 / user32 / setupapi P/Invoke
 ```
 
 ## 빌드 방법

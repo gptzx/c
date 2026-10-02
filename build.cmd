@@ -25,7 +25,6 @@ rem generate under MacChanger\obj are never picked up.
   /win32manifest:MacChanger\app.manifest ^
   /win32icon:MacChanger\app.ico ^
   /reference:System.dll ^
-  /reference:System.Core.dll ^
   /reference:System.Drawing.dll ^
   /reference:System.Windows.Forms.dll ^
   /reference:System.Management.dll ^

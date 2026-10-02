@@ -1,5 +1,4 @@
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Text;
 using System.Threading;
 
@@ -25,8 +24,6 @@ namespace MacChanger.Core
         public const int MacWaitPollMs = 1000;
         /// <summary>비활성화 직후 레지스트리를 쓰기 전 잠시 대기</summary>
         public const int AfterDisableDelayMs = 700;
-
-        private static readonly Action<string> NoLog = delegate { };
 
         // ------------------------------------------------------------------
         // MAC 조회 (매번 새로 조회, 저장하지 않음)
@@ -101,39 +98,22 @@ namespace MacChanger.Core
                 log("어댑터 초기화 대기 중... (" + attempt + ")");
                 Thread.Sleep(MacWaitPollMs);
             }
-            try
-            {
-                string mac = AdapterEnumerator.GetCurrentMacViaGetAdaptersAddresses(adapter.InterfaceGuid);
-                if (mac != null && !MacAddressUtil.IsAllZero(mac)) return mac;
-            }
-            catch (Exception) { }
-            try
-            {
-                string mac = AdapterEnumerator.GetCurrentMacViaWmi(adapter.InterfaceGuid);
-                if (mac != null && !MacAddressUtil.IsAllZero(mac)) return mac;
-            }
-            catch (Exception) { }
-            return null;
+            return ReadCurrentMac(adapter);
         }
 
-        // ------------------------------------------------------------------
-        // 변경 적용
-        // ------------------------------------------------------------------
-        public static MacChangeResult Apply(NetworkAdapterInfo adapter, string newMac, Action<string> log)
+        /// <summary>
+        /// 변경 적용과 원상복구의 공통 절차: [1/4] 비활성화 → [2/4] 레지스트리 단계(registryStep) → [3/4] Tcpip 값 자동 정리 → [4/4] 활성화 → 현재 MAC 재조회.
+        /// 실패하면 실패 결과를 돌려주고, 성공하면 null을 돌려주며 out 값을 채운다 (deferred 이면 재시작이 보류되어 current 는 null).
+        /// </summary>
+        private static MacChangeResult RunCycle(NetworkAdapterInfo adapter, Action<string> log, string registryStepLabel, Action registryStep,
+            string enableFailHint, out bool deferred, out string tcpipWarning, out string current, out bool live)
         {
-            if (adapter == null) throw new ArgumentNullException("adapter");
-            if (log == null) log = NoLog;
-            MacChangeResult result = new MacChangeResult();
+            deferred = false;
+            tcpipWarning = null;
+            current = null;
+            live = false;
+            MacChangeResult fail = new MacChangeResult();
 
-            string mac = MacAddressUtil.Normalize(newMac);
-            if (mac == null)
-            {
-                result.Message = "새 MAC 형식이 올바르지 않습니다.";
-                return result;
-            }
-            string guid = adapter.InterfaceGuid;
-
-            // (a) 어댑터 비활성화
             log("[1/4] 어댑터 비활성화");
             bool disableDeferred;
             try
@@ -142,28 +122,31 @@ namespace MacChanger.Core
             }
             catch (Exception ex)
             {
-                result.Message = "어댑터 비활성화 실패: " + ex.Message;
-                return result;
+                fail.Message = "어댑터 비활성화 실패: " + ex.Message;
+                return fail;
             }
             Thread.Sleep(AfterDisableDelayMs);
 
-            // (b) NetworkAddress 쓰기
-            log("[2/4] 레지스트리 NetworkAddress 쓰기");
+            log("[2/4] " + registryStepLabel);
             try
             {
-                MacRegistry.SetNetworkAddress(guid, mac);
+                registryStep();
             }
             catch (Exception ex)
             {
-                result.Message = "레지스트리 쓰기 실패: " + ex.Message;
-                TryReEnableAfterFailure(adapter, log);
-                return result;
+                fail.Message = registryStepLabel + " 실패: " + ex.Message;
+                log("오류로 중단 — 어댑터를 다시 활성화합니다");
+                try
+                {
+                    bool needReboot;
+                    AdapterController.Enable(adapter, log, out needReboot);
+                }
+                catch (Exception) { }
+                return fail;
             }
 
-            // (c) Tcpip 값 자동 정리 — EnableDHCP = 1 인 경우에만 (인터페이스 값 + 전역 DhcpDomain/DhcpNameServer)
-            string tcpipWarning = CleanTcpipIfDhcp(guid, "[3/4]", disableDeferred, log);
+            tcpipWarning = CleanTcpipIfDhcp(adapter.InterfaceGuid, "[3/4]", disableDeferred, log);
 
-            // (d) 어댑터 활성화
             log("[4/4] 어댑터 활성화");
             bool enableDeferred;
             try
@@ -172,41 +155,68 @@ namespace MacChanger.Core
             }
             catch (Exception ex)
             {
-                result.Message = "어댑터 활성화 실패: " + ex.Message
-                    + "\r\n레지스트리 값은 기록되었습니다. 네트워크 연결(ncpa.cpl)에서 어댑터를 수동으로 '사용'으로 바꾸세요.";
-                return result;
+                fail.Message = "어댑터 활성화 실패: " + ex.Message + "\r\n" + enableFailHint;
+                return fail;
             }
 
-            if (disableDeferred || enableDeferred)
+            deferred = disableDeferred || enableDeferred;
+            if (deferred) return null;   // 어댑터가 실제로 재시작되지 않았으므로 검증 생략 — 호출자가 재부팅 안내
+
+            current = WaitForCurrentMac(adapter, log, out live);
+            if (current == null)
             {
-                // 어댑터가 실제로 재시작되지 않았으므로 지금 읽은 MAC은 변경 전 값이다. 검증 대신 재부팅 안내.
+                fail.Message = "어댑터가 다시 올라오지 않았습니다(" + (MacWaitTimeoutMs / 1000) + "초 동안 MAC을 읽지 못함). "
+                    + "장치 관리자 또는 네트워크 연결(ncpa.cpl)에서 어댑터 상태를 확인한 뒤 '새로 고침'을 누르세요.";
+                return fail;
+            }
+            return null;
+        }
+
+        private static string SourceNote(bool live)
+        {
+            return live ? "" : " (NDIS 직접 조회가 불가능해 GetAdaptersAddresses/WMI 값 기준)";
+        }
+
+        // ------------------------------------------------------------------
+        // 변경 적용
+        // ------------------------------------------------------------------
+        public static MacChangeResult Apply(NetworkAdapterInfo adapter, string newMac, Action<string> log)
+        {
+            if (adapter == null) throw new ArgumentNullException("adapter");
+            MacChangeResult result = new MacChangeResult();
+            string mac = MacAddressUtil.Normalize(newMac);
+            if (mac == null)
+            {
+                result.Message = "새 MAC 형식이 올바르지 않습니다.";
+                return result;
+            }
+            string guid = adapter.InterfaceGuid;
+
+            bool deferred, live;
+            string tcpipWarning, current;
+            MacChangeResult fail = RunCycle(adapter, log, "레지스트리 NetworkAddress 쓰기",
+                delegate { MacRegistry.SetNetworkAddress(guid, mac); },
+                "레지스트리 값은 기록되었습니다. 네트워크 연결(ncpa.cpl)에서 어댑터를 수동으로 '사용'으로 바꾸세요.",
+                out deferred, out tcpipWarning, out current, out live);
+            if (fail != null) return fail;
+
+            if (deferred)
+            {
                 result.Success = true;
                 result.RebootRequired = true;
                 result.Message = "레지스트리에 NetworkAddress = " + MacAddressUtil.Format(mac) + "를 기록했지만 장치 관리자가 어댑터를 즉시 재시작하지 못했습니다. "
                     + "재부팅 후 새 MAC이 적용됩니다." + WarningSuffix(tcpipWarning);
                 return result;
             }
-
-            // 검증
-            bool live;
-            string current = WaitForCurrentMac(adapter, log, out live);
-            if (current == null)
-            {
-                result.Message = "어댑터가 다시 올라오지 않았습니다(" + (MacWaitTimeoutMs / 1000) + "초 동안 MAC을 읽지 못함). "
-                    + "장치 관리자 또는 네트워크 연결(ncpa.cpl)에서 어댑터 상태를 확인한 뒤 '새로 고침'을 누르세요.";
-                return result;
-            }
-            string sourceNote = live ? "" : " (NDIS 직접 조회가 불가능해 GetAdaptersAddresses/WMI 값 기준)";
             if (string.Equals(current, mac, StringComparison.OrdinalIgnoreCase))
             {
                 result.Success = true;
-                result.Message = "MAC 변경 완료: " + MacAddressUtil.Format(current) + sourceNote + WarningSuffix(tcpipWarning);
+                result.Message = "MAC 변경 완료: " + MacAddressUtil.Format(current) + SourceNote(live) + WarningSuffix(tcpipWarning);
                 if (adapter.Kind == AdapterKind.Wireless && SafeRandomMacState(guid) == true)
                     result.Message += " — 주의: 이 Wi-Fi 인터페이스에 '임의 하드웨어 주소'가 켜져 있어 네트워크 연결 시 MAC이 다시 바뀔 수 있습니다. 설정에서 끄세요.";
                 return result;
             }
-
-            result.Message = "드라이버가 새 MAC을 적용하지 않았습니다. 현재 MAC: " + MacAddressUtil.Format(current) + sourceNote;
+            result.Message = "드라이버가 새 MAC을 적용하지 않았습니다. 현재 MAC: " + MacAddressUtil.Format(current) + SourceNote(live);
             result.Guidance = BuildGuidance(adapter, mac);
             return result;
         }
@@ -217,53 +227,19 @@ namespace MacChanger.Core
         public static MacChangeResult Restore(NetworkAdapterInfo adapter, Action<string> log)
         {
             if (adapter == null) throw new ArgumentNullException("adapter");
-            if (log == null) log = NoLog;
             MacChangeResult result = new MacChangeResult();
             string guid = adapter.InterfaceGuid;
+            bool existed = false;
 
-            log("[1/4] 어댑터 비활성화");
-            bool disableDeferred;
-            try
-            {
-                AdapterController.Disable(adapter, log, out disableDeferred);
-            }
-            catch (Exception ex)
-            {
-                result.Message = "어댑터 비활성화 실패: " + ex.Message;
-                return result;
-            }
-            Thread.Sleep(AfterDisableDelayMs);
+            bool deferred, live;
+            string tcpipWarning, current;
+            MacChangeResult fail = RunCycle(adapter, log, "레지스트리 NetworkAddress 값 삭제",
+                delegate { existed = MacRegistry.DeleteNetworkAddress(guid); },
+                "네트워크 연결(ncpa.cpl)에서 어댑터를 수동으로 '사용'으로 바꾸세요.",
+                out deferred, out tcpipWarning, out current, out live);
+            if (fail != null) return fail;
 
-            log("[2/4] 레지스트리 NetworkAddress 값 삭제");
-            bool existed;
-            try
-            {
-                existed = MacRegistry.DeleteNetworkAddress(guid);
-            }
-            catch (Exception ex)
-            {
-                result.Message = "레지스트리 값 삭제 실패: " + ex.Message;
-                TryReEnableAfterFailure(adapter, log);
-                return result;
-            }
-
-            // 변경 적용 때와 동일한 Tcpip 값 자동 정리
-            string tcpipWarning = CleanTcpipIfDhcp(guid, "[3/4]", disableDeferred, log);
-
-            log("[4/4] 어댑터 활성화");
-            bool enableDeferred;
-            try
-            {
-                AdapterController.Enable(adapter, log, out enableDeferred);
-            }
-            catch (Exception ex)
-            {
-                result.Message = "어댑터 활성화 실패: " + ex.Message
-                    + "\r\n네트워크 연결(ncpa.cpl)에서 어댑터를 수동으로 '사용'으로 바꾸세요.";
-                return result;
-            }
-
-            if (disableDeferred || enableDeferred)
+            if (deferred)
             {
                 result.Success = true;
                 result.RebootRequired = true;
@@ -271,33 +247,22 @@ namespace MacChanger.Core
                     + "장치 관리자가 어댑터를 즉시 재시작하지 못했습니다. 재부팅 후 공장 MAC으로 돌아갑니다." + WarningSuffix(tcpipWarning);
                 return result;
             }
-
-            bool live;
-            string current = WaitForCurrentMac(adapter, log, out live);
-            if (current == null)
-            {
-                result.Message = "어댑터가 다시 올라오지 않았습니다(" + (MacWaitTimeoutMs / 1000) + "초 동안 MAC을 읽지 못함). "
-                    + "장치 관리자 또는 네트워크 연결(ncpa.cpl)에서 어댑터 상태를 확인한 뒤 '새로 고침'을 누르세요.";
-                return result;
-            }
-            string sourceNote = live ? "" : " (NDIS 직접 조회가 불가능해 GetAdaptersAddresses/WMI 값 기준)";
-
             string permanent = ReadPermanentMac(adapter);
             if (permanent == null)
             {
                 result.Success = true;
                 result.Message = (existed ? "NetworkAddress 삭제 및 " : "") + "어댑터 재시작 완료. 현재 MAC: " + MacAddressUtil.Format(current)
-                    + sourceNote + " (공장 MAC을 조회할 수 없어 비교는 생략)" + WarningSuffix(tcpipWarning);
+                    + SourceNote(live) + " (공장 MAC을 조회할 수 없어 비교는 생략)" + WarningSuffix(tcpipWarning);
                 return result;
             }
             if (string.Equals(current, permanent, StringComparison.OrdinalIgnoreCase))
             {
                 result.Success = true;
-                result.Message = "공장 MAC으로 복구 완료: " + MacAddressUtil.Format(current) + sourceNote + WarningSuffix(tcpipWarning);
+                result.Message = "공장 MAC으로 복구 완료: " + MacAddressUtil.Format(current) + SourceNote(live) + WarningSuffix(tcpipWarning);
                 return result;
             }
             result.Message = "NetworkAddress를 삭제했지만 현재 MAC(" + MacAddressUtil.Format(current)
-                + ")이 공장 MAC(" + MacAddressUtil.Format(permanent) + ")과 다릅니다." + sourceNote;
+                + ")이 공장 MAC(" + MacAddressUtil.Format(permanent) + ")과 다릅니다." + SourceNote(live);
             result.Guidance = (adapter.Kind == AdapterKind.Wireless && SafeRandomMacState(guid) == true)
                 ? "이 Wi-Fi 인터페이스에 Windows '임의 하드웨어 주소'가 켜져 있습니다. 설정 > 네트워크 및 인터넷 > Wi-Fi에서 끄면 공장 MAC이 사용됩니다."
                 : "재부팅 후 다시 확인하거나, 무선 어댑터라면 Windows 설정의 '임의 하드웨어 주소'가 켜져 있는지 확인하세요.";
@@ -368,17 +333,6 @@ namespace MacChanger.Core
         {
             try { return MacRegistry.GetWlanRandomMacState(interfaceGuid); }
             catch (Exception) { return null; }
-        }
-
-        private static void TryReEnableAfterFailure(NetworkAdapterInfo adapter, Action<string> log)
-        {
-            log("오류로 중단 — 어댑터를 다시 활성화합니다");
-            try
-            {
-                bool needReboot;
-                AdapterController.Enable(adapter, log, out needReboot);
-            }
-            catch (Exception) { }
         }
 
         private static string BuildGuidance(NetworkAdapterInfo adapter, string mac)

@@ -37,7 +37,6 @@ namespace MacChanger.Core
         private static void SetState(NetworkAdapterInfo adapter, bool enable, Action<string> log, out bool needReboot)
         {
             if (adapter == null) throw new ArgumentNullException("adapter");
-            if (log == null) log = delegate { };
             string action = enable ? "활성화" : "비활성화";
             needReboot = false;
 
@@ -240,9 +239,7 @@ namespace MacChanger.Core
 
         private static bool InvokeWmiMethod(string scopePath, string query, string method, StringBuilder errors)
         {
-            ManagementScope scope = new ManagementScope(scopePath);
-            scope.Connect();
-            using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, new ObjectQuery(query)))
+            using (ManagementObjectSearcher searcher = AdapterEnumerator.CreateSearcher(scopePath, query))
             using (ManagementObjectCollection items = searcher.Get())
             {
                 bool found = false;

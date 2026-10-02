@@ -1,9 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Management;
 using System.Net.NetworkInformation;
-using MacChanger.Native;
 
 namespace MacChanger.Core
 {
@@ -83,7 +82,7 @@ namespace MacChanger.Core
             catch { return -1; }
         }
 
-        private static ManagementObjectSearcher CreateSearcher(string scopePath, string query)
+        internal static ManagementObjectSearcher CreateSearcher(string scopePath, string query)
         {
             ManagementScope scope = new ManagementScope(scopePath);
             scope.Connect();
@@ -224,8 +223,9 @@ namespace MacChanger.Core
             {
                 string guid = NetworkAdapterInfo.NormalizeGuid(ni.Id);
                 if (guid == null) continue;
-                string mac = MacAddressUtil.FromBytes(ni.GetPhysicalAddress().GetAddressBytes());
-                if (mac == null) continue;   // 루프백/터널 등 MAC이 없는 인터페이스 제외
+                byte[] addr = ni.GetPhysicalAddress().GetAddressBytes();
+                if (addr.Length != 6) continue;   // 루프백/터널(Teredo 등 8바이트) 등 MAC이 없는 인터페이스 제외
+                string mac = MacAddressUtil.FromBytes(addr);
 
                 NetworkAdapterInfo info = new NetworkAdapterInfo();
                 info.InterfaceGuid = guid;
@@ -251,9 +251,8 @@ namespace MacChanger.Core
         // ------------------------------------------------------------------
         public static string GetCurrentMacViaGetAdaptersAddresses(string interfaceGuid)
         {
-            foreach (NetworkAdapterInfo a in EnumerateGetAdaptersAddresses())
-                if (string.Equals(a.InterfaceGuid, interfaceGuid, StringComparison.OrdinalIgnoreCase)) return a.CurrentMac;
-            return null;
+            NetworkInterface ni = IpMonitor.FindInterface(interfaceGuid);
+            return ni == null ? null : MacAddressUtil.FromBytes(ni.GetPhysicalAddress().GetAddressBytes());
         }
 
         public static string GetCurrentMacViaWmi(string interfaceGuid)

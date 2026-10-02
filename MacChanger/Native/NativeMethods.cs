@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
@@ -45,6 +45,15 @@ namespace MacChanger.Native
             uint nOutBufferSize,
             out uint lpBytesReturned,
             IntPtr lpOverlapped);
+
+        // ------------------------------------------------------------------
+        // kernel32 / user32 : 실행 파일에 내장된 아이콘 로드 (창/작업표시줄 아이콘)
+        // ------------------------------------------------------------------
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr LoadIcon(IntPtr hInstance, IntPtr lpIconName);
 
         // ------------------------------------------------------------------
         // setupapi : 어댑터 비활성화/활성화 (DIF_PROPERTYCHANGE)
