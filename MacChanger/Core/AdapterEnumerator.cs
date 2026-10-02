@@ -92,7 +92,7 @@ namespace MacChanger.Core
         // ------------------------------------------------------------------
         // 1) MSFT_NetAdapter (root\StandardCimv2, Windows 8+)
         // ------------------------------------------------------------------
-        public static List<NetworkAdapterInfo> EnumerateMsftNetAdapter()
+        private static List<NetworkAdapterInfo> EnumerateMsftNetAdapter()
         {
             List<NetworkAdapterInfo> result = new List<NetworkAdapterInfo>();
             using (ManagementObjectSearcher searcher = CreateSearcher(@"root\StandardCimv2", "SELECT * FROM MSFT_NetAdapter"))
@@ -150,7 +150,7 @@ namespace MacChanger.Core
         // ------------------------------------------------------------------
         // 2) Win32_NetworkAdapter (root\cimv2)
         // ------------------------------------------------------------------
-        public static List<NetworkAdapterInfo> EnumerateWin32NetworkAdapter()
+        private static List<NetworkAdapterInfo> EnumerateWin32NetworkAdapter()
         {
             List<NetworkAdapterInfo> result = new List<NetworkAdapterInfo>();
 
@@ -216,7 +216,7 @@ namespace MacChanger.Core
         // 3) GetAdaptersAddresses — NetworkInterface.GetAllNetworkInterfaces() 가 Vista 이상에서 이 API 를 호출한다.
         //    (비활성화된 어댑터는 나오지 않는다. 열거 폴백과 현재 MAC 재조회에 사용)
         // ------------------------------------------------------------------
-        public static List<NetworkAdapterInfo> EnumerateGetAdaptersAddresses()
+        private static List<NetworkAdapterInfo> EnumerateGetAdaptersAddresses()
         {
             List<NetworkAdapterInfo> result = new List<NetworkAdapterInfo>();
             foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())

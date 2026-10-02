@@ -39,6 +39,7 @@ namespace MacChanger
         {
             InitializeComponent();
             logBottomMargin = ClientSize.Height - txtIpLog.Bottom;   // AutoScaleMode.Font 배율이 적용된 뒤의 값
+            ApplyLogBoxVisibility();                                  // 기본값: 로그 상자 숨김
             try
             {
                 // 실행 파일에 내장된 아이콘(그룹 아이콘 ID 32512)을 EXE 리소스에서 직접 읽어 창/작업표시줄 아이콘으로 쓴다.
@@ -54,7 +55,8 @@ namespace MacChanger
             toolTip.SetToolTip(chkIpLog, "켜 두면 새 IP가 할당될 때마다 로그 상자와 같은 줄을 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 추가합니다. 169.254.x.x 자동 사설 주소는 기록하지 않습니다.");
             toolTip.SetToolTip(chkLogTime, "로그 줄 맨 앞에 시각(yyyy-MM-dd HH:mm:ss)을 넣습니다.");
             toolTip.SetToolTip(chkLogMac, "로그 줄 끝에 그때 사용 중인 MAC을 넣습니다.");
-            toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다.");
+            toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다. 숨겨진 동안에는 상자에 기록하지 않습니다.");
+            toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
         }
 
         private NetworkAdapterInfo SelectedAdapter
@@ -196,9 +198,22 @@ namespace MacChanger
 
         private void chkShowLog_CheckedChanged(object sender, EventArgs e)
         {
-            txtIpLog.Visible = chkShowLog.Checked;
+            ApplyLogBoxVisibility();
+        }
+
+        private void btnClearLog_Click(object sender, EventArgs e)
+        {
+            txtIpLog.Clear();
+        }
+
+        /// <summary>로그 상자 표시 여부에 맞춰 상자와 지우기 버튼, 창 높이를 맞춘다.</summary>
+        private void ApplyLogBoxVisibility()
+        {
+            bool show = chkShowLog.Checked;
+            txtIpLog.Visible = show;
+            btnClearLog.Enabled = show;
             // 고정 상수 대신 배율이 적용된 컨트롤 위치로 높이를 계산한다 (125%/150% DPI에서도 잘리지 않음)
-            int bottom = chkShowLog.Checked ? txtIpLog.Bottom : lblStatus.Bottom;
+            int bottom = show ? txtIpLog.Bottom : lblStatus.Bottom;
             ClientSize = new Size(ClientSize.Width, bottom + logBottomMargin);
         }
 
@@ -361,7 +376,7 @@ namespace MacChanger
 
             lastLoggedIp = assigned;
             string line = IpMonitor.BuildLogLine(assigned, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked);
-            txtIpLog.AppendText(line + Environment.NewLine);
+            if (chkShowLog.Checked) txtIpLog.AppendText(line + Environment.NewLine);   // 숨겨진 동안에는 상자에 기록하지 않음
             if (chkIpLog.Checked)
             {
                 try

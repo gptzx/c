@@ -35,7 +35,7 @@ namespace MacChanger.Core
         /// Control\Class\{4D36E972-...} 아래 00XX 하위 키를 모두 돌며 NetCfgInstanceId가 interfaceGuid와 같은 키 이름("0001" 등)을 찾는다.
         /// 없으면 null.
         /// </summary>
-        public static string FindClassSubKeyName(string interfaceGuid)
+        private static string FindClassSubKeyName(string interfaceGuid)
         {
             if (string.IsNullOrEmpty(interfaceGuid)) throw new ArgumentNullException("interfaceGuid");
 

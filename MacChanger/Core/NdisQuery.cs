@@ -26,11 +26,7 @@ namespace MacChanger.Core
         {
             if (string.IsNullOrEmpty(interfaceGuid)) throw new ArgumentNullException("interfaceGuid");
 
-            string[] paths = new string[]
-            {
-                @"\\.\" + interfaceGuid,
-                @"\\.\Global\" + interfaceGuid
-            };
+            string path = @"\\.\" + interfaceGuid;
             uint[] accessModes = new uint[]
             {
                 0,
@@ -39,48 +35,41 @@ namespace MacChanger.Core
             };
 
             Exception last = null;
-            foreach (string path in paths)
+            foreach (uint access in accessModes)
             {
-                foreach (uint access in accessModes)
+                SafeFileHandle handle = null;
+                try
                 {
-                    SafeFileHandle handle = null;
-                    try
+                    handle = NativeMethods.CreateFile(
+                        path, access,
+                        NativeMethods.FILE_SHARE_READ | NativeMethods.FILE_SHARE_WRITE,
+                        IntPtr.Zero, NativeMethods.OPEN_EXISTING, 0, IntPtr.Zero);
+                    if (handle == null || handle.IsInvalid)
                     {
-                        handle = NativeMethods.CreateFile(
-                            path, access,
-                            NativeMethods.FILE_SHARE_READ | NativeMethods.FILE_SHARE_WRITE,
-                            IntPtr.Zero, NativeMethods.OPEN_EXISTING, 0, IntPtr.Zero);
-                        if (handle == null || handle.IsInvalid)
-                        {
-                            last = new Win32Exception(Marshal.GetLastWin32Error());
-                            continue;
-                        }
+                        last = new Win32Exception(Marshal.GetLastWin32Error());
+                        continue;   // 다른 접근 모드로 다시 시도
+                    }
 
-                        uint oidValue = oid;
-                        byte[] outBuffer = new byte[6];
-                        uint returned;
-                        bool ok = NativeMethods.DeviceIoControl(
-                            handle, NativeMethods.IOCTL_NDIS_QUERY_GLOBAL_STATS,
-                            ref oidValue, sizeof(uint),
-                            outBuffer, (uint)outBuffer.Length,
-                            out returned, IntPtr.Zero);
-                        if (!ok)
-                        {
-                            last = new Win32Exception(Marshal.GetLastWin32Error());
-                            // 장치는 열렸지만 OID를 지원하지 않는 경우: 다른 접근 모드를 더 시도해도 의미 없음
-                            break;
-                        }
-                        if (returned < 6)
-                        {
-                            last = new InvalidOperationException("NDIS 응답 길이가 6바이트 미만입니다 (" + returned + ").");
-                            break;
-                        }
-                        return MacAddressUtil.FromBytes(outBuffer);
-                    }
-                    finally
+                    uint oidValue = oid;
+                    byte[] outBuffer = new byte[6];
+                    uint returned;
+                    bool ok = NativeMethods.DeviceIoControl(
+                        handle, NativeMethods.IOCTL_NDIS_QUERY_GLOBAL_STATS,
+                        ref oidValue, sizeof(uint),
+                        outBuffer, (uint)outBuffer.Length,
+                        out returned, IntPtr.Zero);
+                    if (!ok)
                     {
-                        if (handle != null) handle.Dispose();
+                        // 장치는 열렸지만 OID를 지원하지 않는 경우: 다른 접근 모드를 더 시도해도 의미 없음
+                        throw new Win32Exception(Marshal.GetLastWin32Error());
                     }
+                    if (returned < 6)
+                        throw new InvalidOperationException("NDIS 응답 길이가 6바이트 미만입니다 (" + returned + ").");
+                    return MacAddressUtil.FromBytes(outBuffer);
+                }
+                finally
+                {
+                    if (handle != null) handle.Dispose();
                 }
             }
             throw last ?? new InvalidOperationException("NDIS 장치를 열 수 없습니다: " + interfaceGuid);

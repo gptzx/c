@@ -37,6 +37,7 @@
             this.chkLogTime = new System.Windows.Forms.CheckBox();
             this.chkLogMac = new System.Windows.Forms.CheckBox();
             this.chkShowLog = new System.Windows.Forms.CheckBox();
+            this.btnClearLog = new System.Windows.Forms.Button();
             this.lblStatus = new System.Windows.Forms.Label();
             this.txtIpLog = new System.Windows.Forms.TextBox();
             this.toolTip = new System.Windows.Forms.ToolTip(this.components);
@@ -205,8 +206,6 @@
             // chkLogTime
             // 
             this.chkLogTime.AutoSize = true;
-            this.chkLogTime.Checked = true;
-            this.chkLogTime.CheckState = System.Windows.Forms.CheckState.Checked;
             this.chkLogTime.Location = new System.Drawing.Point(118, 216);
             this.chkLogTime.Name = "chkLogTime";
             this.chkLogTime.Size = new System.Drawing.Size(50, 19);
@@ -217,8 +216,6 @@
             // chkLogMac
             // 
             this.chkLogMac.AutoSize = true;
-            this.chkLogMac.Checked = true;
-            this.chkLogMac.CheckState = System.Windows.Forms.CheckState.Checked;
             this.chkLogMac.Location = new System.Drawing.Point(188, 216);
             this.chkLogMac.Name = "chkLogMac";
             this.chkLogMac.Size = new System.Drawing.Size(55, 19);
@@ -229,8 +226,6 @@
             // chkShowLog
             // 
             this.chkShowLog.AutoSize = true;
-            this.chkShowLog.Checked = true;
-            this.chkShowLog.CheckState = System.Windows.Forms.CheckState.Checked;
             this.chkShowLog.Location = new System.Drawing.Point(362, 216);
             this.chkShowLog.Name = "chkShowLog";
             this.chkShowLog.Size = new System.Drawing.Size(107, 19);
@@ -239,6 +234,16 @@
             this.chkShowLog.UseVisualStyleBackColor = true;
             this.chkShowLog.CheckedChanged += new System.EventHandler(this.chkShowLog_CheckedChanged);
             // 
+            // btnClearLog
+            // 
+            this.btnClearLog.Location = new System.Drawing.Point(474, 212);
+            this.btnClearLog.Name = "btnClearLog";
+            this.btnClearLog.Size = new System.Drawing.Size(74, 25);
+            this.btnClearLog.TabIndex = 19;
+            this.btnClearLog.Text = "로그 지우기";
+            this.btnClearLog.UseVisualStyleBackColor = true;
+            this.btnClearLog.Click += new System.EventHandler(this.btnClearLog_Click);
+            // 
             // lblStatus
             // 
             this.lblStatus.AutoEllipsis = true;
@@ -246,7 +251,7 @@
             this.lblStatus.Location = new System.Drawing.Point(12, 246);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(536, 20);
-            this.lblStatus.TabIndex = 19;
+            this.lblStatus.TabIndex = 20;
             this.lblStatus.Text = "상태: 준비";
             // 
             // txtIpLog
@@ -259,7 +264,7 @@
             this.txtIpLog.ReadOnly = true;
             this.txtIpLog.ScrollBars = System.Windows.Forms.ScrollBars.Both;
             this.txtIpLog.Size = new System.Drawing.Size(536, 110);
-            this.txtIpLog.TabIndex = 20;
+            this.txtIpLog.TabIndex = 21;
             this.txtIpLog.TabStop = false;
             this.txtIpLog.WordWrap = false;
             // 
@@ -282,6 +287,7 @@
             this.ClientSize = new System.Drawing.Size(560, 394);
             this.Controls.Add(this.txtIpLog);
             this.Controls.Add(this.lblStatus);
+            this.Controls.Add(this.btnClearLog);
             this.Controls.Add(this.chkShowLog);
             this.Controls.Add(this.chkLogMac);
             this.Controls.Add(this.chkLogTime);
@@ -335,6 +341,7 @@
         private System.Windows.Forms.CheckBox chkLogTime;
         private System.Windows.Forms.CheckBox chkLogMac;
         private System.Windows.Forms.CheckBox chkShowLog;
+        private System.Windows.Forms.Button btnClearLog;
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.TextBox txtIpLog;
         private System.Windows.Forms.ToolTip toolTip;
