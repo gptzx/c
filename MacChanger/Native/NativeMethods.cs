@@ -6,7 +6,7 @@ namespace MacChanger.Native
 {
     /// <summary>
     /// kernel32 / iphlpapi / setupapi P/Invoke 선언.
-    /// 모든 구조체는 LayoutKind.Sequential 로 선언하여 x86/x64 양쪽에서 Marshal.SizeOf 가 올바른 크기를 돌려주도록 한다.
+    /// 모든 구조체는 LayoutKind.Sequential로 선언하여 x86/x64 양쪽에서 Marshal.SizeOf가 올바른 크기를 돌려주도록 한다.
     /// </summary>
     internal static class NativeMethods
     {
@@ -74,9 +74,9 @@ namespace MacChanger.Native
             ref uint pOutBufLen);
 
         /// <summary>
-        /// IP_ADAPTER_ADDRESSES_LH 의 앞부분(OperStatus 까지)만 선언. 실제 구조체는 더 길지만
+        /// IP_ADAPTER_ADDRESSES_LH의 앞부분(OperStatus까지)만 선언. 실제 구조체는 더 길지만
         /// 필요한 필드까지만 읽고 Next 포인터로 순회하므로 문제 없다.
-        /// (x86: 68 bytes, x64: 108 bytes 지점까지의 레이아웃이 원본과 일치)
+        /// (Marshal.SizeOf: x86 72 bytes, x64 112 bytes — OperStatus 까지의 오프셋이 원본 SDK 레이아웃과 일치)
         /// </summary>
         [StructLayout(LayoutKind.Sequential)]
         public struct IP_ADAPTER_ADDRESSES_HEAD
@@ -120,7 +120,7 @@ namespace MacChanger.Native
         public const uint DI_NEEDRESTART = 0x00000080;
         public const uint DI_NEEDREBOOT = 0x00000100;
 
-        /// <summary>64비트 Windows 에서 32비트 프로세스가 SetupDiCallClassInstaller 를 호출하면 반환되는 오류</summary>
+        /// <summary>64비트 Windows에서 32비트 프로세스가 SetupDiCallClassInstaller를 호출하면 반환되는 오류</summary>
         public const int ERROR_IN_WOW64 = unchecked((int)0xE0000235);
 
         public static readonly IntPtr INVALID_HANDLE_VALUE = new IntPtr(-1);
@@ -191,7 +191,7 @@ namespace MacChanger.Native
             uint propertyBufferSize,
             out uint requiredSize);
 
-        [DllImport("setupapi.dll", SetLastError = true)]
+        [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool SetupDiSetClassInstallParams(
             IntPtr deviceInfoSet,

@@ -7,8 +7,8 @@ using Microsoft.Win32.SafeHandles;
 namespace MacChanger.Core
 {
     /// <summary>
-    /// \\.\{GUID} NDIS 장치에 IOCTL_NDIS_QUERY_GLOBAL_STATS 를 보내 OID_802_3_PERMANENT_ADDRESS(공장 MAC) /
-    /// OID_802_3_CURRENT_ADDRESS(현재 MAC) 를 읽는다. 파일에 저장하지 않고 호출할 때마다 조회한다.
+    /// \\.\{GUID} NDIS 장치에 IOCTL_NDIS_QUERY_GLOBAL_STATS를 보내 OID_802_3_PERMANENT_ADDRESS(공장 MAC) /
+    /// OID_802_3_CURRENT_ADDRESS(현재 MAC)를 읽는다. 파일에 저장하지 않고 호출할 때마다 조회한다.
     /// </summary>
     public static class NdisQuery
     {
@@ -67,7 +67,7 @@ namespace MacChanger.Core
                         if (!ok)
                         {
                             last = new Win32Exception(Marshal.GetLastWin32Error());
-                            // 장치는 열렸지만 OID 를 지원하지 않는 경우: 다른 접근 모드를 더 시도해도 의미 없음
+                            // 장치는 열렸지만 OID를 지원하지 않는 경우: 다른 접근 모드를 더 시도해도 의미 없음
                             break;
                         }
                         if (returned < 6)

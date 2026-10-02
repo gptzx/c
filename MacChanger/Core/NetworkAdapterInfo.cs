@@ -7,6 +7,7 @@ namespace MacChanger.Core
     {
         Wired,
         Wireless,
+        Bluetooth,
         Other
     }
 
@@ -22,10 +23,10 @@ namespace MacChanger.Core
         /// <summary>네트워크 연결 이름. 예: "이더넷", "Wi-Fi"</summary>
         public string ConnectionName { get; set; }
 
-        /// <summary>열거 시점의 현재 MAC (12자리 hex, 없으면 null)</summary>
+        /// <summary>가장 최근에 읽은 현재 MAC (12자리 hex, 없으면 null). 열거 시점에 채워지고 변경/복구 후 다시 읽어 갱신된다.</summary>
         public string CurrentMac { get; set; }
 
-        /// <summary>WMI(MSFT_NetAdapter.PermanentAddress)가 알려준 공장 MAC 힌트. 실제 표시는 매번 IOCTL 로 다시 조회한다.</summary>
+        /// <summary>WMI(MSFT_NetAdapter.PermanentAddress)가 알려준 공장 MAC 힌트. 실제 표시는 매번 IOCTL로 다시 조회한다.</summary>
         public string PermanentMacHint { get; set; }
 
         public AdapterKind Kind { get; set; }
@@ -45,6 +46,7 @@ namespace MacChanger.Core
                 {
                     case AdapterKind.Wired: return "유선";
                     case AdapterKind.Wireless: return "무선";
+                    case AdapterKind.Bluetooth: return "블루투스";
                     default: return "기타";
                 }
             }
@@ -81,12 +83,21 @@ namespace MacChanger.Core
             return "{" + g.ToString("D").ToUpperInvariant() + "}";
         }
 
+        /// <summary>설명/연결 이름에 무선 LAN 키워드가 있는지 (미디어 타입을 알 수 없을 때의 보조 판별)</summary>
         public static bool LooksWireless(string text)
         {
             if (string.IsNullOrEmpty(text)) return false;
             string t = text.ToUpperInvariant();
             return t.Contains("WIRELESS") || t.Contains("WI-FI") || t.Contains("WIFI") || t.Contains("WLAN")
-                || t.Contains("802.11") || t.Contains("무선");
+                || t.Contains("802.11") || t.Contains("CENTRINO") || t.Contains("무선");
+        }
+
+        /// <summary>블루투스 PAN 어댑터 키워드 (Microsoft 스택은 PhysicalMediaType=10, InterfaceType=6으로 보고한다)</summary>
+        public static bool LooksBluetooth(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            string t = text.ToUpperInvariant();
+            return t.Contains("BLUETOOTH") || t.Contains("PERSONAL AREA NETWORK") || t.Contains("블루투스");
         }
     }
 }

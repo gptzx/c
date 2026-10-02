@@ -35,11 +35,11 @@ namespace MacChanger.Core
                     log("어댑터 열거: " + SourceMsft + " (" + list.Count + "개)");
                     return Sort(list);
                 }
-                log(SourceMsft + ": 결과 없음 → " + SourceWin32 + " 로 폴백");
+                log(SourceMsft + ": 결과 없음 → " + SourceWin32 + "로 폴백");
             }
             catch (Exception ex)
             {
-                log(SourceMsft + " 조회 실패(Windows 7 등에서는 정상): " + ex.Message + " → " + SourceWin32 + " 로 폴백");
+                log(SourceMsft + " 조회 실패(Windows 7 등에서는 정상): " + ex.Message + " → " + SourceWin32 + "로 폴백");
             }
 
             try
@@ -50,11 +50,11 @@ namespace MacChanger.Core
                     log("어댑터 열거: " + SourceWin32 + " (" + list.Count + "개)");
                     return Sort(list);
                 }
-                log(SourceWin32 + ": 결과 없음 → " + SourceGaa + " 로 폴백");
+                log(SourceWin32 + ": 결과 없음 → " + SourceGaa + "로 폴백");
             }
             catch (Exception ex)
             {
-                log(SourceWin32 + " 조회 실패: " + ex.Message + " → " + SourceGaa + " 로 폴백");
+                log(SourceWin32 + " 조회 실패: " + ex.Message + " → " + SourceGaa + "로 폴백");
             }
 
             try
@@ -71,6 +71,7 @@ namespace MacChanger.Core
             return new List<NetworkAdapterInfo>();
         }
 
+        /// <summary>물리 유선 → 물리 무선 → 블루투스 → 기타 순, 가상 어댑터는 뒤로.</summary>
         private static List<NetworkAdapterInfo> Sort(List<NetworkAdapterInfo> list)
         {
             list.Sort(delegate(NetworkAdapterInfo a, NetworkAdapterInfo b)
@@ -90,7 +91,8 @@ namespace MacChanger.Core
             {
                 case AdapterKind.Wired: return 0;
                 case AdapterKind.Wireless: return 1;
-                default: return 2;
+                case AdapterKind.Bluetooth: return 2;
+                default: return 3;
             }
         }
 
@@ -183,6 +185,9 @@ namespace MacChanger.Core
                 return AdapterKind.Wireless;
             if (physicalMediaType == 14 || ndisPhysicalMedium == 14)
                 return AdapterKind.Wired;
+            // Microsoft 블루투스 PAN(BTHPAN)은 PhysicalMediaType=10, InterfaceType=6으로 보고되므로 802.3 판정보다 먼저 거른다.
+            if (physicalMediaType == 10 || ndisPhysicalMedium == 10 || NetworkAdapterInfo.LooksBluetooth(description))
+                return AdapterKind.Bluetooth;
             if (NetworkAdapterInfo.LooksWireless(description))
                 return AdapterKind.Wireless;
             if (interfaceType == NativeMethods.IF_TYPE_ETHERNET_CSMACD)
@@ -201,6 +206,17 @@ namespace MacChanger.Core
         public static List<NetworkAdapterInfo> EnumerateWin32NetworkAdapter()
         {
             List<NetworkAdapterInfo> result = new List<NetworkAdapterInfo>();
+
+            // Win32_NetworkAdapter.AdapterTypeID는 NDIS_MEDIUM 값이라 Wi-Fi도 0("Ethernet 802.3")으로 보고된다.
+            // 활성 상태인 어댑터는 GetAdaptersAddresses의 IfType(71=IEEE 802.11)이 가장 믿을 만한 무선 판별 근거이므로 먼저 모아 둔다.
+            Dictionary<string, AdapterKind> liveKinds = new Dictionary<string, AdapterKind>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                foreach (NetworkAdapterInfo g in EnumerateGetAdaptersAddresses())
+                    liveKinds[g.InterfaceGuid] = g.Kind;
+            }
+            catch (Exception) { }
+
             using (ManagementObjectSearcher searcher = CreateSearcher(@"root\cimv2", "SELECT * FROM Win32_NetworkAdapter WHERE GUID IS NOT NULL"))
             using (ManagementObjectCollection items = searcher.Get())
             {
@@ -213,23 +229,35 @@ namespace MacChanger.Core
 
                         bool physical = PropBool(mo, "PhysicalAdapter", false);
                         string mac = MacAddressUtil.Normalize(PropString(mo, "MACAddress"));
-                        // 비활성화된 물리 어댑터는 MACAddress 가 null 이므로 PhysicalAdapter 로도 포함시킨다.
+                        string connectionName = PropString(mo, "NetConnectionID");
+                        // 비활성화된 물리 어댑터는 MACAddress가 null이므로 PhysicalAdapter로도 포함시킨다.
                         if (!physical && mac == null) continue;
+                        // 숨겨진 의사 어댑터(RAS Async Adapter, WAN Miniport 등)는 네트워크 연결 이름이 없다.
+                        if (!physical && connectionName == null) continue;
 
                         NetworkAdapterInfo info = new NetworkAdapterInfo();
                         info.Source = SourceWin32;
                         info.InterfaceGuid = guid;
                         info.Description = PropString(mo, "Description") ?? PropString(mo, "Name");
-                        info.ConnectionName = PropString(mo, "NetConnectionID");
+                        info.ConnectionName = connectionName;
                         info.CurrentMac = mac;
                         info.IsVirtual = !physical;
                         info.PnpDeviceId = PropString(mo, "PNPDeviceID");
 
-                        // AdapterTypeID: 0 = Ethernet 802.3, 9 = Wireless (어댑터가 비활성화 상태이면 null)
+                        // AdapterTypeID: 0 = Ethernet 802.3, 9 = Wireless WAN (어댑터가 비활성화 상태이면 null)
                         long adapterTypeId = PropLong(mo, "AdapterTypeID", -1);
-                        if (adapterTypeId == 9 || NetworkAdapterInfo.LooksWireless(info.Description) || NetworkAdapterInfo.LooksWireless(PropString(mo, "AdapterType")))
+                        string adapterType = PropString(mo, "AdapterType");
+                        AdapterKind liveKind;
+                        bool hasLiveKind = liveKinds.TryGetValue(guid, out liveKind);
+
+                        if (NetworkAdapterInfo.LooksBluetooth(info.Description) || NetworkAdapterInfo.LooksBluetooth(connectionName)
+                            || (hasLiveKind && liveKind == AdapterKind.Bluetooth))
+                            info.Kind = AdapterKind.Bluetooth;
+                        else if ((hasLiveKind && liveKind == AdapterKind.Wireless) || adapterTypeId == 9
+                            || NetworkAdapterInfo.LooksWireless(info.Description) || NetworkAdapterInfo.LooksWireless(connectionName)
+                            || NetworkAdapterInfo.LooksWireless(adapterType))
                             info.Kind = AdapterKind.Wireless;
-                        else if (adapterTypeId == 0 || physical)
+                        else if (adapterTypeId == 0 || physical || (hasLiveKind && liveKind == AdapterKind.Wired))
                             info.Kind = AdapterKind.Wired;
                         else
                             info.Kind = AdapterKind.Other;
@@ -274,7 +302,7 @@ namespace MacChanger.Core
 
                     string guid = NetworkAdapterInfo.NormalizeGuid(Marshal.PtrToStringAnsi(a.AdapterName));
                     if (guid == null) continue;
-                    if (a.PhysicalAddressLength != 6) continue;   // 루프백/터널 등 MAC 이 없는 인터페이스 제외
+                    if (a.PhysicalAddressLength != 6) continue;   // 루프백/터널 등 MAC이 없는 인터페이스 제외
 
                     NetworkAdapterInfo info = new NetworkAdapterInfo();
                     info.Source = SourceGaa;
@@ -282,9 +310,14 @@ namespace MacChanger.Core
                     info.Description = Marshal.PtrToStringUni(a.Description);
                     info.ConnectionName = Marshal.PtrToStringUni(a.FriendlyName);
                     info.CurrentMac = MacAddressUtil.FromBytes(a.PhysicalAddress, (int)a.PhysicalAddressLength);
-                    if (a.IfType == NativeMethods.IF_TYPE_IEEE80211) info.Kind = AdapterKind.Wireless;
-                    else if (a.IfType == NativeMethods.IF_TYPE_ETHERNET_CSMACD) info.Kind = NetworkAdapterInfo.LooksWireless(info.Description) ? AdapterKind.Wireless : AdapterKind.Wired;
-                    else info.Kind = AdapterKind.Other;
+                    if (a.IfType == NativeMethods.IF_TYPE_IEEE80211)
+                        info.Kind = AdapterKind.Wireless;
+                    else if (NetworkAdapterInfo.LooksBluetooth(info.Description) || NetworkAdapterInfo.LooksBluetooth(info.ConnectionName))
+                        info.Kind = AdapterKind.Bluetooth;
+                    else if (a.IfType == NativeMethods.IF_TYPE_ETHERNET_CSMACD)
+                        info.Kind = NetworkAdapterInfo.LooksWireless(info.Description) ? AdapterKind.Wireless : AdapterKind.Wired;
+                    else
+                        info.Kind = AdapterKind.Other;
                     result.Add(info);
                 }
             }

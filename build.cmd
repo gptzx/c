@@ -18,6 +18,8 @@ if not exist out mkdir out
 if exist out\MacChanger.exe del /q out\MacChanger.exe
 
 echo Using compiler: %CSC%
+rem Source folders are listed explicitly (no /recurse) so that files MSBuild/Visual Studio
+rem generate under MacChanger\obj are never picked up.
 "%CSC%" /nologo /target:winexe /platform:anycpu /optimize+ /debug- /warn:4 /codepage:65001 ^
   /out:out\MacChanger.exe ^
   /win32manifest:MacChanger\app.manifest ^
@@ -26,7 +28,7 @@ echo Using compiler: %CSC%
   /reference:System.Drawing.dll ^
   /reference:System.Windows.Forms.dll ^
   /reference:System.Management.dll ^
-  /recurse:MacChanger\*.cs
+  MacChanger\*.cs MacChanger\Properties\*.cs MacChanger\Core\*.cs MacChanger\Native\*.cs
 if errorlevel 1 (
     echo [ERROR] Build failed.
     exit /b 1

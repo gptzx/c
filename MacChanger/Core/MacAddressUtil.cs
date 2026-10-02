@@ -29,7 +29,7 @@ namespace MacChanger.Core
             return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
         }
 
-        /// <summary>12자리 hex 를 "AA-BB-CC-DD-EE-FF" 형태로 표시한다. 정규화 불가능하면 입력을 그대로 돌려준다.</summary>
+        /// <summary>12자리 hex를 "AA-BB-CC-DD-EE-FF" 형태로 표시한다. 정규화 불가능하면 입력을 그대로 돌려준다.</summary>
         public static string Format(string mac)
         {
             string n = Normalize(mac);
@@ -43,7 +43,7 @@ namespace MacChanger.Core
             return sb.ToString();
         }
 
-        /// <summary>바이트 배열(최소 6바이트)을 12자리 대문자 hex 로 변환한다.</summary>
+        /// <summary>바이트 배열(최소 6바이트)을 12자리 대문자 hex로 변환한다.</summary>
         public static string FromBytes(byte[] bytes, int length)
         {
             if (bytes == null || length < 6 || bytes.Length < 6) return null;
@@ -80,7 +80,7 @@ namespace MacChanger.Core
 
         /// <summary>
         /// 랜덤 MAC 생성. 첫 옥텟은 항상 유니캐스트(bit0=0)·로컬관리(bit1=1).
-        /// fixFirstOctetTo02 == true 이면 첫 옥텟을 0x02 로 고정, false 이면 0x02/0x06/0x0A/0x0E 중 무작위.
+        /// fixFirstOctetTo02 == true이면 첫 옥텟을 0x02로 고정, false이면 0x02/0x06/0x0A/0x0E 중 무작위.
         /// 결과적으로 왼쪽에서 두 번째 자리는 항상 2/6/A/E 이다.
         /// </summary>
         public static string GenerateRandom(bool fixFirstOctetTo02)

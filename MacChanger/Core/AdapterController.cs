@@ -11,7 +11,7 @@ namespace MacChanger.Core
 {
     /// <summary>
     /// 어댑터 비활성화/활성화.
-    /// 1) SetupAPI DIF_PROPERTYCHANGE (DICS_DISABLE / DICS_ENABLE) — devcon 과 같은 방식
+    /// 1) SetupAPI DIF_PROPERTYCHANGE (DICS_DISABLE / DICS_ENABLE) — devcon과 같은 방식
     /// 2) 실패 시 WMI Win32_NetworkAdapter.Disable()/Enable() → MSFT_NetAdapter.Disable()/Enable()
     /// </summary>
     public static class AdapterController
@@ -19,32 +19,49 @@ namespace MacChanger.Core
         public const int WmiEnableRetryCount = 3;
         public const int WmiRetryDelayMs = 1500;
 
-        public static bool Disable(NetworkAdapterInfo adapter, Action<string> log)
+        public static void Disable(NetworkAdapterInfo adapter, Action<string> log)
         {
-            return SetState(adapter, false, log);
+            bool needReboot;
+            SetState(adapter, false, log, out needReboot);
         }
 
-        public static bool Enable(NetworkAdapterInfo adapter, Action<string> log)
+        public static void Enable(NetworkAdapterInfo adapter, Action<string> log)
         {
-            return SetState(adapter, true, log);
+            bool needReboot;
+            SetState(adapter, true, log, out needReboot);
         }
 
-        /// <summary>상태 변경. 성공하면 true(재부팅 필요 플래그가 설정된 경우도 true 이며 로그에 남김). 모든 경로가 실패하면 예외.</summary>
-        private static bool SetState(NetworkAdapterInfo adapter, bool enable, Action<string> log)
+        /// <summary>
+        /// 비활성화. needReboot가 true이면 장치 관리자(PnP)가 즉시 중지하지 못해 재부팅 필요 플래그(DI_NEEDREBOOT/DI_NEEDRESTART)를
+        /// 설정한 것이므로 어댑터는 아직 동작 중이다 (devcon의 "Disabled on reboot"와 같은 상태).
+        /// </summary>
+        public static void Disable(NetworkAdapterInfo adapter, Action<string> log, out bool needReboot)
+        {
+            SetState(adapter, false, log, out needReboot);
+        }
+
+        public static void Enable(NetworkAdapterInfo adapter, Action<string> log, out bool needReboot)
+        {
+            SetState(adapter, true, log, out needReboot);
+        }
+
+        /// <summary>상태 변경. 모든 경로가 실패하면 예외. WMI 경로는 재부팅 필요 여부를 알려주지 않으므로 needReboot=false.</summary>
+        private static void SetState(NetworkAdapterInfo adapter, bool enable, Action<string> log, out bool needReboot)
         {
             if (adapter == null) throw new ArgumentNullException("adapter");
             if (log == null) log = delegate { };
             string action = enable ? "활성화" : "비활성화";
+            needReboot = false;
 
-            bool needReboot;
             string setupError;
             if (TrySetupApiChangeState(adapter.InterfaceGuid, enable, out needReboot, out setupError))
             {
-                log("  SetupAPI 로 어댑터 " + action + " 완료" + (needReboot ? " (장치 관리자가 재부팅 필요 플래그를 설정했습니다)" : ""));
-                return true;
+                log("  SetupAPI로 어댑터 " + action + " 완료" + (needReboot ? " — 장치 관리자가 즉시 적용하지 못해 재부팅 필요 플래그를 설정했습니다" : ""));
+                return;
             }
+            needReboot = false;
             log("  SetupAPI " + action + " 실패: " + setupError);
-            log("  WMI 로 " + action + " 재시도...");
+            log("  WMI로 " + action + " 재시도...");
 
             int attempts = enable ? WmiEnableRetryCount : 1;
             string wmiError = null;
@@ -57,8 +74,8 @@ namespace MacChanger.Core
                 }
                 if (TryWmiChangeState(adapter.InterfaceGuid, enable, out wmiError))
                 {
-                    log("  WMI 로 어댑터 " + action + " 완료");
-                    return true;
+                    log("  WMI로 어댑터 " + action + " 완료");
+                    return;
                 }
                 log("  WMI " + action + " 실패: " + wmiError);
             }
@@ -97,7 +114,7 @@ namespace MacChanger.Core
                         return false;
                     }
 
-                    // SPDRP_DRIVER = "{4D36E972-...}\00XX" → 해당 키의 NetCfgInstanceId 와 비교
+                    // SPDRP_DRIVER = "{4D36E972-...}\00XX" → 해당 키의 NetCfgInstanceId와 비교
                     string driverKey = GetDeviceRegistryString(devInfoSet, ref devInfo, NativeMethods.SPDRP_DRIVER);
                     if (string.IsNullOrEmpty(driverKey)) continue;
                     string id;
@@ -134,7 +151,7 @@ namespace MacChanger.Core
 
             if (enable)
             {
-                // devcon 과 동일: 전역(GLOBAL) 활성화를 먼저 시도하고 결과는 무시한 뒤, 현재 하드웨어 프로필에 적용한다.
+                // devcon과 동일: 전역(GLOBAL) 활성화를 먼저 시도하고 결과는 무시한 뒤, 현재 하드웨어 프로필에 적용한다.
                 p.Scope = NativeMethods.DICS_FLAG_GLOBAL;
                 if (NativeMethods.SetupDiSetClassInstallParams(devInfoSet, ref devInfo, ref p, size))
                     NativeMethods.SetupDiCallClassInstaller(NativeMethods.DIF_PROPERTYCHANGE, devInfoSet, ref devInfo);
@@ -151,7 +168,7 @@ namespace MacChanger.Core
             {
                 int e = Marshal.GetLastWin32Error();
                 if (e == NativeMethods.ERROR_IN_WOW64)
-                    error = "SetupDiCallClassInstaller: 64비트 Windows 에서 32비트 프로세스로는 호출할 수 없습니다(ERROR_IN_WOW64). "
+                    error = "SetupDiCallClassInstaller: 64비트 Windows에서 32비트 프로세스로는 호출할 수 없습니다(ERROR_IN_WOW64). "
                           + "AnyCPU(64비트)로 빌드된 실행 파일을 사용하세요.";
                 else
                     error = "SetupDiCallClassInstaller: " + Win32Message(e);
@@ -235,7 +252,7 @@ namespace MacChanger.Core
                 errors.Append("MSFT_NetAdapter: ").Append(ex.Message).Append("; ");
             }
 
-            error = errors.Length > 0 ? errors.ToString().TrimEnd(' ', ';') : "WMI 에서 어댑터를 찾지 못했습니다.";
+            error = errors.Length > 0 ? errors.ToString().TrimEnd(' ', ';') : "WMI에서 어댑터를 찾지 못했습니다.";
             return false;
         }
 

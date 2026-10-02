@@ -115,6 +115,7 @@
             // 
             this.lblRegistry.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblRegistry.AutoEllipsis = true;
             this.lblRegistry.ForeColor = System.Drawing.SystemColors.GrayText;
             this.lblRegistry.Location = new System.Drawing.Point(334, 46);
             this.lblRegistry.Name = "lblRegistry";
@@ -260,6 +261,7 @@
             this.Text = "MAC 주소 변경 유틸리티";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
             this.Load += new System.EventHandler(this.MainForm_Load);
+            this.Shown += new System.EventHandler(this.MainForm_Shown);
             this.ResumeLayout(false);
             this.PerformLayout();
         }
