@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Text;
+using System.Drawing;
 using System.Windows.Forms;
 using MacChanger.Core;
 
@@ -23,19 +23,21 @@ namespace MacChanger
         }
 
         private bool busy;
-        /// <summary>드롭다운 항목 텍스트를 갱신(Items[i] = item)할 때 SelectedIndexChanged가 다시 발생하는 것을 막는다.</summary>
+        /// <summary>드롭다운 항목 텍스트를 갱신(Items[i] = item)하거나 목록을 다시 채울 때 SelectedIndexChanged를 막는다.</summary>
         private bool suppressSelectionChanged;
+        /// <summary>선택한 어댑터에 대해 마지막으로 로그 파일에 기록한 IP (어댑터를 바꾸면 초기화)</summary>
+        private string lastLoggedIp;
 
         public MainForm()
         {
             InitializeComponent();
-            toolTip.SetToolTip(lblRules,
-                "랜덤 생성: 무선 어댑터는 왼쪽에서 두 번째 자리를 2/6/A/E 중 하나로, 그 외(유선/블루투스/기타) 어댑터는 짝수(0/2/4/6/8/A/C/E) 중 하나로 만들고 나머지 11자리는 0~F 무작위입니다. 00-00-00-00-00-00과 FF-FF-FF-FF-FF-FF는 제외합니다.\r\n"
-                + "Tcpip 정리: 변경 적용/원상복구 시 Tcpip\\Parameters\\Interfaces\\{GUID}의 EnableDHCP가 1이면 그 키의 값(EnableDHCP 제외)과 "
-                + "Tcpip\\Parameters의 DhcpDomain/DhcpNameServer를 자동으로 삭제합니다. EnableDHCP가 0(고정 IP)이면 아무것도 지우지 않습니다.");
+            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }   // 실행 파일에 내장된 아이콘 = 창/작업표시줄 아이콘
+            catch (Exception) { }
             toolTip.SetToolTip(txtNewMac, "12자리 16진수. 구분자(-, :, .)는 있어도 되고 없어도 됩니다. 예: 02-1A-2B-3C-4D-5E");
+            toolTip.SetToolTip(btnRandom, "무선 어댑터: 두 번째 자리 2/6/A/E, 그 외: 두 번째 자리 짝수, 나머지 11자리 0~F 무작위");
             toolTip.SetToolTip(btnApply, "확인 창 없이 바로 어댑터를 비활성화하고 NetworkAddress를 기록한 뒤(EnableDHCP = 1이면 Tcpip 값 자동 정리) 다시 활성화합니다.");
-            toolTip.SetToolTip(btnRestore, "확인 창 없이 바로 NetworkAddress 레지스트리 값을 삭제하고 어댑터를 재시작하여 공장 MAC으로 되돌립니다. EnableDHCP = 1인 어댑터는 변경 적용 때와 같이 Tcpip 값(DhcpDomain/DhcpNameServer 포함)도 자동 정리합니다.");
+            toolTip.SetToolTip(btnRestore, "확인 창 없이 바로 NetworkAddress 값을 삭제하고(EnableDHCP = 1이면 Tcpip 값 자동 정리) 어댑터를 재시작하여 공장 MAC으로 되돌립니다.");
+            toolTip.SetToolTip(chkIpLog, "켜 두면 선택한 어댑터에 새 IP가 할당될 때마다 실행 파일 옆 " + IpMonitor.LogFileName + " 에 시각·IP·MAC·어댑터를 한 줄로 기록합니다.");
         }
 
         private NetworkAdapterInfo SelectedAdapter
@@ -48,17 +50,13 @@ namespace MacChanger
         // ------------------------------------------------------------------
         private void MainForm_Load(object sender, EventArgs e)
         {
-            AppendLog("OS: " + Environment.OSVersion + " / " + (Environment.Is64BitOperatingSystem ? "64비트" : "32비트") + " OS, "
-                + (Environment.Is64BitProcess ? "64비트" : "32비트") + " 프로세스");
-            if (Environment.Is64BitOperatingSystem && !Environment.Is64BitProcess)
-                AppendLog("주의: 64비트 OS에서 32비트 프로세스로 실행 중입니다. 레지스트리는 64비트 뷰로 접근하지만 SetupAPI 어댑터 재시작은 WMI 폴백을 사용할 수 있습니다.");
             SetStatus("진행", "어댑터 목록을 읽는 중...");
         }
 
         private void MainForm_Shown(object sender, EventArgs e)
         {
             // 창이 먼저 그려진 뒤에 (WMI 조회가 몇 초 걸릴 수 있으므로) 목록을 읽는다.
-            BeginInvoke(new MethodInvoker(delegate { LoadAdapters(null); }));
+            BeginInvoke(new MethodInvoker(delegate { LoadAdapters(null); ipTimer.Start(); }));
         }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -88,9 +86,8 @@ namespace MacChanger
             {
                 NetworkAdapterInfo adapter = SelectedAdapter;
                 bool wireless = adapter != null && adapter.Kind == AdapterKind.Wireless;
-                string mac = MacAddressUtil.GenerateRandom(wireless);
-                txtNewMac.Text = MacAddressUtil.Format(mac);
-                SetStatus("준비", "랜덤 MAC 생성됨 (" + (wireless ? "무선 규칙: 두 번째 자리 2/6/A/E" : "유선/기타 규칙: 두 번째 자리 짝수") + "): " + txtNewMac.Text);
+                txtNewMac.Text = MacAddressUtil.Format(MacAddressUtil.GenerateRandom(wireless));
+                SetStatus("준비", "랜덤 MAC 생성됨 (" + (wireless ? "무선: 두 번째 자리 2/6/A/E" : "유선/기타: 두 번째 자리 짝수") + "): " + txtNewMac.Text);
             }
             catch (Exception ex)
             {
@@ -106,7 +103,6 @@ namespace MacChanger
                 SetStatus("실패", "어댑터를 선택하세요.");
                 return;
             }
-
             string mac = MacAddressUtil.Normalize(txtNewMac.Text);
             if (mac == null)
             {
@@ -116,7 +112,7 @@ namespace MacChanger
             }
             if (!MacAddressUtil.IsUnicast(mac))
             {
-                SetStatus("실패", "첫 옥텟의 최하위 비트가 1(멀티캐스트 주소)입니다. 첫 옥텟을 짝수(예: 02)로 바꾸세요.");
+                SetStatus("실패", "두 번째 자리가 홀수(멀티캐스트 주소)입니다. 두 번째 자리를 짝수로 바꾸세요.");
                 txtNewMac.Focus();
                 return;
             }
@@ -133,19 +129,7 @@ namespace MacChanger
                 return;
             }
 
-            // 확인 대화 상자 없이 바로 적용한다. 주의할 점은 로그에만 남긴다.
-            if (adapter.Kind == AdapterKind.Wireless)
-            {
-                if (!MacAddressUtil.MatchesWirelessRule(mac))
-                    AppendLog("경고: 무선 어댑터는 두 번째 자리가 2/6/A/E가 아니면 드라이버/OS가 변경을 무시할 수 있습니다: " + MacAddressUtil.Format(mac));
-                if (SafeGetRandomMacState(adapter.InterfaceGuid) == true)
-                    AppendLog("경고: 이 Wi-Fi 인터페이스에 Windows '임의 하드웨어 주소' 설정이 켜져 있어 변경과 충돌할 수 있습니다. 설정 > 네트워크 및 인터넷 > Wi-Fi에서 끄는 것을 권장합니다.");
-            }
-            else if (!MacAddressUtil.IsLocallyAdministered(mac))
-            {
-                AppendLog("참고: 입력한 MAC은 로컬 관리 주소가 아닙니다(두 번째 자리 2/6/A/E 아님). 일부 드라이버는 거부할 수 있습니다.");
-            }
-
+            // 확인 대화 상자 없이 바로 적용한다.
             OperationArgs args = new OperationArgs();
             args.Kind = OperationKind.Apply;
             args.Adapter = adapter;
@@ -168,6 +152,25 @@ namespace MacChanger
             StartOperation(args);
         }
 
+        private void chkIpLog_CheckedChanged(object sender, EventArgs e)
+        {
+            lastLoggedIp = null;
+            if (chkIpLog.Checked)
+            {
+                SetStatus("준비", "할당 IP 로그를 실행 파일 옆 " + IpMonitor.LogFileName + " 에 기록합니다.");
+                RefreshIp();   // 현재 할당된 IP를 즉시 한 줄 기록
+            }
+            else
+            {
+                SetStatus("준비", "할당 IP 로그 기록을 껐습니다.");
+            }
+        }
+
+        private void ipTimer_Tick(object sender, EventArgs e)
+        {
+            RefreshIp();
+        }
+
         // ------------------------------------------------------------------
         // 어댑터 목록 / 정보 갱신
         // ------------------------------------------------------------------
@@ -181,20 +184,20 @@ namespace MacChanger
                 List<NetworkAdapterInfo> adapters;
                 try
                 {
-                    adapters = AdapterEnumerator.Enumerate(AppendLog);
+                    adapters = AdapterEnumerator.Enumerate();
                 }
                 catch (Exception ex)
                 {
                     adapters = new List<NetworkAdapterInfo>();
-                    AppendLog("어댑터 열거 오류: " + ex.Message);
+                    SetStatus("실패", "어댑터 열거 오류: " + ex.Message);
                 }
 
                 suppressSelectionChanged = true;
-                int selectIndex = -1;
                 try
                 {
                     cboAdapters.BeginUpdate();
                     cboAdapters.Items.Clear();
+                    int selectIndex = -1;
                     foreach (NetworkAdapterInfo a in adapters)
                     {
                         int idx = cboAdapters.Items.Add(a);
@@ -212,7 +215,7 @@ namespace MacChanger
 
                 if (cboAdapters.Items.Count == 0)
                 {
-                    ClearAdapterInfo();
+                    txtPermanentMac.Text = txtCurrentMac.Text = txtCurrentIp.Text = string.Empty;
                     SetStatus("실패", "네트워크 어댑터를 찾지 못했습니다.");
                     return;
                 }
@@ -224,38 +227,21 @@ namespace MacChanger
             }
         }
 
-        private void ClearAdapterInfo()
-        {
-            txtPermanentMac.Text = string.Empty;
-            txtCurrentMac.Text = string.Empty;
-            SetRegistryLabel("레지스트리 NetworkAddress: -", null);
-        }
-
         private void RefreshSelectedAdapterInfo()
         {
             NetworkAdapterInfo adapter = SelectedAdapter;
-            if (adapter == null)
-            {
-                ClearAdapterInfo();
-                return;
-            }
+            if (adapter == null) return;
             Cursor = Cursors.WaitCursor;
             try
             {
                 SetStatus("진행", "어댑터 정보를 읽는 중...");
                 lblStatus.Update();
-                AppendLog("선택: [" + adapter.KindLabel + "] " + adapter.Description + " [" + adapter.InterfaceGuid + ", " + adapter.Source + "]");
+                lastLoggedIp = null;
 
-                string permanent = null;
-                string permanentError = null;
-                try { permanent = MacChangeService.ReadPermanentMac(adapter, AppendLog); }
-                catch (Exception ex) { permanentError = ex.Message; AppendLog("  공장 MAC 조회 오류: " + ex.Message); }
+                string permanent = MacChangeService.ReadPermanentMac(adapter);
                 txtPermanentMac.Text = permanent != null ? MacAddressUtil.Format(permanent) : "(조회 실패)";
 
-                string current = null;
-                string currentError = null;
-                try { current = MacChangeService.ReadCurrentMac(adapter, AppendLog); }
-                catch (Exception ex) { currentError = ex.Message; AppendLog("  현재 MAC 조회 오류: " + ex.Message); }
+                string current = MacChangeService.ReadCurrentMac(adapter);
                 txtCurrentMac.Text = current != null ? MacAddressUtil.Format(current) : "(조회 실패)";
 
                 // 드롭다운 항목 텍스트에도 최신 MAC을 반영한다 (ComboBox는 Add 시점의 문자열을 캐시하므로 항목을 다시 넣어야 한다).
@@ -270,37 +256,12 @@ namespace MacChanger
                         finally { suppressSelectionChanged = false; }
                     }
                 }
-
-                try
-                {
-                    string subKey;
-                    string regValue = MacRegistry.GetNetworkAddress(adapter.InterfaceGuid, out subKey);
-                    string prefix = "레지스트리 NetworkAddress (클래스 키 " + subKey + "):\r\n";
-                    if (regValue != null)
-                        SetRegistryLabel(prefix + MacAddressUtil.Format(regValue), null);
-                    else if (permanent != null && current != null && !string.Equals(permanent, current, StringComparison.OrdinalIgnoreCase))
-                        SetRegistryLabel(prefix + "(없음 — 현재 MAC이 공장 MAC과 다름: 임의 하드웨어 주소 등 OS 설정 영향)", null);
-                    else
-                        SetRegistryLabel(prefix + "(없음 — 공장 MAC 사용 중)", null);
-                }
-                catch (Exception ex)
-                {
-                    SetRegistryLabel("레지스트리 NetworkAddress: 조회 실패 (로그 참조)", ex.Message);
-                    AppendLog("  레지스트리 조회 오류: " + ex.Message);
-                }
-
-                if (adapter.Kind == AdapterKind.Wireless)
-                {
-                    bool? randomMac = SafeGetRandomMacState(adapter.InterfaceGuid);
-                    if (randomMac == true)
-                        AppendLog("  경고: 이 Wi-Fi 인터페이스에 '임의 하드웨어 주소' 설정이 켜져 있습니다. MAC 변경과 충돌할 수 있습니다.");
-                    AppendLog("  참고: 무선 어댑터는 두 번째 자리가 2/6/A/E가 아니면 드라이버가 변경을 무시할 수 있습니다. (랜덤 생성이 자동으로 맞춰 줍니다)");
-                }
+                RefreshIp();
 
                 if (current == null)
-                    SetStatus("실패", "현재 MAC을 읽지 못했습니다" + (currentError != null ? ": " + currentError : " (어댑터가 비활성화되었거나 드라이버가 조회를 거부). 로그를 확인하세요."));
+                    SetStatus("실패", "현재 MAC을 읽지 못했습니다 (어댑터가 비활성화되었거나 드라이버가 조회를 거부).");
                 else if (permanent == null)
-                    SetStatus("준비", "공장 MAC을 읽지 못했습니다" + (permanentError != null ? ": " + permanentError : " (드라이버가 OID 조회를 지원하지 않음). 현재 MAC은 읽었습니다."));
+                    SetStatus("준비", "공장 MAC을 읽지 못했습니다 (드라이버가 OID 조회를 지원하지 않음). 현재 MAC은 읽었습니다.");
                 else
                     SetStatus("준비", "어댑터 정보를 읽었습니다.");
             }
@@ -310,16 +271,38 @@ namespace MacChanger
             }
         }
 
-        private void SetRegistryLabel(string text, string tooltipDetail)
+        /// <summary>선택한 어댑터의 현재 IPv4를 표시하고, 로그 옵션이 켜져 있으면 새로 할당된 IP를 파일에 기록한다.</summary>
+        private void RefreshIp()
         {
-            lblRegistry.Text = text;
-            toolTip.SetToolTip(lblRegistry, tooltipDetail ?? text);
-        }
+            NetworkAdapterInfo adapter = SelectedAdapter;
+            if (adapter == null)
+            {
+                txtCurrentIp.Text = string.Empty;
+                return;
+            }
+            string ip;
+            try { ip = IpMonitor.ReadIPv4(adapter.InterfaceGuid); }
+            catch (Exception) { ip = null; }
 
-        private static bool? SafeGetRandomMacState(string interfaceGuid)
-        {
-            try { return MacRegistry.GetWlanRandomMacState(interfaceGuid); }
-            catch { return null; }
+            string text;
+            if (ip == null) text = "(어댑터 비활성 상태)";
+            else if (ip.Length == 0) text = "(IP 없음 — 할당 대기 중)";
+            else text = ip + (IpMonitor.IsOnlyApipa(ip) ? "  (DHCP 응답 없음 — 자동 사설 주소)" : "");
+            if (txtCurrentIp.Text != text) txtCurrentIp.Text = text;
+
+            if (chkIpLog.Checked && !string.IsNullOrEmpty(ip) && !IpMonitor.IsOnlyApipa(ip) && ip != lastLoggedIp)
+            {
+                try
+                {
+                    IpMonitor.AppendAssignedIp(Application.ExecutablePath, ip, adapter);
+                    lastLoggedIp = ip;
+                }
+                catch (Exception ex)
+                {
+                    chkIpLog.Checked = false;   // CheckedChanged 가 상태를 덮어쓰므로 그 뒤에 오류를 표시한다
+                    SetStatus("실패", "IP 로그 저장 실패: " + ex.Message);
+                }
+            }
         }
 
         // ------------------------------------------------------------------
@@ -329,8 +312,7 @@ namespace MacChanger
         {
             if (worker.IsBusy) return;
             SetBusy(true);
-            SetStatus("진행", (args.Kind == OperationKind.Apply ? "MAC 변경" : "원상복구") + " 작업을 시작합니다...");
-            AppendLog("---- " + (args.Kind == OperationKind.Apply ? "변경 적용" : "원상복구") + " 시작 ----");
+            SetStatus("진행", (args.Kind == OperationKind.Apply ? "MAC 변경" : "원상복구") + " 시작...");
             worker.RunWorkerAsync(args);
         }
 
@@ -339,54 +321,26 @@ namespace MacChanger
             OperationArgs args = (OperationArgs)e.Argument;
             BackgroundWorker w = (BackgroundWorker)sender;
             Action<string> log = delegate(string message) { w.ReportProgress(0, message); };
-
-            MacChangeResult result;
-            if (args.Kind == OperationKind.Apply)
-                result = MacChangeService.Apply(args.Adapter, args.NewMac, log);
-            else
-                result = MacChangeService.Restore(args.Adapter, log);
-            e.Result = result;
+            e.Result = args.Kind == OperationKind.Apply
+                ? MacChangeService.Apply(args.Adapter, args.NewMac, log)
+                : MacChangeService.Restore(args.Adapter, log);
         }
 
         private void worker_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
             string message = e.UserState as string;
-            if (message == null) return;
-            AppendLog(message);
-            if (message.StartsWith("[", StringComparison.Ordinal))
-                SetStatus("진행", message);
+            if (message != null) SetStatus("진행", message);
         }
 
         private void worker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             SetBusy(false);
 
-            MacChangeResult result = null;
-            string finalState;
-            string finalMessage;
-            if (e.Error != null)
-            {
-                finalState = "실패";
-                finalMessage = e.Error.Message;
-                AppendLog("오류: " + e.Error);
-            }
-            else
-            {
-                result = e.Result as MacChangeResult;
-                if (result == null)
-                {
-                    finalState = "실패";
-                    finalMessage = "결과를 받지 못했습니다.";
-                }
-                else
-                {
-                    finalState = result.Success ? "완료" : "실패";
-                    finalMessage = result.Message;
-                }
-            }
-            AppendLog("---- 작업 종료: " + finalState + " — " + finalMessage + " ----");
+            MacChangeResult result = e.Error == null ? e.Result as MacChangeResult : null;
+            string finalState = result != null && result.Success ? "완료" : "실패";
+            string finalMessage = e.Error != null ? e.Error.Message : result != null ? result.Message : "결과를 받지 못했습니다.";
 
-            // 변경/복구 후 현재 MAC 등을 다시 읽어 UI를 갱신한 뒤, 작업 결과 상태를 최종적으로 표시한다.
+            // 변경/복구 후 현재 MAC/IP를 다시 읽어 UI를 갱신한 뒤, 작업 결과 상태를 최종적으로 표시한다.
             RefreshSelectedAdapterInfo();
             SetStatus(finalState, finalMessage);
 
@@ -395,10 +349,10 @@ namespace MacChanger
                 MessageBox.Show(this, result.Message + "\r\n\r\n지금 재부팅하거나, 장치 관리자에서 어댑터를 '사용 안 함' → '사용'으로 직접 재시작하세요.",
                     Program.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
-            else if (result != null && !result.Success)
+            else if (finalState == "실패")
             {
-                string text = result.Message;
-                if (!string.IsNullOrEmpty(result.Guidance)) text += "\r\n\r\n" + result.Guidance;
+                string text = finalMessage;
+                if (result != null && !string.IsNullOrEmpty(result.Guidance)) text += "\r\n\r\n" + result.Guidance;
                 MessageBox.Show(this, text, Program.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
@@ -419,7 +373,7 @@ namespace MacChanger
         }
 
         /// <param name="state">준비 / 진행 / 완료 / 실패</param>
-        /// <param name="message">상태 라벨에 덧붙일 한국어 메시지</param>
+        /// <param name="message">상태 라벨에 덧붙일 한국어 메시지 (전체 내용은 툴팁으로도 볼 수 있다)</param>
         private void SetStatus(string state, string message)
         {
             string text = "상태: " + state;
@@ -427,24 +381,12 @@ namespace MacChanger
             lblStatus.Text = text;
             switch (state)
             {
-                case "완료": lblStatus.ForeColor = System.Drawing.Color.DarkGreen; break;
-                case "실패": lblStatus.ForeColor = System.Drawing.Color.Firebrick; break;
-                case "진행": lblStatus.ForeColor = System.Drawing.Color.DarkOrange; break;
-                default: lblStatus.ForeColor = System.Drawing.SystemColors.ControlText; break;
+                case "완료": lblStatus.ForeColor = Color.DarkGreen; break;
+                case "실패": lblStatus.ForeColor = Color.Firebrick; break;
+                case "진행": lblStatus.ForeColor = Color.DarkOrange; break;
+                default: lblStatus.ForeColor = SystemColors.ControlText; break;
             }
             toolTip.SetToolTip(lblStatus, text);
-        }
-
-        private void AppendLog(string message)
-        {
-            if (InvokeRequired)
-            {
-                BeginInvoke(new Action<string>(AppendLog), message);
-                return;
-            }
-            string line = DateTime.Now.ToString("HH:mm:ss") + "  " + message;
-            if (txtLog.TextLength > 200000) txtLog.Clear();
-            txtLog.AppendText(line + Environment.NewLine);
         }
     }
 }

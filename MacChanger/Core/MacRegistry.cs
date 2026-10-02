@@ -94,17 +94,8 @@ namespace MacChanger.Core
             }
         }
 
-        /// <summary>현재 레지스트리에 설정된 NetworkAddress 값. 없으면 null.</summary>
-        public static string GetNetworkAddress(string interfaceGuid, out string subKeyName)
-        {
-            using (RegistryKey key = OpenAdapterClassKey(interfaceGuid, false, out subKeyName))
-            {
-                return key.GetValue(NetworkAddressValueName) as string;
-            }
-        }
-
-        /// <summary>NetworkAddress(REG_SZ, 하이픈 없는 12자리)를 쓰고 다시 읽어 검증한다. 기록한 하위 키 이름을 돌려준다.</summary>
-        public static string SetNetworkAddress(string interfaceGuid, string mac12)
+        /// <summary>NetworkAddress(REG_SZ, 하이픈 없는 12자리)를 쓰고 다시 읽어 검증한다.</summary>
+        public static void SetNetworkAddress(string interfaceGuid, string mac12)
         {
             string normalized = MacAddressUtil.Normalize(mac12);
             if (normalized == null) throw new ArgumentException("MAC 형식이 올바르지 않습니다.", "mac12");
@@ -118,12 +109,12 @@ namespace MacChanger.Core
                 if (!string.Equals(readBack, normalized, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("NetworkAddress를 썼지만 다시 읽은 값이 다릅니다: " + (readBack ?? "(null)"));
             }
-            return subKeyName;
         }
 
         /// <summary>NetworkAddress 값을 삭제하고 실제로 사라졌는지 확인한다. 값이 있었으면 true.</summary>
-        public static bool DeleteNetworkAddress(string interfaceGuid, out string subKeyName)
+        public static bool DeleteNetworkAddress(string interfaceGuid)
         {
+            string subKeyName;
             using (RegistryKey key = OpenAdapterClassKey(interfaceGuid, true, out subKeyName))
             {
                 if (key.GetValue(NetworkAddressValueName) == null) return false;
@@ -156,12 +147,9 @@ namespace MacChanger.Core
             }
         }
 
-        /// <summary>
-        /// Tcpip\Parameters(전역) 키에서 DhcpDomain, DhcpNameServer 값을 삭제한다 (있는 것만). 삭제한 이름을 돌려주고 삭제 실패 시 예외.
-        /// </summary>
-        public static List<string> DeleteGlobalDhcpValues()
+        /// <summary>Tcpip\Parameters(전역) 키에서 DhcpDomain, DhcpNameServer 값을 삭제한다 (있는 것만). 삭제 실패 시 예외.</summary>
+        public static void DeleteGlobalDhcpValues()
         {
-            List<string> deleted = new List<string>();
             List<string> failed = new List<string>();
             using (RegistryKey hklm = OpenHklm64())
             using (RegistryKey key = hklm.OpenSubKey(TcpipParametersKeyPath, true))
@@ -172,42 +160,34 @@ namespace MacChanger.Core
                     if (key.GetValue(name) == null) continue;
                     key.DeleteValue(name, false);
                     if (key.GetValue(name) != null) failed.Add(name);
-                    else deleted.Add(name);
                 }
                 key.Flush();
             }
             if (failed.Count > 0)
                 throw new InvalidOperationException("삭제되지 않은 값: " + string.Join(", ", failed.ToArray()));
-            return deleted;
         }
 
         /// <summary>
         /// Tcpip\Parameters\Interfaces\{GUID} 키에서 EnableDHCP를 제외한 모든 값(value)을 삭제한다. 하위 키는 건드리지 않는다.
-        /// 키가 없으면 keyExists=false, 0을 돌려준다. 삭제한 값 이름 목록을 deletedNames로 돌려주고, 삭제되지 않은 값이 있으면 예외.
+        /// 키가 없으면 아무것도 하지 않는다. 삭제되지 않은 값이 있으면 예외.
         /// </summary>
-        public static int CleanTcpipInterfaceValues(string interfaceGuid, out bool keyExists, out List<string> deletedNames)
+        public static void CleanTcpipInterfaceValues(string interfaceGuid)
         {
-            keyExists = false;
-            deletedNames = new List<string>();
             List<string> failed = new List<string>();
             using (RegistryKey hklm = OpenHklm64())
             using (RegistryKey key = hklm.OpenSubKey(TcpipInterfacesKeyPath + "\\" + interfaceGuid, true))
             {
-                if (key == null) return 0;
-                keyExists = true;
+                if (key == null) return;
                 foreach (string valueName in key.GetValueNames())
                 {
                     if (string.Equals(valueName, EnableDhcpValueName, StringComparison.OrdinalIgnoreCase)) continue;
-                    string display = valueName.Length == 0 ? "(기본값)" : valueName;
                     key.DeleteValue(valueName, false);
-                    if (key.GetValue(valueName) != null) failed.Add(display);
-                    else deletedNames.Add(display);
+                    if (key.GetValue(valueName) != null) failed.Add(valueName.Length == 0 ? "(기본값)" : valueName);
                 }
                 key.Flush();
             }
             if (failed.Count > 0)
                 throw new InvalidOperationException("삭제되지 않은 값: " + string.Join(", ", failed.ToArray()));
-            return deletedNames.Count;
         }
 
         /// <summary>

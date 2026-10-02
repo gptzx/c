@@ -1,4 +1,4 @@
-﻿namespace MacChanger
+namespace MacChanger
 {
     partial class MainForm
     {
@@ -25,16 +25,17 @@
             this.txtPermanentMac = new System.Windows.Forms.TextBox();
             this.lblCurrent = new System.Windows.Forms.Label();
             this.txtCurrentMac = new System.Windows.Forms.TextBox();
-            this.lblRegistry = new System.Windows.Forms.Label();
+            this.lblIp = new System.Windows.Forms.Label();
+            this.txtCurrentIp = new System.Windows.Forms.TextBox();
             this.lblNew = new System.Windows.Forms.Label();
             this.txtNewMac = new System.Windows.Forms.TextBox();
             this.btnRandom = new System.Windows.Forms.Button();
-            this.lblRules = new System.Windows.Forms.Label();
             this.btnApply = new System.Windows.Forms.Button();
             this.btnRestore = new System.Windows.Forms.Button();
+            this.chkIpLog = new System.Windows.Forms.CheckBox();
             this.lblStatus = new System.Windows.Forms.Label();
-            this.txtLog = new System.Windows.Forms.TextBox();
             this.toolTip = new System.Windows.Forms.ToolTip(this.components);
+            this.ipTimer = new System.Windows.Forms.Timer(this.components);
             this.worker = new System.ComponentModel.BackgroundWorker();
             this.SuspendLayout();
             // 
@@ -49,22 +50,19 @@
             // 
             // cboAdapters
             // 
-            this.cboAdapters.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
             this.cboAdapters.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cboAdapters.FormattingEnabled = true;
-            this.cboAdapters.Location = new System.Drawing.Point(130, 12);
+            this.cboAdapters.Location = new System.Drawing.Point(118, 12);
             this.cboAdapters.Name = "cboAdapters";
-            this.cboAdapters.Size = new System.Drawing.Size(412, 23);
+            this.cboAdapters.Size = new System.Drawing.Size(350, 23);
             this.cboAdapters.TabIndex = 1;
             this.cboAdapters.SelectedIndexChanged += new System.EventHandler(this.cboAdapters_SelectedIndexChanged);
             // 
             // btnRefresh
             // 
-            this.btnRefresh.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnRefresh.Location = new System.Drawing.Point(548, 11);
+            this.btnRefresh.Location = new System.Drawing.Point(474, 11);
             this.btnRefresh.Name = "btnRefresh";
-            this.btnRefresh.Size = new System.Drawing.Size(80, 25);
+            this.btnRefresh.Size = new System.Drawing.Size(74, 25);
             this.btnRefresh.TabIndex = 2;
             this.btnRefresh.Text = "새로 고침";
             this.btnRefresh.UseVisualStyleBackColor = true;
@@ -83,7 +81,7 @@
             // 
             this.txtPermanentMac.BackColor = System.Drawing.SystemColors.Window;
             this.txtPermanentMac.Font = new System.Drawing.Font("Consolas", 10F);
-            this.txtPermanentMac.Location = new System.Drawing.Point(130, 46);
+            this.txtPermanentMac.Location = new System.Drawing.Point(118, 46);
             this.txtPermanentMac.Name = "txtPermanentMac";
             this.txtPermanentMac.ReadOnly = true;
             this.txtPermanentMac.Size = new System.Drawing.Size(190, 23);
@@ -103,114 +101,107 @@
             // 
             this.txtCurrentMac.BackColor = System.Drawing.SystemColors.Window;
             this.txtCurrentMac.Font = new System.Drawing.Font("Consolas", 10F);
-            this.txtCurrentMac.Location = new System.Drawing.Point(130, 78);
+            this.txtCurrentMac.Location = new System.Drawing.Point(118, 78);
             this.txtCurrentMac.Name = "txtCurrentMac";
             this.txtCurrentMac.ReadOnly = true;
             this.txtCurrentMac.Size = new System.Drawing.Size(190, 23);
             this.txtCurrentMac.TabIndex = 6;
             this.txtCurrentMac.TabStop = false;
             // 
-            // lblRegistry
+            // lblIp
             // 
-            this.lblRegistry.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.lblRegistry.AutoEllipsis = true;
-            this.lblRegistry.ForeColor = System.Drawing.SystemColors.GrayText;
-            this.lblRegistry.Location = new System.Drawing.Point(334, 46);
-            this.lblRegistry.Name = "lblRegistry";
-            this.lblRegistry.Size = new System.Drawing.Size(294, 55);
-            this.lblRegistry.TabIndex = 7;
-            this.lblRegistry.Text = "레지스트리 NetworkAddress: -";
+            this.lblIp.AutoSize = true;
+            this.lblIp.Location = new System.Drawing.Point(12, 114);
+            this.lblIp.Name = "lblIp";
+            this.lblIp.Size = new System.Drawing.Size(50, 15);
+            this.lblIp.TabIndex = 7;
+            this.lblIp.Text = "현재 IP:";
+            // 
+            // txtCurrentIp
+            // 
+            this.txtCurrentIp.BackColor = System.Drawing.SystemColors.Window;
+            this.txtCurrentIp.Font = new System.Drawing.Font("Consolas", 10F);
+            this.txtCurrentIp.Location = new System.Drawing.Point(118, 110);
+            this.txtCurrentIp.Name = "txtCurrentIp";
+            this.txtCurrentIp.ReadOnly = true;
+            this.txtCurrentIp.Size = new System.Drawing.Size(430, 23);
+            this.txtCurrentIp.TabIndex = 8;
+            this.txtCurrentIp.TabStop = false;
             // 
             // lblNew
             // 
             this.lblNew.AutoSize = true;
-            this.lblNew.Location = new System.Drawing.Point(12, 117);
+            this.lblNew.Location = new System.Drawing.Point(12, 146);
             this.lblNew.Name = "lblNew";
             this.lblNew.Size = new System.Drawing.Size(55, 15);
-            this.lblNew.TabIndex = 8;
+            this.lblNew.TabIndex = 9;
             this.lblNew.Text = "새 MAC:";
             // 
             // txtNewMac
             // 
             this.txtNewMac.Font = new System.Drawing.Font("Consolas", 10F);
-            this.txtNewMac.Location = new System.Drawing.Point(130, 113);
+            this.txtNewMac.Location = new System.Drawing.Point(118, 142);
             this.txtNewMac.MaxLength = 17;
             this.txtNewMac.Name = "txtNewMac";
             this.txtNewMac.Size = new System.Drawing.Size(190, 23);
-            this.txtNewMac.TabIndex = 9;
+            this.txtNewMac.TabIndex = 10;
             // 
             // btnRandom
             // 
-            this.btnRandom.Location = new System.Drawing.Point(334, 112);
+            this.btnRandom.Location = new System.Drawing.Point(314, 141);
             this.btnRandom.Name = "btnRandom";
             this.btnRandom.Size = new System.Drawing.Size(90, 25);
-            this.btnRandom.TabIndex = 10;
+            this.btnRandom.TabIndex = 11;
             this.btnRandom.Text = "랜덤 생성";
             this.btnRandom.UseVisualStyleBackColor = true;
             this.btnRandom.Click += new System.EventHandler(this.btnRandom_Click);
             // 
-            // lblRules
-            // 
-            this.lblRules.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.lblRules.AutoEllipsis = true;
-            this.lblRules.ForeColor = System.Drawing.SystemColors.GrayText;
-            this.lblRules.Location = new System.Drawing.Point(130, 143);
-            this.lblRules.Name = "lblRules";
-            this.lblRules.Size = new System.Drawing.Size(498, 30);
-            this.lblRules.TabIndex = 11;
-            this.lblRules.Text = "랜덤 규칙: 무선 = 두 번째 자리 2/6/A/E, 유선·기타 = 짝수 (나머지 0~F)\r\nTcpip 정리: EnableDHCP = 1인 어댑터만 자동 (DhcpDomain/DhcpNameServer 포함)";
-            // 
             // btnApply
             // 
             this.btnApply.Font = new System.Drawing.Font("맑은 고딕", 9F, System.Drawing.FontStyle.Bold);
-            this.btnApply.Location = new System.Drawing.Point(130, 176);
+            this.btnApply.Location = new System.Drawing.Point(118, 178);
             this.btnApply.Name = "btnApply";
-            this.btnApply.Size = new System.Drawing.Size(120, 32);
-            this.btnApply.TabIndex = 13;
+            this.btnApply.Size = new System.Drawing.Size(110, 30);
+            this.btnApply.TabIndex = 12;
             this.btnApply.Text = "변경 적용";
             this.btnApply.UseVisualStyleBackColor = true;
             this.btnApply.Click += new System.EventHandler(this.btnApply_Click);
             // 
             // btnRestore
             // 
-            this.btnRestore.Location = new System.Drawing.Point(262, 176);
+            this.btnRestore.Location = new System.Drawing.Point(236, 178);
             this.btnRestore.Name = "btnRestore";
-            this.btnRestore.Size = new System.Drawing.Size(120, 32);
-            this.btnRestore.TabIndex = 14;
+            this.btnRestore.Size = new System.Drawing.Size(110, 30);
+            this.btnRestore.TabIndex = 13;
             this.btnRestore.Text = "원상복구";
             this.btnRestore.UseVisualStyleBackColor = true;
             this.btnRestore.Click += new System.EventHandler(this.btnRestore_Click);
             // 
+            // chkIpLog
+            // 
+            this.chkIpLog.AutoSize = true;
+            this.chkIpLog.Location = new System.Drawing.Point(362, 184);
+            this.chkIpLog.Name = "chkIpLog";
+            this.chkIpLog.Size = new System.Drawing.Size(129, 19);
+            this.chkIpLog.TabIndex = 14;
+            this.chkIpLog.Text = "할당 IP 로그 저장";
+            this.chkIpLog.UseVisualStyleBackColor = true;
+            this.chkIpLog.CheckedChanged += new System.EventHandler(this.chkIpLog_CheckedChanged);
+            // 
             // lblStatus
             // 
-            this.lblStatus.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
             this.lblStatus.AutoEllipsis = true;
             this.lblStatus.Font = new System.Drawing.Font("맑은 고딕", 9F, System.Drawing.FontStyle.Bold);
             this.lblStatus.Location = new System.Drawing.Point(12, 220);
             this.lblStatus.Name = "lblStatus";
-            this.lblStatus.Size = new System.Drawing.Size(616, 20);
+            this.lblStatus.Size = new System.Drawing.Size(536, 20);
             this.lblStatus.TabIndex = 15;
             this.lblStatus.Text = "상태: 준비";
             // 
-            // txtLog
+            // ipTimer
             // 
-            this.txtLog.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-            | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtLog.BackColor = System.Drawing.SystemColors.Window;
-            this.txtLog.Font = new System.Drawing.Font("맑은 고딕", 8.25F);
-            this.txtLog.Location = new System.Drawing.Point(12, 246);
-            this.txtLog.Multiline = true;
-            this.txtLog.Name = "txtLog";
-            this.txtLog.ReadOnly = true;
-            this.txtLog.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtLog.Size = new System.Drawing.Size(616, 195);
-            this.txtLog.TabIndex = 16;
-            this.txtLog.TabStop = false;
-            this.txtLog.WordWrap = true;
+            this.ipTimer.Interval = 2000;
+            this.ipTimer.Tick += new System.EventHandler(this.ipTimer_Tick);
             // 
             // worker
             // 
@@ -223,16 +214,16 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(640, 453);
-            this.Controls.Add(this.txtLog);
+            this.ClientSize = new System.Drawing.Size(560, 250);
             this.Controls.Add(this.lblStatus);
+            this.Controls.Add(this.chkIpLog);
             this.Controls.Add(this.btnRestore);
             this.Controls.Add(this.btnApply);
-            this.Controls.Add(this.lblRules);
             this.Controls.Add(this.btnRandom);
             this.Controls.Add(this.txtNewMac);
             this.Controls.Add(this.lblNew);
-            this.Controls.Add(this.lblRegistry);
+            this.Controls.Add(this.txtCurrentIp);
+            this.Controls.Add(this.lblIp);
             this.Controls.Add(this.txtCurrentMac);
             this.Controls.Add(this.lblCurrent);
             this.Controls.Add(this.txtPermanentMac);
@@ -241,7 +232,8 @@
             this.Controls.Add(this.cboAdapters);
             this.Controls.Add(this.lblAdapter);
             this.Font = new System.Drawing.Font("맑은 고딕", 9F);
-            this.MinimumSize = new System.Drawing.Size(560, 400);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+            this.MaximizeBox = false;
             this.Name = "MainForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "MAC 주소 변경 유틸리티";
@@ -261,16 +253,17 @@
         private System.Windows.Forms.TextBox txtPermanentMac;
         private System.Windows.Forms.Label lblCurrent;
         private System.Windows.Forms.TextBox txtCurrentMac;
-        private System.Windows.Forms.Label lblRegistry;
+        private System.Windows.Forms.Label lblIp;
+        private System.Windows.Forms.TextBox txtCurrentIp;
         private System.Windows.Forms.Label lblNew;
         private System.Windows.Forms.TextBox txtNewMac;
         private System.Windows.Forms.Button btnRandom;
-        private System.Windows.Forms.Label lblRules;
         private System.Windows.Forms.Button btnApply;
         private System.Windows.Forms.Button btnRestore;
+        private System.Windows.Forms.CheckBox chkIpLog;
         private System.Windows.Forms.Label lblStatus;
-        private System.Windows.Forms.TextBox txtLog;
         private System.Windows.Forms.ToolTip toolTip;
+        private System.Windows.Forms.Timer ipTimer;
         private System.ComponentModel.BackgroundWorker worker;
     }
 }

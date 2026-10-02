@@ -19,18 +19,6 @@ namespace MacChanger.Core
         public const int WmiEnableRetryCount = 3;
         public const int WmiRetryDelayMs = 1500;
 
-        public static void Disable(NetworkAdapterInfo adapter, Action<string> log)
-        {
-            bool needReboot;
-            SetState(adapter, false, log, out needReboot);
-        }
-
-        public static void Enable(NetworkAdapterInfo adapter, Action<string> log)
-        {
-            bool needReboot;
-            SetState(adapter, true, log, out needReboot);
-        }
-
         /// <summary>
         /// 비활성화. needReboot가 true이면 장치 관리자(PnP)가 즉시 중지하지 못해 재부팅 필요 플래그(DI_NEEDREBOOT/DI_NEEDRESTART)를
         /// 설정한 것이므로 어댑터는 아직 동작 중이다 (devcon의 "Disabled on reboot"와 같은 상태).
@@ -56,12 +44,11 @@ namespace MacChanger.Core
             string setupError;
             if (TrySetupApiChangeState(adapter.InterfaceGuid, enable, out needReboot, out setupError))
             {
-                log("  SetupAPI로 어댑터 " + action + " 완료" + (needReboot ? " — 장치 관리자가 즉시 적용하지 못해 재부팅 필요 플래그를 설정했습니다" : ""));
+                if (needReboot) log("장치 관리자가 즉시 " + action + "하지 못해 재부팅 필요 플래그를 설정했습니다");
                 return;
             }
             needReboot = false;
-            log("  SetupAPI " + action + " 실패: " + setupError);
-            log("  WMI로 " + action + " 재시도...");
+            log("SetupAPI " + action + " 실패(" + setupError + ") → WMI로 재시도");
 
             int attempts = enable ? WmiEnableRetryCount : 1;
             string wmiError = null;
@@ -70,14 +57,9 @@ namespace MacChanger.Core
                 if (i > 0)
                 {
                     Thread.Sleep(WmiRetryDelayMs);
-                    log("  WMI " + action + " 재시도 " + (i + 1) + "/" + attempts);
+                    log("WMI " + action + " 재시도 " + (i + 1) + "/" + attempts);
                 }
-                if (TryWmiChangeState(adapter.InterfaceGuid, enable, out wmiError))
-                {
-                    log("  WMI로 어댑터 " + action + " 완료");
-                    return;
-                }
-                log("  WMI " + action + " 실패: " + wmiError);
+                if (TryWmiChangeState(adapter.InterfaceGuid, enable, out wmiError)) return;
             }
             throw new InvalidOperationException("어댑터 " + action + " 실패 — SetupAPI: " + setupError + " / WMI: " + wmiError);
         }

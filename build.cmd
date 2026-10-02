@@ -23,6 +23,7 @@ rem generate under MacChanger\obj are never picked up.
 "%CSC%" /nologo /target:winexe /platform:anycpu /optimize+ /debug- /warn:4 /codepage:65001 ^
   /out:out\MacChanger.exe ^
   /win32manifest:MacChanger\app.manifest ^
+  /win32icon:MacChanger\app.ico ^
   /reference:System.dll ^
   /reference:System.Core.dll ^
   /reference:System.Drawing.dll ^

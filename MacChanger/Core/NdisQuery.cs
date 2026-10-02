@@ -75,7 +75,7 @@ namespace MacChanger.Core
                             last = new InvalidOperationException("NDIS 응답 길이가 6바이트 미만입니다 (" + returned + ").");
                             break;
                         }
-                        return MacAddressUtil.FromBytes(outBuffer, 6);
+                        return MacAddressUtil.FromBytes(outBuffer);
                     }
                     finally
                     {

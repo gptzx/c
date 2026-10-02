@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text;
 
 namespace MacChanger.Core
@@ -33,11 +33,6 @@ namespace MacChanger.Core
 
         public bool IsVirtual { get; set; }
 
-        public string PnpDeviceId { get; set; }
-
-        /// <summary>어느 열거 경로에서 얻었는지 ("MSFT_NetAdapter" / "Win32_NetworkAdapter" / "GetAdaptersAddresses")</summary>
-        public string Source { get; set; }
-
         public string KindLabel
         {
             get
@@ -52,26 +47,18 @@ namespace MacChanger.Core
             }
         }
 
-        public string DisplayText
-        {
-            get
-            {
-                StringBuilder sb = new StringBuilder();
-                sb.Append('[').Append(KindLabel).Append(']');
-                if (IsVirtual) sb.Append("(가상)");
-                sb.Append(' ');
-                sb.Append(string.IsNullOrEmpty(Description) ? "(설명 없음)" : Description);
-                if (!string.IsNullOrEmpty(ConnectionName) && ConnectionName != Description)
-                    sb.Append(" (").Append(ConnectionName).Append(')');
-                sb.Append(" - ");
-                sb.Append(CurrentMac != null ? MacAddressUtil.Format(CurrentMac) : "MAC 없음");
-                return sb.ToString();
-            }
-        }
-
         public override string ToString()
         {
-            return DisplayText;
+            StringBuilder sb = new StringBuilder();
+            sb.Append('[').Append(KindLabel).Append(']');
+            if (IsVirtual) sb.Append("(가상)");
+            sb.Append(' ');
+            sb.Append(string.IsNullOrEmpty(Description) ? "(설명 없음)" : Description);
+            if (!string.IsNullOrEmpty(ConnectionName) && ConnectionName != Description)
+                sb.Append(" (").Append(ConnectionName).Append(')');
+            sb.Append(" - ");
+            sb.Append(CurrentMac != null ? MacAddressUtil.Format(CurrentMac) : "MAC 없음");
+            return sb.ToString();
         }
 
         /// <summary>GUID 문자열을 "{...}" 대문자 형식으로 정규화한다. 파싱 실패 시 null.</summary>

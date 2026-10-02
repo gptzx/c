@@ -1,9 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Globalization;
 using System.Management;
-using System.Runtime.InteropServices;
+using System.Net.NetworkInformation;
 using MacChanger.Native;
 
 namespace MacChanger.Core
@@ -12,63 +11,29 @@ namespace MacChanger.Core
     /// 네트워크 어댑터 열거.
     /// 1) WMI root\StandardCimv2\MSFT_NetAdapter (Windows 8 이상)
     /// 2) WMI root\cimv2\Win32_NetworkAdapter (Windows 7 포함)
-    /// 3) iphlpapi GetAdaptersAddresses
+    /// 3) GetAdaptersAddresses (System.Net.NetworkInformation.NetworkInterface 가 감싸는 iphlpapi API)
     /// 순서로 시도하고, 앞 단계가 실패하거나 결과가 비어 있으면 다음 단계로 넘어간다.
     /// </summary>
     public static class AdapterEnumerator
     {
-        public const string SourceMsft = "MSFT_NetAdapter";
-        public const string SourceWin32 = "Win32_NetworkAdapter";
-        public const string SourceGaa = "GetAdaptersAddresses";
-
-        public static List<NetworkAdapterInfo> Enumerate(Action<string> log)
+        public static List<NetworkAdapterInfo> Enumerate()
         {
-            if (log == null) log = delegate { };
-
             List<NetworkAdapterInfo> list;
-
             try
             {
                 list = EnumerateMsftNetAdapter();
-                if (list.Count > 0)
-                {
-                    log("어댑터 열거: " + SourceMsft + " (" + list.Count + "개)");
-                    return Sort(list);
-                }
-                log(SourceMsft + ": 결과 없음 → " + SourceWin32 + "로 폴백");
+                if (list.Count > 0) return Sort(list);
             }
-            catch (Exception ex)
-            {
-                log(SourceMsft + " 조회 실패(Windows 7 등에서는 정상): " + ex.Message + " → " + SourceWin32 + "로 폴백");
-            }
+            catch (Exception) { }   // Windows 7 등: root\StandardCimv2 없음 → 폴백
 
             try
             {
                 list = EnumerateWin32NetworkAdapter();
-                if (list.Count > 0)
-                {
-                    log("어댑터 열거: " + SourceWin32 + " (" + list.Count + "개)");
-                    return Sort(list);
-                }
-                log(SourceWin32 + ": 결과 없음 → " + SourceGaa + "로 폴백");
+                if (list.Count > 0) return Sort(list);
             }
-            catch (Exception ex)
-            {
-                log(SourceWin32 + " 조회 실패: " + ex.Message + " → " + SourceGaa + "로 폴백");
-            }
+            catch (Exception) { }
 
-            try
-            {
-                list = EnumerateGetAdaptersAddresses();
-                log("어댑터 열거: " + SourceGaa + " (" + list.Count + "개)");
-                return Sort(list);
-            }
-            catch (Exception ex)
-            {
-                log(SourceGaa + " 조회 실패: " + ex.Message);
-            }
-
-            return new List<NetworkAdapterInfo>();
+            return Sort(EnumerateGetAdaptersAddresses());
         }
 
         /// <summary>물리 유선 → 물리 무선 → 블루투스 → 기타 순, 가상 어댑터는 뒤로.</summary>
@@ -78,22 +43,11 @@ namespace MacChanger.Core
             {
                 int c = a.IsVirtual.CompareTo(b.IsVirtual);
                 if (c != 0) return c;
-                c = KindOrder(a.Kind).CompareTo(KindOrder(b.Kind));
+                c = ((int)a.Kind).CompareTo((int)b.Kind);
                 if (c != 0) return c;
                 return string.Compare(a.Description, b.Description, StringComparison.CurrentCultureIgnoreCase);
             });
             return list;
-        }
-
-        private static int KindOrder(AdapterKind kind)
-        {
-            switch (kind)
-            {
-                case AdapterKind.Wired: return 0;
-                case AdapterKind.Wireless: return 1;
-                case AdapterKind.Bluetooth: return 2;
-                default: return 3;
-            }
         }
 
         // ------------------------------------------------------------------
@@ -113,20 +67,20 @@ namespace MacChanger.Core
             return string.IsNullOrEmpty(s) ? null : s;
         }
 
-        private static bool PropBool(ManagementBaseObject mo, string name, bool defaultValue)
+        private static bool PropBool(ManagementBaseObject mo, string name)
         {
             object o = Prop(mo, name);
-            if (o == null) return defaultValue;
+            if (o == null) return false;
             try { return Convert.ToBoolean(o, CultureInfo.InvariantCulture); }
-            catch { return defaultValue; }
+            catch { return false; }
         }
 
-        private static long PropLong(ManagementBaseObject mo, string name, long defaultValue)
+        private static long PropLong(ManagementBaseObject mo, string name)
         {
             object o = Prop(mo, name);
-            if (o == null) return defaultValue;
+            if (o == null) return -1;
             try { return Convert.ToInt64(o, CultureInfo.InvariantCulture); }
-            catch { return defaultValue; }
+            catch { return -1; }
         }
 
         private static ManagementObjectSearcher CreateSearcher(string scopePath, string query)
@@ -149,25 +103,19 @@ namespace MacChanger.Core
                 {
                     using (mo)
                     {
-                        if (PropBool(mo, "Hidden", false)) continue;
+                        if (PropBool(mo, "Hidden")) continue;
                         string guid = NetworkAdapterInfo.NormalizeGuid(PropString(mo, "InterfaceGuid"));
                         if (guid == null) guid = NetworkAdapterInfo.NormalizeGuid(PropString(mo, "DeviceID"));
                         if (guid == null) continue;
 
                         NetworkAdapterInfo info = new NetworkAdapterInfo();
-                        info.Source = SourceMsft;
                         info.InterfaceGuid = guid;
                         info.Description = PropString(mo, "InterfaceDescription") ?? PropString(mo, "DriverDescription");
                         info.ConnectionName = PropString(mo, "Name");
                         info.CurrentMac = MacAddressUtil.Normalize(PropString(mo, "MacAddress"));
                         info.PermanentMacHint = MacAddressUtil.Normalize(PropString(mo, "PermanentAddress"));
-                        info.IsVirtual = PropBool(mo, "Virtual", false);
-                        info.PnpDeviceId = PropString(mo, "PnPDeviceID");
-
-                        long physicalMediaType = PropLong(mo, "PhysicalMediaType", -1);
-                        long ndisPhysicalMedium = PropLong(mo, "NdisPhysicalMedium", -1);
-                        long interfaceType = PropLong(mo, "InterfaceType", -1);
-                        info.Kind = ClassifyNdis(physicalMediaType, ndisPhysicalMedium, interfaceType, info.Description);
+                        info.IsVirtual = PropBool(mo, "Virtual");
+                        info.Kind = ClassifyNdis(PropLong(mo, "PhysicalMediaType"), PropLong(mo, "NdisPhysicalMedium"), PropLong(mo, "InterfaceType"), info.Description);
                         result.Add(info);
                     }
                 }
@@ -181,7 +129,7 @@ namespace MacChanger.Core
         /// </summary>
         private static AdapterKind ClassifyNdis(long physicalMediaType, long ndisPhysicalMedium, long interfaceType, string description)
         {
-            if (IsWirelessMedium(physicalMediaType) || IsWirelessMedium(ndisPhysicalMedium) || interfaceType == NativeMethods.IF_TYPE_IEEE80211)
+            if (IsWirelessMedium(physicalMediaType) || IsWirelessMedium(ndisPhysicalMedium) || interfaceType == 71)
                 return AdapterKind.Wireless;
             if (physicalMediaType == 14 || ndisPhysicalMedium == 14)
                 return AdapterKind.Wired;
@@ -190,7 +138,7 @@ namespace MacChanger.Core
                 return AdapterKind.Bluetooth;
             if (NetworkAdapterInfo.LooksWireless(description))
                 return AdapterKind.Wireless;
-            if (interfaceType == NativeMethods.IF_TYPE_ETHERNET_CSMACD)
+            if (interfaceType == 6)
                 return AdapterKind.Wired;
             return AdapterKind.Other;
         }
@@ -208,7 +156,7 @@ namespace MacChanger.Core
             List<NetworkAdapterInfo> result = new List<NetworkAdapterInfo>();
 
             // Win32_NetworkAdapter.AdapterTypeID는 NDIS_MEDIUM 값이라 Wi-Fi도 0("Ethernet 802.3")으로 보고된다.
-            // 활성 상태인 어댑터는 GetAdaptersAddresses의 IfType(71=IEEE 802.11)이 가장 믿을 만한 무선 판별 근거이므로 먼저 모아 둔다.
+            // 활성 상태인 어댑터는 GetAdaptersAddresses의 IfType(IEEE 802.11)이 가장 믿을 만한 무선 판별 근거이므로 먼저 모아 둔다.
             Dictionary<string, AdapterKind> liveKinds = new Dictionary<string, AdapterKind>(StringComparer.OrdinalIgnoreCase);
             try
             {
@@ -227,7 +175,7 @@ namespace MacChanger.Core
                         string guid = NetworkAdapterInfo.NormalizeGuid(PropString(mo, "GUID"));
                         if (guid == null) continue;
 
-                        bool physical = PropBool(mo, "PhysicalAdapter", false);
+                        bool physical = PropBool(mo, "PhysicalAdapter");
                         string mac = MacAddressUtil.Normalize(PropString(mo, "MACAddress"));
                         string connectionName = PropString(mo, "NetConnectionID");
                         // 비활성화된 물리 어댑터는 MACAddress가 null이므로 PhysicalAdapter로도 포함시킨다.
@@ -236,17 +184,14 @@ namespace MacChanger.Core
                         if (!physical && connectionName == null) continue;
 
                         NetworkAdapterInfo info = new NetworkAdapterInfo();
-                        info.Source = SourceWin32;
                         info.InterfaceGuid = guid;
                         info.Description = PropString(mo, "Description") ?? PropString(mo, "Name");
                         info.ConnectionName = connectionName;
                         info.CurrentMac = mac;
                         info.IsVirtual = !physical;
-                        info.PnpDeviceId = PropString(mo, "PNPDeviceID");
 
                         // AdapterTypeID: 0 = Ethernet 802.3, 9 = Wireless WAN (어댑터가 비활성화 상태이면 null)
-                        long adapterTypeId = PropLong(mo, "AdapterTypeID", -1);
-                        string adapterType = PropString(mo, "AdapterType");
+                        long adapterTypeId = PropLong(mo, "AdapterTypeID");
                         AdapterKind liveKind;
                         bool hasLiveKind = liveKinds.TryGetValue(guid, out liveKind);
 
@@ -255,7 +200,7 @@ namespace MacChanger.Core
                             info.Kind = AdapterKind.Bluetooth;
                         else if ((hasLiveKind && liveKind == AdapterKind.Wireless) || adapterTypeId == 9
                             || NetworkAdapterInfo.LooksWireless(info.Description) || NetworkAdapterInfo.LooksWireless(connectionName)
-                            || NetworkAdapterInfo.LooksWireless(adapterType))
+                            || NetworkAdapterInfo.LooksWireless(PropString(mo, "AdapterType")))
                             info.Kind = AdapterKind.Wireless;
                         else if (adapterTypeId == 0 || physical || (hasLiveKind && liveKind == AdapterKind.Wired))
                             info.Kind = AdapterKind.Wired;
@@ -269,61 +214,34 @@ namespace MacChanger.Core
         }
 
         // ------------------------------------------------------------------
-        // 3) GetAdaptersAddresses (iphlpapi)
+        // 3) GetAdaptersAddresses — NetworkInterface.GetAllNetworkInterfaces() 가 Vista 이상에서 이 API 를 호출한다.
+        //    (비활성화된 어댑터는 나오지 않는다. 열거 폴백과 현재 MAC 재조회에 사용)
         // ------------------------------------------------------------------
         public static List<NetworkAdapterInfo> EnumerateGetAdaptersAddresses()
         {
             List<NetworkAdapterInfo> result = new List<NetworkAdapterInfo>();
-            uint flags = NativeMethods.GAA_FLAG_SKIP_UNICAST | NativeMethods.GAA_FLAG_SKIP_ANYCAST
-                       | NativeMethods.GAA_FLAG_SKIP_MULTICAST | NativeMethods.GAA_FLAG_SKIP_DNS_SERVER
-                       | NativeMethods.GAA_FLAG_INCLUDE_ALL_INTERFACES;
-            uint size = 32 * 1024;
-            IntPtr buffer = IntPtr.Zero;
-            try
+            foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
             {
-                for (int attempt = 0; attempt < 5; attempt++)
-                {
-                    buffer = Marshal.AllocHGlobal((int)size);
-                    uint rc = NativeMethods.GetAdaptersAddresses(NativeMethods.AF_UNSPEC, flags, IntPtr.Zero, buffer, ref size);
-                    if (rc == NativeMethods.ERROR_SUCCESS) break;
-                    Marshal.FreeHGlobal(buffer);
-                    buffer = IntPtr.Zero;
-                    if (rc == NativeMethods.ERROR_NO_DATA) return result;
-                    if (rc != NativeMethods.ERROR_BUFFER_OVERFLOW) throw new Win32Exception((int)rc);
-                }
-                if (buffer == IntPtr.Zero) throw new InvalidOperationException("GetAdaptersAddresses 버퍼 크기를 결정하지 못했습니다.");
+                string guid = NetworkAdapterInfo.NormalizeGuid(ni.Id);
+                if (guid == null) continue;
+                string mac = MacAddressUtil.FromBytes(ni.GetPhysicalAddress().GetAddressBytes());
+                if (mac == null) continue;   // 루프백/터널 등 MAC이 없는 인터페이스 제외
 
-                IntPtr current = buffer;
-                while (current != IntPtr.Zero)
-                {
-                    NativeMethods.IP_ADAPTER_ADDRESSES_HEAD a =
-                        (NativeMethods.IP_ADAPTER_ADDRESSES_HEAD)Marshal.PtrToStructure(current, typeof(NativeMethods.IP_ADAPTER_ADDRESSES_HEAD));
-                    current = a.Next;
-
-                    string guid = NetworkAdapterInfo.NormalizeGuid(Marshal.PtrToStringAnsi(a.AdapterName));
-                    if (guid == null) continue;
-                    if (a.PhysicalAddressLength != 6) continue;   // 루프백/터널 등 MAC이 없는 인터페이스 제외
-
-                    NetworkAdapterInfo info = new NetworkAdapterInfo();
-                    info.Source = SourceGaa;
-                    info.InterfaceGuid = guid;
-                    info.Description = Marshal.PtrToStringUni(a.Description);
-                    info.ConnectionName = Marshal.PtrToStringUni(a.FriendlyName);
-                    info.CurrentMac = MacAddressUtil.FromBytes(a.PhysicalAddress, (int)a.PhysicalAddressLength);
-                    if (a.IfType == NativeMethods.IF_TYPE_IEEE80211)
-                        info.Kind = AdapterKind.Wireless;
-                    else if (NetworkAdapterInfo.LooksBluetooth(info.Description) || NetworkAdapterInfo.LooksBluetooth(info.ConnectionName))
-                        info.Kind = AdapterKind.Bluetooth;
-                    else if (a.IfType == NativeMethods.IF_TYPE_ETHERNET_CSMACD)
-                        info.Kind = NetworkAdapterInfo.LooksWireless(info.Description) ? AdapterKind.Wireless : AdapterKind.Wired;
-                    else
-                        info.Kind = AdapterKind.Other;
-                    result.Add(info);
-                }
-            }
-            finally
-            {
-                if (buffer != IntPtr.Zero) Marshal.FreeHGlobal(buffer);
+                NetworkAdapterInfo info = new NetworkAdapterInfo();
+                info.InterfaceGuid = guid;
+                info.Description = ni.Description;
+                info.ConnectionName = ni.Name;
+                info.CurrentMac = mac;
+                if (ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
+                    info.Kind = AdapterKind.Wireless;
+                else if (NetworkAdapterInfo.LooksBluetooth(ni.Description) || NetworkAdapterInfo.LooksBluetooth(ni.Name))
+                    info.Kind = AdapterKind.Bluetooth;
+                else if (ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet || ni.NetworkInterfaceType == NetworkInterfaceType.FastEthernetT
+                      || ni.NetworkInterfaceType == NetworkInterfaceType.FastEthernetFx || ni.NetworkInterfaceType == NetworkInterfaceType.GigabitEthernet)
+                    info.Kind = NetworkAdapterInfo.LooksWireless(ni.Description) ? AdapterKind.Wireless : AdapterKind.Wired;
+                else
+                    info.Kind = AdapterKind.Other;
+                result.Add(info);
             }
             return result;
         }
