@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 
@@ -151,7 +152,7 @@ namespace MacChanger.Core
         // ------------------------------------------------------------------
         // 변경 적용
         // ------------------------------------------------------------------
-        public static MacChangeResult Apply(NetworkAdapterInfo adapter, string newMac, bool cleanTcpip, Action<string> log)
+        public static MacChangeResult Apply(NetworkAdapterInfo adapter, string newMac, Action<string> log)
         {
             if (adapter == null) throw new ArgumentNullException("adapter");
             if (log == null) log = NoLog;
@@ -196,34 +197,8 @@ namespace MacChanger.Core
                 return result;
             }
 
-            // (c) Tcpip Interfaces 값 정리
-            string tcpipWarning = null;
-            if (!cleanTcpip)
-            {
-                log("[3/" + totalSteps + "] Tcpip 값 정리 건너뜀 (옵션 해제)");
-            }
-            else if (disableDeferred)
-            {
-                log("[3/" + totalSteps + "] Tcpip 값 정리 건너뜀 (어댑터가 아직 동작 중)");
-            }
-            else
-            {
-                log("[3/" + totalSteps + "] Tcpip\\Parameters\\Interfaces\\" + guid + " 값 정리 (EnableDHCP만 유지)");
-                try
-                {
-                    bool exists;
-                    System.Collections.Generic.List<string> deleted;
-                    int count = MacRegistry.CleanTcpipInterfaceValues(guid, out exists, out deleted);
-                    if (!exists) log("  Tcpip 인터페이스 키가 없어 건너뜀");
-                    else if (count == 0) log("  삭제할 값 없음");
-                    else log("  " + count + "개 값 삭제: " + string.Join(", ", deleted.ToArray()));
-                }
-                catch (Exception ex)
-                {
-                    tcpipWarning = "Tcpip 값 정리 실패: " + ex.Message;
-                    log("  " + tcpipWarning + " (계속 진행)");
-                }
-            }
+            // (c) Tcpip 값 자동 정리 — EnableDHCP = 1 인 경우에만 (인터페이스 값 + 전역 DhcpDomain/DhcpNameServer)
+            string tcpipWarning = CleanTcpipIfDhcp(guid, "[3/" + totalSteps + "]", disableDeferred, log);
 
             // (d) 어댑터 활성화
             log("[4/" + totalSteps + "] 어댑터 활성화");
@@ -246,8 +221,7 @@ namespace MacChanger.Core
                 result.RebootRequired = true;
                 result.CurrentMac = ReadCurrentMac(adapter, NoLog);
                 result.Message = "레지스트리에 NetworkAddress = " + MacAddressUtil.Format(mac) + "를 기록했지만 장치 관리자가 어댑터를 즉시 재시작하지 못했습니다. "
-                    + "재부팅 후 새 MAC이 적용됩니다."
-                    + (tcpipWarning != null ? " (경고: " + tcpipWarning + ")" : "");
+                    + "재부팅 후 새 MAC이 적용됩니다." + WarningSuffix(tcpipWarning);
                 return result;
             }
 
@@ -266,8 +240,7 @@ namespace MacChanger.Core
             if (string.Equals(current, mac, StringComparison.OrdinalIgnoreCase))
             {
                 result.Success = true;
-                result.Message = "MAC 변경 완료: " + MacAddressUtil.Format(current) + sourceNote
-                    + (tcpipWarning != null ? " (경고: " + tcpipWarning + ")" : "");
+                result.Message = "MAC 변경 완료: " + MacAddressUtil.Format(current) + sourceNote + WarningSuffix(tcpipWarning);
                 if (adapter.Kind == AdapterKind.Wireless && SafeRandomMacState(guid) == true)
                     result.Message += " — 주의: 이 Wi-Fi 인터페이스에 '임의 하드웨어 주소'가 켜져 있어 네트워크 연결 시 MAC이 다시 바뀔 수 있습니다. 설정에서 끄세요.";
                 return result;
@@ -288,7 +261,7 @@ namespace MacChanger.Core
             MacChangeResult result = new MacChangeResult();
             string guid = adapter.InterfaceGuid;
 
-            log("[1/3] 어댑터 비활성화: " + adapter.Description);
+            log("[1/4] 어댑터 비활성화: " + adapter.Description);
             bool disableDeferred;
             try
             {
@@ -303,7 +276,7 @@ namespace MacChanger.Core
                 log("  주의: 어댑터가 아직 동작 중입니다(재부팅 시 중지 예약). 레지스트리 값은 삭제하되 즉시 검증은 건너뜁니다.");
             Thread.Sleep(AfterDisableDelayMs);
 
-            log("[2/3] 레지스트리 NetworkAddress 값 삭제");
+            log("[2/4] 레지스트리 NetworkAddress 값 삭제");
             bool existed = false;
             try
             {
@@ -320,7 +293,10 @@ namespace MacChanger.Core
                 return result;
             }
 
-            log("[3/3] 어댑터 활성화");
+            // 변경 적용 때와 동일한 Tcpip 값 자동 정리
+            string tcpipWarning = CleanTcpipIfDhcp(guid, "[3/4]", disableDeferred, log);
+
+            log("[4/4] 어댑터 활성화");
             bool enableDeferred;
             try
             {
@@ -339,7 +315,8 @@ namespace MacChanger.Core
                 result.RebootRequired = true;
                 result.CurrentMac = ReadCurrentMac(adapter, NoLog);
                 result.Message = (existed ? "NetworkAddress 값을 삭제했지만 " : "NetworkAddress 값은 원래 없었고 ")
-                    + "장치 관리자가 어댑터를 즉시 재시작하지 못했습니다. 재부팅 후 공장 MAC으로 돌아갑니다.";
+                    + "장치 관리자가 어댑터를 즉시 재시작하지 못했습니다. 재부팅 후 공장 MAC으로 돌아갑니다."
+                    + WarningSuffix(tcpipWarning);
                 return result;
             }
 
@@ -360,13 +337,13 @@ namespace MacChanger.Core
             {
                 result.Success = true;
                 result.Message = (existed ? "NetworkAddress 삭제 및 " : "") + "어댑터 재시작 완료. 현재 MAC: " + MacAddressUtil.Format(current)
-                    + sourceNote + " (공장 MAC을 조회할 수 없어 비교는 생략)";
+                    + sourceNote + " (공장 MAC을 조회할 수 없어 비교는 생략)" + WarningSuffix(tcpipWarning);
                 return result;
             }
             if (string.Equals(current, permanent, StringComparison.OrdinalIgnoreCase))
             {
                 result.Success = true;
-                result.Message = "공장 MAC으로 복구 완료: " + MacAddressUtil.Format(current) + sourceNote;
+                result.Message = "공장 MAC으로 복구 완료: " + MacAddressUtil.Format(current) + sourceNote + WarningSuffix(tcpipWarning);
                 return result;
             }
             result.Message = "NetworkAddress를 삭제했지만 현재 MAC(" + MacAddressUtil.Format(current)
@@ -380,6 +357,60 @@ namespace MacChanger.Core
         // ------------------------------------------------------------------
         // 내부 헬퍼
         // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Tcpip 값 자동 정리. 인터페이스 키의 EnableDHCP가 1이면 그 키의 값(EnableDHCP 제외)과 전역
+        /// Tcpip\Parameters의 DhcpDomain/DhcpNameServer를 삭제한다. EnableDHCP가 0(고정 IP)이거나 값/키가 없으면 건너뛴다.
+        /// 실패해도 예외를 던지지 않고 경고 문자열을 돌려준다 (없으면 null).
+        /// </summary>
+        private static string CleanTcpipIfDhcp(string guid, string stepLabel, bool adapterStillRunning, Action<string> log)
+        {
+            if (adapterStillRunning)
+            {
+                log(stepLabel + " Tcpip 값 정리 건너뜀 (어댑터가 아직 동작 중)");
+                return null;
+            }
+            try
+            {
+                bool keyExists;
+                int? enableDhcp = MacRegistry.GetEnableDhcp(guid, out keyExists);
+                if (!keyExists)
+                {
+                    log(stepLabel + " Tcpip 값 정리 건너뜀 (Tcpip 인터페이스 키 없음)");
+                    return null;
+                }
+                if (enableDhcp == null)
+                {
+                    log(stepLabel + " Tcpip 값 정리 건너뜀 (EnableDHCP 값 없음)");
+                    return null;
+                }
+                if (enableDhcp.Value != 1)
+                {
+                    log(stepLabel + " Tcpip 값 정리 건너뜀 (EnableDHCP = " + enableDhcp.Value + ", 고정 IP 설정 유지)");
+                    return null;
+                }
+
+                log(stepLabel + " EnableDHCP = 1 → Tcpip 값 자동 정리");
+                List<string> deleted;
+                int count = MacRegistry.CleanTcpipInterfaceValues(guid, out keyExists, out deleted);
+                log("  Interfaces\\" + guid + ": " + (count == 0 ? "삭제할 값 없음" : count + "개 값 삭제 (" + string.Join(", ", deleted.ToArray()) + ")"));
+                List<string> globalDeleted = MacRegistry.DeleteGlobalDhcpValues();
+                log("  Tcpip\\Parameters: " + (globalDeleted.Count == 0 ? "DhcpDomain/DhcpNameServer 값 없음" : string.Join(", ", globalDeleted.ToArray()) + " 삭제"));
+                return null;
+            }
+            catch (Exception ex)
+            {
+                string warning = "Tcpip 값 정리 실패: " + ex.Message;
+                log("  " + warning + " (계속 진행)");
+                return warning;
+            }
+        }
+
+        private static string WarningSuffix(string warning)
+        {
+            return warning != null ? " (경고: " + warning + ")" : "";
+        }
+
         private static bool? SafeRandomMacState(string interfaceGuid)
         {
             try { return MacRegistry.GetWlanRandomMacState(interfaceGuid); }

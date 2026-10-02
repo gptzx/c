@@ -11,9 +11,10 @@ Windows 7(.NET 4.0 설치됨) / 8 / 8.1 / 10 / 11에서 추가 런타임 설치 
 | 어댑터 열거 | `root\StandardCimv2\MSFT_NetAdapter` → 실패/빈 결과 시 `Win32_NetworkAdapter` → `GetAdaptersAddresses` 순으로 폴백. 드롭다운에 `[유선]/[무선]/[블루투스]/[기타]` 라벨 + 설명 + 현재 MAC 표시 (Windows 7의 `Win32_NetworkAdapter` 경로에서는 `GetAdaptersAddresses`의 IfType으로 무선 여부를 보강) |
 | 원래(공장) MAC | `\\.\{GUID}`에 `IOCTL_NDIS_QUERY_GLOBAL_STATS` + `OID_802_3_PERMANENT_ADDRESS`로 조회, 실패 시 `MSFT_NetAdapter.PermanentAddress`. 파일에 저장하지 않고 매번 조회 |
 | 현재 MAC | `OID_802_3_CURRENT_ADDRESS` → `GetAdaptersAddresses` → WMI 순으로 조회 |
-| 랜덤 생성 | 첫 옥텟 `02` 고정(기본) 또는 `02/06/0A/0E` 중 무작위 → 항상 유니캐스트(bit0=0)·로컬관리(bit1=1). 왼쪽에서 두 번째 자리는 항상 2/6/A/E |
-| 변경 적용 | (a) SetupAPI `DICS_DISABLE`(실패 시 WMI `Disable()`) → (b) `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4D36E972-…}\00XX` 중 `NetCfgInstanceId`가 일치하는 키에 `NetworkAddress`(REG_SZ, 하이픈 없는 12자리) 기록 → (c) `Tcpip\Parameters\Interfaces\{GUID}`에서 `EnableDHCP`만 남기고 모든 값 삭제(하위 키는 유지, 체크박스로 끌 수 있음) → (d) SetupAPI `DICS_ENABLE`(실패 시 WMI `Enable()` + 재시도) → NDIS에서 현재 MAC을 다시 읽어 검증 |
-| 원상복구 | `NetworkAddress` 값 삭제 후 어댑터 재시작 → 공장 MAC과 비교 |
+| 랜덤 생성 | 선택한 어댑터 종류에 따라 자동. **무선**: 12자리 중 왼쪽에서 두 번째 자리만 `2/6/A/E` 중 하나(`X2/X6/XA/XE-XX-XX-XX-XX-XX`), 나머지 11자리는 `0~F` 전부 무작위(첫 자리도 고정하지 않음). **유선/기타**: 두 번째 자리만 짝수(`0/2/4/6/8/A/C/E`), 나머지 11자리 `0~F`, `00-00-00-00-00-00`과 `FF-FF-FF-FF-FF-FF` 제외 |
+| 변경 적용 | 확인 대화 상자 없이 바로 실행. (a) SetupAPI `DICS_DISABLE`(실패 시 WMI `Disable()`) → (b) `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4D36E972-…}\00XX` 중 `NetCfgInstanceId`가 일치하는 키에 `NetworkAddress`(REG_SZ, 하이픈 없는 12자리) 기록 → (c) Tcpip 값 자동 정리(아래 참고) → (d) SetupAPI `DICS_ENABLE`(실패 시 WMI `Enable()` + 재시도) → NDIS에서 현재 MAC을 다시 읽어 검증 |
+| Tcpip 값 자동 정리 | `Tcpip\Parameters\Interfaces\{GUID}`의 `EnableDHCP`가 **1**이면 그 키의 값을 `EnableDHCP`만 남기고 모두 삭제(하위 키는 유지)하고, 전역 `HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters`의 `DhcpDomain`·`DhcpNameServer` 값도 삭제. `EnableDHCP`가 **0**(고정 IP)이거나 값이 없으면 아무것도 지우지 않음. 변경 적용과 원상복구 모두에서 수행 |
+| 원상복구 | 확인 대화 상자 없이 바로 실행. `NetworkAddress` 값 삭제 → Tcpip 값 자동 정리 → 어댑터 재시작 → 공장 MAC과 비교 |
 | 재부팅 보류 처리 | 장치 관리자가 어댑터를 즉시 중지/재시작하지 못해 재부팅 필요 플래그(`DI_NEEDREBOOT`)를 설정하면, 잘못된 "드라이버 거부" 판정 대신 "재부팅 후 적용" 상태로 안내 |
 | 상태 표시 | 상태 라벨: `준비 / 진행 / 완료 / 실패` + 단계별 한국어 로그 |
 
@@ -22,7 +23,7 @@ Windows 7(.NET 4.0 설치됨) / 8 / 8.1 / 10 / 11에서 추가 런타임 설치 
 * `app.manifest`에 `requestedExecutionLevel level="requireAdministrator"`가 포함되어 UAC 승격을 요구합니다.
 * 레지스트리는 항상 `RegistryView.Registry64`로 열어 64비트 OS에서 32비트 프로세스로 실행되어도 WOW64 리다이렉션 문제가 없습니다. (32비트 OS에서는 Registry64 지정이 무시됩니다.)
 * 빌드는 **AnyCPU(Prefer32Bit=false)**이므로 64비트 OS에서는 64비트 프로세스로 실행됩니다. 32비트 프로세스로 실행되면 `SetupDiCallClassInstaller`가 `ERROR_IN_WOW64`로 실패하는데, 이 경우 자동으로 WMI 폴백을 사용합니다.
-* 무선 어댑터는 드라이버/OS 제약으로 첫 옥텟이 `02`가 아니면 변경이 무시될 수 있습니다. 적용 후 현재 MAC이 요청값과 다르면 안내 메시지를 띄웁니다. Windows 10 이상의 Wi-Fi "임의 하드웨어 주소" 설정이 켜져 있으면(`HKLM\SOFTWARE\Microsoft\WlanSvc\Interfaces\{GUID}\RandomMacState` 또는 `%ProgramData%\Microsoft\Wlansvc\Profiles\Interfaces\{GUID}\*.xml`의 `<enableRandomization>true</enableRandomization>`) 경고합니다.
+* 무선 어댑터는 드라이버/OS 제약으로 두 번째 자리가 `2/6/A/E`(로컬 관리 주소)가 아니면 변경이 무시될 수 있습니다. 랜덤 생성이 무선 어댑터에서 이 규칙을 자동으로 따르며, 직접 입력한 값이 규칙에 어긋나면 로그에 경고를 남깁니다. 적용 후 현재 MAC이 요청값과 다르면 안내 메시지를 띄웁니다. Windows 10 이상의 Wi-Fi "임의 하드웨어 주소" 설정이 켜져 있으면(`HKLM\SOFTWARE\Microsoft\WlanSvc\Interfaces\{GUID}\RandomMacState` 또는 `%ProgramData%\Microsoft\Wlansvc\Profiles\Interfaces\{GUID}\*.xml`의 `<enableRandomization>true</enableRandomization>`) 경고합니다.
 
 ## 파일 구성
 
@@ -34,14 +35,14 @@ MacChanger/
   MacChanger.csproj                    ← .NET Framework 4.0, AnyCPU, 매니페스트 포함
   app.manifest                         ← requireAdministrator, supportedOS(Win7~11), dpiAware
   Program.cs                           ← 진입점, 관리자 권한 확인, 전역 예외 처리
-  MainForm.cs / MainForm.Designer.cs   ← UI (드롭다운, 원래/현재 MAC, 새 MAC, 랜덤 생성, 변경 적용, 원상복구, 상태 라벨, 체크박스 2개, 로그)
+  MainForm.cs / MainForm.Designer.cs   ← UI (드롭다운, 원래/현재 MAC, 새 MAC, 랜덤 생성, 변경 적용, 원상복구, 상태 라벨, 로그)
   Properties/AssemblyInfo.cs
   Core/
-    MacAddressUtil.cs                  ← MAC 정규화/서식/검증/랜덤 생성
+    MacAddressUtil.cs                  ← MAC 정규화/서식/검증/랜덤 생성(무선·유선 규칙)
     NetworkAdapterInfo.cs              ← 어댑터 정보 모델, 유선/무선/블루투스 라벨
     AdapterEnumerator.cs               ← MSFT_NetAdapter → Win32_NetworkAdapter → GetAdaptersAddresses 열거
     NdisQuery.cs                       ← IOCTL_NDIS_QUERY_GLOBAL_STATS로 공장/현재 MAC 조회
-    MacRegistry.cs                     ← HKLM(64비트 뷰) NetworkAddress / Tcpip 값 정리 / 임의 하드웨어 주소 설정 확인
+    MacRegistry.cs                     ← HKLM(64비트 뷰) NetworkAddress / EnableDHCP 확인 / Tcpip 값 정리(인터페이스 + 전역 DhcpDomain·DhcpNameServer) / 임의 하드웨어 주소 설정 확인
     AdapterController.cs               ← SetupAPI DICS_DISABLE/ENABLE(재부팅 필요 플래그 보고), WMI Enable()/Disable() 폴백
     MacChangeService.cs                ← 변경 적용 / 원상복구 절차
   Native/
@@ -85,13 +86,14 @@ VS 2017 이상의 MSBuild(Developer Command Prompt의 `msbuild`)에서는 같은
 
 1. `MacChanger.exe` 실행 → UAC 승격 확인.
 2. 드롭다운에서 어댑터 선택 → 원래(공장) MAC / 현재 MAC / 레지스트리 NetworkAddress 상태가 표시됩니다.
-3. **랜덤 생성**을 누르거나 새 MAC을 직접 입력합니다. (`02-1A-2B-3C-4D-5E`, `021A2B3C4D5E`, `02:1A:…` 모두 허용)
-4. **변경 적용** → 확인 창의 경고를 읽고 진행. 어댑터가 재시작되며 완료 후 현재 MAC이 갱신됩니다.
-5. **원상복구** → `NetworkAddress` 값을 지우고 어댑터를 재시작하여 공장 MAC으로 돌아갑니다.
+3. **랜덤 생성**을 누르거나 새 MAC을 직접 입력합니다. (`02-1A-2B-3C-4D-5E`, `021A2B3C4D5E`, `02:1A:…` 모두 허용) 랜덤 생성은 선택한 어댑터가 무선이면 두 번째 자리를 2/6/A/E로, 유선이면 짝수로 만듭니다.
+4. **변경 적용** → 확인 창 없이 바로 어댑터가 재시작되며, 완료 후 현재 MAC이 갱신됩니다. 주의 사항은 로그에 표시됩니다.
+5. **원상복구** → 확인 창 없이 바로 `NetworkAddress` 값을 지우고(필요 시 Tcpip 값 정리) 어댑터를 재시작하여 공장 MAC으로 돌아갑니다.
 
 ## 주의 사항
 
-* **Tcpip 값 정리** 체크박스가 켜져 있으면 해당 어댑터의 고정 IP / 서브넷 / 게이트웨이 / DNS 설정이 삭제됩니다(`EnableDHCP`만 유지). 고정 IP를 쓰는 어댑터라면 체크를 끄거나 변경 후 다시 설정하세요.
+* **Tcpip 값 자동 정리**는 `EnableDHCP = 1`(DHCP 사용)인 어댑터에서만 동작하며, DHCP 임대 정보(`DhcpIPAddress`, `DhcpNameServer`, `DhcpDomain` 등)가 삭제되어 재연결 시 새로 받습니다. 고정 IP(`EnableDHCP = 0`) 어댑터는 아무 값도 지우지 않습니다.
+* 변경 적용과 원상복구는 확인 창 없이 즉시 실행됩니다. 실패하거나 재부팅이 필요한 경우에만 안내 창이 뜹니다.
 * 일부 드라이버(특히 무선, 일부 USB 이더넷)는 `NetworkAddress` 값을 지원하지 않거나 로컬 관리 주소(두 번째 자리 2/6/A/E)만 허용합니다.
 * 어댑터를 즉시 중지할 수 없는 경우(장치 관리자가 재부팅 필요 플래그 설정) 레지스트리 값은 기록되고 재부팅 후 적용됩니다. 프로그램이 이를 감지해 "재부팅 후 적용" 안내를 띄웁니다.
 * 프로그램 자체는 어떤 설정 파일/레지스트리 키도 만들지 않습니다. 다만 .NET 런타임이 일부 Windows 10 버전에서 `%LOCALAPPDATA%\Microsoft\CLR_v4.0\UsageLogs\`에 사용 로그를 남기는 것은 OS/런타임 동작으로 프로그램과 무관합니다.

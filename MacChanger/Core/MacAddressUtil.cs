@@ -72,34 +72,56 @@ namespace MacChanger.Core
             return (FirstOctet(mac) & 0x02) != 0;
         }
 
+        /// <summary>00-00-00-00-00-00</summary>
         public static bool IsAllZero(string mac)
         {
+            return Normalize(mac) == "000000000000";
+        }
+
+        /// <summary>FF-FF-FF-FF-FF-FF (브로드캐스트)</summary>
+        public static bool IsAllFF(string mac)
+        {
+            return Normalize(mac) == "FFFFFFFFFFFF";
+        }
+
+        /// <summary>왼쪽에서 두 번째 16진 자리(첫 옥텟의 하위 니블)</summary>
+        public static char SecondDigit(string mac)
+        {
             string n = Normalize(mac);
-            return n == "000000000000";
+            if (n == null) throw new ArgumentException("MAC 형식이 올바르지 않습니다.", "mac");
+            return n[1];
+        }
+
+        /// <summary>무선 규칙: 두 번째 자리가 2/6/A/E (유니캐스트 + 로컬 관리)</summary>
+        public static bool MatchesWirelessRule(string mac)
+        {
+            return "26AE".IndexOf(SecondDigit(mac)) >= 0;
         }
 
         /// <summary>
-        /// 랜덤 MAC 생성. 첫 옥텟은 항상 유니캐스트(bit0=0)·로컬관리(bit1=1).
-        /// fixFirstOctetTo02 == true이면 첫 옥텟을 0x02로 고정, false이면 0x02/0x06/0x0A/0x0E 중 무작위.
-        /// 결과적으로 왼쪽에서 두 번째 자리는 항상 2/6/A/E 이다.
+        /// 랜덤 MAC 생성 (12자리 모두 0~F 범위에서 무작위, 첫 자리도 고정하지 않음).
+        /// wireless == true  : 왼쪽에서 두 번째 자리만 2/6/A/E 중 하나 → X2/X6/XA/XE-XX-XX-XX-XX-XX (유니캐스트·로컬관리 보장)
+        /// wireless == false : 왼쪽에서 두 번째 자리만 짝수(0/2/4/6/8/A/C/E) → 유니캐스트 보장, 00-00-00-00-00-00 과 FF-FF-FF-FF-FF-FF 는 제외
         /// </summary>
-        public static string GenerateRandom(bool fixFirstOctetTo02)
+        public static string GenerateRandom(bool wireless)
         {
-            byte[] b = new byte[6];
+            const string hex = "0123456789ABCDEF";
+            string secondChoices = wireless ? "26AE" : "02468ACE";
+            byte[] rnd = new byte[12];
             using (RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider())
             {
-                rng.GetBytes(b);
+                for (int attempt = 0; attempt < 64; attempt++)
+                {
+                    rng.GetBytes(rnd);
+                    char[] c = new char[12];
+                    for (int i = 0; i < 12; i++) c[i] = hex[rnd[i] & 0x0F];
+                    c[1] = secondChoices[rnd[1] & (secondChoices.Length - 1)];   // 4 또는 8개 중 균등 선택
+                    string mac = new string(c);
+                    if (mac == "000000000000" || mac == "FFFFFFFFFFFF") continue;
+                    return mac;
+                }
             }
-            if (fixFirstOctetTo02)
-            {
-                b[0] = 0x02;
-            }
-            else
-            {
-                byte[] choices = new byte[] { 0x02, 0x06, 0x0A, 0x0E };
-                b[0] = choices[b[0] & 0x03];
-            }
-            return FromBytes(b, 6);
+            throw new InvalidOperationException("랜덤 MAC 생성에 실패했습니다.");
         }
     }
 }

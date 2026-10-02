@@ -15,7 +15,10 @@ namespace MacChanger.Core
     {
         public const string NetClassGuid = "{4D36E972-E325-11CE-BFC1-08002BE10318}";
         public const string NetClassKeyPath = @"SYSTEM\CurrentControlSet\Control\Class\" + NetClassGuid;
-        public const string TcpipInterfacesKeyPath = @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces";
+        public const string TcpipParametersKeyPath = @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters";
+        public const string TcpipInterfacesKeyPath = TcpipParametersKeyPath + @"\Interfaces";
+        /// <summary>EnableDHCP=1 인 어댑터를 정리할 때 Tcpip\Parameters(전역)에서 함께 삭제하는 값</summary>
+        public static readonly string[] GlobalDhcpValueNames = new string[] { "DhcpDomain", "DhcpNameServer" };
         public const string WlanSvcInterfacesKeyPath = @"SOFTWARE\Microsoft\WlanSvc\Interfaces";
 
         public const string NetCfgInstanceIdValueName = "NetCfgInstanceId";
@@ -131,6 +134,51 @@ namespace MacChanger.Core
                     throw new InvalidOperationException("NetworkAddress 값을 삭제하지 못했습니다 (값이 아직 남아 있음).");
                 return true;
             }
+        }
+
+        /// <summary>
+        /// Tcpip\Parameters\Interfaces\{GUID} 의 EnableDHCP 값. 키가 없으면 keyExists=false. 값이 없거나 숫자가 아니면 null.
+        /// </summary>
+        public static int? GetEnableDhcp(string interfaceGuid, out bool keyExists)
+        {
+            keyExists = false;
+            using (RegistryKey hklm = OpenHklm64())
+            using (RegistryKey key = hklm.OpenSubKey(TcpipInterfacesKeyPath + "\\" + interfaceGuid, false))
+            {
+                if (key == null) return null;
+                keyExists = true;
+                object value = key.GetValue(EnableDhcpValueName);
+                if (value == null) return null;
+                try { return Convert.ToInt32(value); }
+                catch (FormatException) { return null; }
+                catch (InvalidCastException) { return null; }
+                catch (OverflowException) { return null; }
+            }
+        }
+
+        /// <summary>
+        /// Tcpip\Parameters(전역) 키에서 DhcpDomain, DhcpNameServer 값을 삭제한다 (있는 것만). 삭제한 이름을 돌려주고 삭제 실패 시 예외.
+        /// </summary>
+        public static List<string> DeleteGlobalDhcpValues()
+        {
+            List<string> deleted = new List<string>();
+            List<string> failed = new List<string>();
+            using (RegistryKey hklm = OpenHklm64())
+            using (RegistryKey key = hklm.OpenSubKey(TcpipParametersKeyPath, true))
+            {
+                if (key == null) throw new InvalidOperationException("Tcpip\\Parameters 키를 열 수 없습니다.");
+                foreach (string name in GlobalDhcpValueNames)
+                {
+                    if (key.GetValue(name) == null) continue;
+                    key.DeleteValue(name, false);
+                    if (key.GetValue(name) != null) failed.Add(name);
+                    else deleted.Add(name);
+                }
+                key.Flush();
+            }
+            if (failed.Count > 0)
+                throw new InvalidOperationException("삭제되지 않은 값: " + string.Join(", ", failed.ToArray()));
+            return deleted;
         }
 
         /// <summary>

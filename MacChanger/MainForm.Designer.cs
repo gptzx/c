@@ -29,8 +29,7 @@
             this.lblNew = new System.Windows.Forms.Label();
             this.txtNewMac = new System.Windows.Forms.TextBox();
             this.btnRandom = new System.Windows.Forms.Button();
-            this.chkFixFirstOctet = new System.Windows.Forms.CheckBox();
-            this.chkCleanTcpip = new System.Windows.Forms.CheckBox();
+            this.lblRules = new System.Windows.Forms.Label();
             this.btnApply = new System.Windows.Forms.Button();
             this.btnRestore = new System.Windows.Forms.Button();
             this.lblStatus = new System.Windows.Forms.Label();
@@ -151,29 +150,17 @@
             this.btnRandom.UseVisualStyleBackColor = true;
             this.btnRandom.Click += new System.EventHandler(this.btnRandom_Click);
             // 
-            // chkFixFirstOctet
+            // lblRules
             // 
-            this.chkFixFirstOctet.AutoSize = true;
-            this.chkFixFirstOctet.Checked = true;
-            this.chkFixFirstOctet.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkFixFirstOctet.Location = new System.Drawing.Point(130, 146);
-            this.chkFixFirstOctet.Name = "chkFixFirstOctet";
-            this.chkFixFirstOctet.Size = new System.Drawing.Size(123, 19);
-            this.chkFixFirstOctet.TabIndex = 11;
-            this.chkFixFirstOctet.Text = "첫 옥텟 02 고정";
-            this.chkFixFirstOctet.UseVisualStyleBackColor = true;
-            // 
-            // chkCleanTcpip
-            // 
-            this.chkCleanTcpip.AutoSize = true;
-            this.chkCleanTcpip.Checked = true;
-            this.chkCleanTcpip.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkCleanTcpip.Location = new System.Drawing.Point(334, 146);
-            this.chkCleanTcpip.Name = "chkCleanTcpip";
-            this.chkCleanTcpip.Size = new System.Drawing.Size(109, 19);
-            this.chkCleanTcpip.TabIndex = 12;
-            this.chkCleanTcpip.Text = "Tcpip 값 정리";
-            this.chkCleanTcpip.UseVisualStyleBackColor = true;
+            this.lblRules.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblRules.AutoEllipsis = true;
+            this.lblRules.ForeColor = System.Drawing.SystemColors.GrayText;
+            this.lblRules.Location = new System.Drawing.Point(130, 143);
+            this.lblRules.Name = "lblRules";
+            this.lblRules.Size = new System.Drawing.Size(498, 30);
+            this.lblRules.TabIndex = 11;
+            this.lblRules.Text = "랜덤 규칙: 무선 = 두 번째 자리 2/6/A/E, 유선 = 두 번째 자리 짝수 (나머지 11자리 0~F)\r\nTcpip 정리: EnableDHCP = 1인 어댑터만 자동 (DhcpDomain/DhcpNameServer 포함)";
             // 
             // btnApply
             // 
@@ -241,8 +228,7 @@
             this.Controls.Add(this.lblStatus);
             this.Controls.Add(this.btnRestore);
             this.Controls.Add(this.btnApply);
-            this.Controls.Add(this.chkCleanTcpip);
-            this.Controls.Add(this.chkFixFirstOctet);
+            this.Controls.Add(this.lblRules);
             this.Controls.Add(this.btnRandom);
             this.Controls.Add(this.txtNewMac);
             this.Controls.Add(this.lblNew);
@@ -279,8 +265,7 @@
         private System.Windows.Forms.Label lblNew;
         private System.Windows.Forms.TextBox txtNewMac;
         private System.Windows.Forms.Button btnRandom;
-        private System.Windows.Forms.CheckBox chkFixFirstOctet;
-        private System.Windows.Forms.CheckBox chkCleanTcpip;
+        private System.Windows.Forms.Label lblRules;
         private System.Windows.Forms.Button btnApply;
         private System.Windows.Forms.Button btnRestore;
         private System.Windows.Forms.Label lblStatus;

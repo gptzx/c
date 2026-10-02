@@ -20,7 +20,6 @@ namespace MacChanger
             public OperationKind Kind;
             public NetworkAdapterInfo Adapter;
             public string NewMac;
-            public bool CleanTcpip;
         }
 
         private bool busy;
@@ -30,8 +29,10 @@ namespace MacChanger
         public MainForm()
         {
             InitializeComponent();
-            toolTip.SetToolTip(chkFixFirstOctet, "켜면 랜덤 생성 시 첫 옥텟을 항상 02로 고정합니다. 끄면 02/06/0A/0E 중 무작위로 고릅니다. (둘 다 유니캐스트·로컬관리 주소)");
-            toolTip.SetToolTip(chkCleanTcpip, "변경 적용 시 HKLM\\...\\Tcpip\\Parameters\\Interfaces\\{GUID}의 값 중 EnableDHCP만 남기고 모두 삭제합니다. (고정 IP/DNS 설정이 지워집니다)");
+            toolTip.SetToolTip(lblRules,
+                "랜덤 생성: 무선 어댑터는 왼쪽에서 두 번째 자리를 2/6/A/E 중 하나로, 유선 어댑터는 짝수(0/2/4/6/8/A/C/E) 중 하나로 만들고 나머지 11자리는 0~F 무작위입니다.\r\n"
+                + "Tcpip 정리: 변경 적용/원상복구 시 Tcpip\\Parameters\\Interfaces\\{GUID}의 EnableDHCP가 1이면 그 키의 값(EnableDHCP 제외)과 "
+                + "Tcpip\\Parameters의 DhcpDomain/DhcpNameServer를 자동으로 삭제합니다. EnableDHCP가 0(고정 IP)이면 아무것도 지우지 않습니다.");
             toolTip.SetToolTip(txtNewMac, "12자리 16진수. 구분자(-, :, .)는 있어도 되고 없어도 됩니다. 예: 02-1A-2B-3C-4D-5E");
             toolTip.SetToolTip(btnRestore, "NetworkAddress 레지스트리 값을 삭제하고 어댑터를 재시작하여 공장 MAC으로 되돌립니다.");
         }
@@ -84,9 +85,11 @@ namespace MacChanger
         {
             try
             {
-                string mac = MacAddressUtil.GenerateRandom(chkFixFirstOctet.Checked);
+                NetworkAdapterInfo adapter = SelectedAdapter;
+                bool wireless = adapter != null && adapter.Kind == AdapterKind.Wireless;
+                string mac = MacAddressUtil.GenerateRandom(wireless);
                 txtNewMac.Text = MacAddressUtil.Format(mac);
-                SetStatus("준비", "랜덤 MAC 생성됨: " + txtNewMac.Text);
+                SetStatus("준비", "랜덤 MAC 생성됨 (" + (wireless ? "무선 규칙: 두 번째 자리 2/6/A/E" : "유선 규칙: 두 번째 자리 짝수") + "): " + txtNewMac.Text);
             }
             catch (Exception ex)
             {
@@ -116,9 +119,10 @@ namespace MacChanger
                 txtNewMac.Focus();
                 return;
             }
-            if (MacAddressUtil.IsAllZero(mac))
+            if (MacAddressUtil.IsAllZero(mac) || MacAddressUtil.IsAllFF(mac))
             {
-                SetStatus("실패", "00-00-00-00-00-00은 사용할 수 없습니다.");
+                SetStatus("실패", "00-00-00-00-00-00 과 FF-FF-FF-FF-FF-FF 는 사용할 수 없습니다.");
+                txtNewMac.Focus();
                 return;
             }
             string currentNormalized = MacAddressUtil.Normalize(txtCurrentMac.Text);
@@ -128,44 +132,23 @@ namespace MacChanger
                 return;
             }
 
-            List<string> warnings = new List<string>();
-            if (!MacAddressUtil.IsLocallyAdministered(mac))
-                warnings.Add("입력한 MAC은 로컬 관리 주소가 아닙니다(두 번째 자리 2/6/A/E 권장). 드라이버가 거부할 수 있습니다.");
+            // 확인 대화 상자 없이 바로 적용한다. 주의할 점은 로그에만 남긴다.
             if (adapter.Kind == AdapterKind.Wireless)
             {
-                if (MacAddressUtil.FirstOctet(mac) != 0x02)
-                    warnings.Add("무선 어댑터는 드라이버/OS 제약으로 첫 옥텟이 02가 아니면 변경이 무시될 수 있습니다.");
-                bool? randomMac = SafeGetRandomMacState(adapter.InterfaceGuid);
-                if (randomMac == true)
-                    warnings.Add("이 Wi-Fi 인터페이스에 Windows '임의 하드웨어 주소' 설정이 켜져 있습니다. 변경과 충돌할 수 있으니 설정 > 네트워크 및 인터넷 > Wi-Fi에서 끄는 것을 권장합니다.");
-                else
-                    warnings.Add("Windows 10 이상에서 '임의 하드웨어 주소'(Random hardware addresses)가 켜져 있으면 변경이 충돌할 수 있습니다.");
+                if (!MacAddressUtil.MatchesWirelessRule(mac))
+                    AppendLog("경고: 무선 어댑터는 두 번째 자리가 2/6/A/E가 아니면 드라이버/OS가 변경을 무시할 수 있습니다: " + MacAddressUtil.Format(mac));
+                if (SafeGetRandomMacState(adapter.InterfaceGuid) == true)
+                    AppendLog("경고: 이 Wi-Fi 인터페이스에 Windows '임의 하드웨어 주소' 설정이 켜져 있어 변경과 충돌할 수 있습니다. 설정 > 네트워크 및 인터넷 > Wi-Fi에서 끄는 것을 권장합니다.");
             }
-            if (chkCleanTcpip.Checked)
-                warnings.Add("'Tcpip 값 정리'가 켜져 있어 이 어댑터의 고정 IP/DNS 설정이 삭제됩니다 (EnableDHCP만 유지).");
-
-            StringBuilder sb = new StringBuilder();
-            sb.AppendLine("다음 어댑터의 MAC을 변경합니다. 변경 중 네트워크 연결이 잠시 끊어집니다.");
-            sb.AppendLine();
-            sb.AppendLine("어댑터: " + adapter.Description);
-            sb.AppendLine("현재 MAC: " + (txtCurrentMac.Text.Length > 0 ? txtCurrentMac.Text : "-"));
-            sb.AppendLine("새 MAC: " + MacAddressUtil.Format(mac));
-            if (warnings.Count > 0)
+            else if (!MacAddressUtil.IsLocallyAdministered(mac))
             {
-                sb.AppendLine();
-                foreach (string w in warnings) sb.AppendLine("※ " + w);
+                AppendLog("참고: 입력한 MAC은 로컬 관리 주소가 아닙니다(두 번째 자리 2/6/A/E 아님). 일부 드라이버는 거부할 수 있습니다.");
             }
-            sb.AppendLine();
-            sb.Append("계속하시겠습니까?");
-
-            if (MessageBox.Show(this, sb.ToString(), "변경 적용", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
-                return;
 
             OperationArgs args = new OperationArgs();
             args.Kind = OperationKind.Apply;
             args.Adapter = adapter;
             args.NewMac = mac;
-            args.CleanTcpip = chkCleanTcpip.Checked;
             StartOperation(args);
         }
 
@@ -177,12 +160,7 @@ namespace MacChanger
                 SetStatus("실패", "어댑터를 선택하세요.");
                 return;
             }
-            string message = "다음 어댑터의 NetworkAddress 레지스트리 값을 삭제하고 어댑터를 재시작하여 공장 MAC으로 되돌립니다.\r\n\r\n"
-                + "어댑터: " + adapter.Description + "\r\n"
-                + "공장 MAC: " + (txtPermanentMac.Text.Length > 0 ? txtPermanentMac.Text : "-") + "\r\n\r\n계속하시겠습니까?";
-            if (MessageBox.Show(this, message, "원상복구", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
-                return;
-
+            // 확인 대화 상자 없이 바로 복구한다.
             OperationArgs args = new OperationArgs();
             args.Kind = OperationKind.Restore;
             args.Adapter = adapter;
@@ -363,7 +341,7 @@ namespace MacChanger
 
             MacChangeResult result;
             if (args.Kind == OperationKind.Apply)
-                result = MacChangeService.Apply(args.Adapter, args.NewMac, args.CleanTcpip, log);
+                result = MacChangeService.Apply(args.Adapter, args.NewMac, log);
             else
                 result = MacChangeService.Restore(args.Adapter, log);
             e.Result = result;
@@ -434,8 +412,6 @@ namespace MacChanger
             btnRefresh.Enabled = !value;
             txtNewMac.Enabled = !value;
             btnRandom.Enabled = !value;
-            chkFixFirstOctet.Enabled = !value;
-            chkCleanTcpip.Enabled = !value;
             btnApply.Enabled = !value;
             btnRestore.Enabled = !value;
             UseWaitCursor = value;
