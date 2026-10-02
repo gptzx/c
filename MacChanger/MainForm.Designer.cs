@@ -160,7 +160,7 @@
             this.lblRules.Name = "lblRules";
             this.lblRules.Size = new System.Drawing.Size(498, 30);
             this.lblRules.TabIndex = 11;
-            this.lblRules.Text = "랜덤 규칙: 무선 = 두 번째 자리 2/6/A/E, 유선 = 두 번째 자리 짝수 (나머지 11자리 0~F)\r\nTcpip 정리: EnableDHCP = 1인 어댑터만 자동 (DhcpDomain/DhcpNameServer 포함)";
+            this.lblRules.Text = "랜덤 규칙: 무선 = 두 번째 자리 2/6/A/E, 유선·기타 = 짝수 (나머지 0~F)\r\nTcpip 정리: EnableDHCP = 1인 어댑터만 자동 (DhcpDomain/DhcpNameServer 포함)";
             // 
             // btnApply
             // 

@@ -273,7 +273,7 @@ namespace MacChanger.Core
                 return result;
             }
             if (disableDeferred)
-                log("  주의: 어댑터가 아직 동작 중입니다(재부팅 시 중지 예약). 레지스트리 값은 삭제하되 즉시 검증은 건너뜁니다.");
+                log("  주의: 어댑터가 아직 동작 중입니다(재부팅 시 중지 예약). 레지스트리 값은 삭제하되 Tcpip 정리와 즉시 검증은 건너뜁니다.");
             Thread.Sleep(AfterDisableDelayMs);
 
             log("[2/4] 레지스트리 NetworkAddress 값 삭제");
@@ -391,19 +391,44 @@ namespace MacChanger.Core
                 }
 
                 log(stepLabel + " EnableDHCP = 1 → Tcpip 값 자동 정리");
-                List<string> deleted;
-                int count = MacRegistry.CleanTcpipInterfaceValues(guid, out keyExists, out deleted);
-                log("  Interfaces\\" + guid + ": " + (count == 0 ? "삭제할 값 없음" : count + "개 값 삭제 (" + string.Join(", ", deleted.ToArray()) + ")"));
-                List<string> globalDeleted = MacRegistry.DeleteGlobalDhcpValues();
-                log("  Tcpip\\Parameters: " + (globalDeleted.Count == 0 ? "DhcpDomain/DhcpNameServer 값 없음" : string.Join(", ", globalDeleted.ToArray()) + " 삭제"));
-                return null;
             }
             catch (Exception ex)
             {
-                string warning = "Tcpip 값 정리 실패: " + ex.Message;
-                log("  " + warning + " (계속 진행)");
+                string warning = "EnableDHCP 확인 실패: " + ex.Message;
+                log("  " + warning + " (정리 건너뜀, 계속 진행)");
                 return warning;
             }
+
+            // 인터페이스 값 삭제와 전역 값 삭제는 서로 독립이므로 한쪽이 실패해도 다른 쪽은 시도한다.
+            string interfaceWarning = null;
+            try
+            {
+                bool exists;
+                List<string> deleted;
+                int count = MacRegistry.CleanTcpipInterfaceValues(guid, out exists, out deleted);
+                log("  Interfaces\\" + guid + ": " + (count == 0 ? "삭제할 값 없음" : count + "개 값 삭제 (" + string.Join(", ", deleted.ToArray()) + ")"));
+            }
+            catch (Exception ex)
+            {
+                interfaceWarning = "인터페이스 Tcpip 값 정리 실패: " + ex.Message;
+                log("  " + interfaceWarning + " (계속 진행)");
+            }
+
+            string globalWarning = null;
+            try
+            {
+                List<string> globalDeleted = MacRegistry.DeleteGlobalDhcpValues();
+                log("  Tcpip\\Parameters: " + (globalDeleted.Count == 0 ? "DhcpDomain/DhcpNameServer 값 없음" : string.Join(", ", globalDeleted.ToArray()) + " 삭제"));
+            }
+            catch (Exception ex)
+            {
+                globalWarning = "전역 DhcpDomain/DhcpNameServer 삭제 실패: " + ex.Message;
+                log("  " + globalWarning + " (계속 진행)");
+            }
+
+            if (interfaceWarning == null && globalWarning == null) return null;
+            if (interfaceWarning != null && globalWarning != null) return interfaceWarning + "; " + globalWarning;
+            return interfaceWarning ?? globalWarning;
         }
 
         private static string WarningSuffix(string warning)
@@ -435,9 +460,9 @@ namespace MacChanger.Core
             StringBuilder sb = new StringBuilder();
             if (adapter.Kind == AdapterKind.Wireless)
             {
-                sb.AppendLine("무선 어댑터는 드라이버/OS 제약으로 첫 옥텟이 02(또는 06/0A/0E)가 아니면 변경이 무시될 수 있습니다.");
-                if (MacAddressUtil.FirstOctet(mac) != 0x02)
-                    sb.AppendLine("'첫 옥텟 02 고정' 옵션을 켜고 '랜덤 생성'으로 다시 만든 뒤 적용해 보세요.");
+                sb.AppendLine("무선 어댑터는 드라이버/OS 제약으로 두 번째 자리가 2/6/A/E(유니캐스트·로컬 관리 주소)가 아니면 변경이 무시될 수 있습니다.");
+                if (!MacAddressUtil.MatchesWirelessRule(mac))
+                    sb.AppendLine("무선 어댑터를 선택한 상태에서 '랜덤 생성'을 눌러 두 번째 자리가 2/6/A/E인 주소(X2/X6/XA/XE-XX-XX-XX-XX-XX)를 만든 뒤 다시 적용해 보세요.");
                 if (SafeRandomMacState(adapter.InterfaceGuid) == true)
                     sb.AppendLine("이 Wi-Fi 인터페이스에 '임의 하드웨어 주소'가 켜져 있습니다. 설정 > 네트워크 및 인터넷 > Wi-Fi에서 끄고 다시 시도하세요.");
                 else
@@ -448,8 +473,8 @@ namespace MacChanger.Core
                 sb.AppendLine("일부 드라이버는 NetworkAddress 값을 지원하지 않거나 로컬 관리 주소(두 번째 자리 2/6/A/E)만 허용합니다.");
                 sb.AppendLine("장치 관리자 > 어댑터 속성 > 고급 탭에 '네트워크 주소(Network Address)' 항목이 있는지 확인하세요.");
             }
-            if (!MacAddressUtil.IsLocallyAdministered(mac))
-                sb.AppendLine("입력한 MAC은 로컬 관리 주소가 아닙니다. 두 번째 자리를 2/6/A/E로 바꿔 보세요.");
+            if (adapter.Kind != AdapterKind.Wireless && !MacAddressUtil.IsLocallyAdministered(mac))
+                sb.AppendLine("적용한 MAC은 로컬 관리 주소가 아닙니다(두 번째 자리 2/6/A/E 아님). 드라이버가 이를 거부한다면 두 번째 자리를 2/6/A/E로 바꿔 보세요.");
             sb.AppendLine("드라이버에 따라 재부팅 후에 적용되는 경우도 있습니다.");
             return sb.ToString().TrimEnd();
         }

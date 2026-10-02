@@ -30,11 +30,12 @@ namespace MacChanger
         {
             InitializeComponent();
             toolTip.SetToolTip(lblRules,
-                "랜덤 생성: 무선 어댑터는 왼쪽에서 두 번째 자리를 2/6/A/E 중 하나로, 유선 어댑터는 짝수(0/2/4/6/8/A/C/E) 중 하나로 만들고 나머지 11자리는 0~F 무작위입니다.\r\n"
+                "랜덤 생성: 무선 어댑터는 왼쪽에서 두 번째 자리를 2/6/A/E 중 하나로, 그 외(유선/블루투스/기타) 어댑터는 짝수(0/2/4/6/8/A/C/E) 중 하나로 만들고 나머지 11자리는 0~F 무작위입니다. 00-00-00-00-00-00과 FF-FF-FF-FF-FF-FF는 제외합니다.\r\n"
                 + "Tcpip 정리: 변경 적용/원상복구 시 Tcpip\\Parameters\\Interfaces\\{GUID}의 EnableDHCP가 1이면 그 키의 값(EnableDHCP 제외)과 "
                 + "Tcpip\\Parameters의 DhcpDomain/DhcpNameServer를 자동으로 삭제합니다. EnableDHCP가 0(고정 IP)이면 아무것도 지우지 않습니다.");
             toolTip.SetToolTip(txtNewMac, "12자리 16진수. 구분자(-, :, .)는 있어도 되고 없어도 됩니다. 예: 02-1A-2B-3C-4D-5E");
-            toolTip.SetToolTip(btnRestore, "NetworkAddress 레지스트리 값을 삭제하고 어댑터를 재시작하여 공장 MAC으로 되돌립니다.");
+            toolTip.SetToolTip(btnApply, "확인 창 없이 바로 어댑터를 비활성화하고 NetworkAddress를 기록한 뒤(EnableDHCP = 1이면 Tcpip 값 자동 정리) 다시 활성화합니다.");
+            toolTip.SetToolTip(btnRestore, "확인 창 없이 바로 NetworkAddress 레지스트리 값을 삭제하고 어댑터를 재시작하여 공장 MAC으로 되돌립니다. EnableDHCP = 1인 어댑터는 변경 적용 때와 같이 Tcpip 값(DhcpDomain/DhcpNameServer 포함)도 자동 정리합니다.");
         }
 
         private NetworkAdapterInfo SelectedAdapter
@@ -89,7 +90,7 @@ namespace MacChanger
                 bool wireless = adapter != null && adapter.Kind == AdapterKind.Wireless;
                 string mac = MacAddressUtil.GenerateRandom(wireless);
                 txtNewMac.Text = MacAddressUtil.Format(mac);
-                SetStatus("준비", "랜덤 MAC 생성됨 (" + (wireless ? "무선 규칙: 두 번째 자리 2/6/A/E" : "유선 규칙: 두 번째 자리 짝수") + "): " + txtNewMac.Text);
+                SetStatus("준비", "랜덤 MAC 생성됨 (" + (wireless ? "무선 규칙: 두 번째 자리 2/6/A/E" : "유선/기타 규칙: 두 번째 자리 짝수") + "): " + txtNewMac.Text);
             }
             catch (Exception ex)
             {
@@ -121,7 +122,7 @@ namespace MacChanger
             }
             if (MacAddressUtil.IsAllZero(mac) || MacAddressUtil.IsAllFF(mac))
             {
-                SetStatus("실패", "00-00-00-00-00-00 과 FF-FF-FF-FF-FF-FF 는 사용할 수 없습니다.");
+                SetStatus("실패", "00-00-00-00-00-00과 FF-FF-FF-FF-FF-FF는 사용할 수 없습니다.");
                 txtNewMac.Focus();
                 return;
             }
@@ -293,7 +294,7 @@ namespace MacChanger
                     bool? randomMac = SafeGetRandomMacState(adapter.InterfaceGuid);
                     if (randomMac == true)
                         AppendLog("  경고: 이 Wi-Fi 인터페이스에 '임의 하드웨어 주소' 설정이 켜져 있습니다. MAC 변경과 충돌할 수 있습니다.");
-                    AppendLog("  참고: 무선 어댑터는 첫 옥텟이 02가 아니면 드라이버가 변경을 무시할 수 있습니다.");
+                    AppendLog("  참고: 무선 어댑터는 두 번째 자리가 2/6/A/E가 아니면 드라이버가 변경을 무시할 수 있습니다. (랜덤 생성이 자동으로 맞춰 줍니다)");
                 }
 
                 if (current == null)

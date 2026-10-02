@@ -101,7 +101,7 @@ namespace MacChanger.Core
         /// <summary>
         /// 랜덤 MAC 생성 (12자리 모두 0~F 범위에서 무작위, 첫 자리도 고정하지 않음).
         /// wireless == true  : 왼쪽에서 두 번째 자리만 2/6/A/E 중 하나 → X2/X6/XA/XE-XX-XX-XX-XX-XX (유니캐스트·로컬관리 보장)
-        /// wireless == false : 왼쪽에서 두 번째 자리만 짝수(0/2/4/6/8/A/C/E) → 유니캐스트 보장, 00-00-00-00-00-00 과 FF-FF-FF-FF-FF-FF 는 제외
+        /// wireless == false : 왼쪽에서 두 번째 자리만 짝수(0/2/4/6/8/A/C/E) → 유니캐스트 보장, 00-00-00-00-00-00과 FF-FF-FF-FF-FF-FF는 제외
         /// </summary>
         public static string GenerateRandom(bool wireless)
         {

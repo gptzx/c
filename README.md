@@ -86,13 +86,13 @@ VS 2017 이상의 MSBuild(Developer Command Prompt의 `msbuild`)에서는 같은
 
 1. `MacChanger.exe` 실행 → UAC 승격 확인.
 2. 드롭다운에서 어댑터 선택 → 원래(공장) MAC / 현재 MAC / 레지스트리 NetworkAddress 상태가 표시됩니다.
-3. **랜덤 생성**을 누르거나 새 MAC을 직접 입력합니다. (`02-1A-2B-3C-4D-5E`, `021A2B3C4D5E`, `02:1A:…` 모두 허용) 랜덤 생성은 선택한 어댑터가 무선이면 두 번째 자리를 2/6/A/E로, 유선이면 짝수로 만듭니다.
+3. **랜덤 생성**을 누르거나 새 MAC을 직접 입력합니다. (`02-1A-2B-3C-4D-5E`, `021A2B3C4D5E`, `02:1A:…` 모두 허용) 랜덤 생성은 선택한 어댑터가 무선이면 두 번째 자리를 2/6/A/E로, 무선이 아니면(유선/블루투스/기타) 짝수로 만듭니다.
 4. **변경 적용** → 확인 창 없이 바로 어댑터가 재시작되며, 완료 후 현재 MAC이 갱신됩니다. 주의 사항은 로그에 표시됩니다.
 5. **원상복구** → 확인 창 없이 바로 `NetworkAddress` 값을 지우고(필요 시 Tcpip 값 정리) 어댑터를 재시작하여 공장 MAC으로 돌아갑니다.
 
 ## 주의 사항
 
-* **Tcpip 값 자동 정리**는 `EnableDHCP = 1`(DHCP 사용)인 어댑터에서만 동작하며, DHCP 임대 정보(`DhcpIPAddress`, `DhcpNameServer`, `DhcpDomain` 등)가 삭제되어 재연결 시 새로 받습니다. 고정 IP(`EnableDHCP = 0`) 어댑터는 아무 값도 지우지 않습니다.
+* **Tcpip 값 자동 정리**는 `EnableDHCP = 1`(DHCP 사용)인 어댑터에서만 동작하며, 그 어댑터의 `Tcpip\Parameters\Interfaces\{GUID}` 키에서 `EnableDHCP`를 제외한 **모든 값**이 삭제됩니다. DHCP 임대 정보(`DhcpIPAddress`, `DhcpNameServer`, `DhcpDomain` 등)뿐 아니라 수동으로 지정한 DNS(`NameServer`), `Domain`, `InterfaceMetric`, `MTU` 등 이 키에 저장된 설정도 함께 지워지므로, DHCP 어댑터에 DNS 등을 직접 설정해 두었다면 변경/복구 후 다시 설정하세요. 전역 `Tcpip\Parameters`의 `DhcpDomain`·`DhcpNameServer`도 삭제됩니다. 고정 IP(`EnableDHCP = 0`) 어댑터, `EnableDHCP` 값이 없는 어댑터, 그리고 어댑터를 즉시 중지하지 못한 경우(재부팅 보류)에는 아무 값도 지우지 않습니다.
 * 변경 적용과 원상복구는 확인 창 없이 즉시 실행됩니다. 실패하거나 재부팅이 필요한 경우에만 안내 창이 뜹니다.
 * 일부 드라이버(특히 무선, 일부 USB 이더넷)는 `NetworkAddress` 값을 지원하지 않거나 로컬 관리 주소(두 번째 자리 2/6/A/E)만 허용합니다.
 * 어댑터를 즉시 중지할 수 없는 경우(장치 관리자가 재부팅 필요 플래그 설정) 레지스트리 값은 기록되고 재부팅 후 적용됩니다. 프로그램이 이를 감지해 "재부팅 후 적용" 안내를 띄웁니다.
