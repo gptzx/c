@@ -17,7 +17,8 @@ Windows 7(.NET 4.0 설치됨) / 8 / 8.1 / 10 / 11에서 추가 런타임 설치 
 | 원상복구 | 확인 대화 상자 없이 바로 실행. `NetworkAddress` 값 삭제 → Tcpip 값 자동 정리 → 어댑터 재시작 → 공장 MAC과 비교 |
 | 재부팅 보류 처리 | 장치 관리자가 어댑터를 즉시 중지/재시작하지 못해 재부팅 필요 플래그(`DI_NEEDREBOOT`)를 설정하면, 잘못된 "드라이버 거부" 판정 대신 "재부팅 후 적용" 상태로 안내 |
 | 현재 IP 실시간 표시 | 선택한 어댑터의 IPv4 주소를 2초마다 다시 읽어 표시 (어댑터 비활성 / 링크 없음 / 할당 대기 / 169.254.x.x 자동 사설 주소 구분) |
-| 할당 IP 로그 저장 | 체크하면 선택한 어댑터에 새 IP가 할당될 때마다 실행 파일 옆 `MacChanger-ip.log`에 `시각(탭)IP(탭)MAC` 한 줄을 추가 (기본 꺼짐, 켜지 않으면 어떤 파일도 만들지 않음). 작업 중에는 기록하지 않고 작업 완료 후 새 MAC과 함께 기록 |
+| 할당 IP 로그 | 선택한 어댑터에 새 IP가 할당될 때마다 로그 상자에 한 줄(`[시각(탭)]IP[(탭)MAC]`)을 추가. **시간**·**MAC** 항목은 각각 체크박스로 켜고 끌 수 있고, **로그 상자 표시**로 상자를 숨기거나 보일 수 있음. 169.254.x.x 자동 사설 주소는 로그에 넣지 않으며, DHCP 전환 중 169.254 주소가 잠깐 붙었다 떨어져도 같은 IP를 다시 기록하지 않음. 작업 중에는 기록하지 않고 작업 완료 후 새 MAC과 함께 기록 |
+| 할당 IP 로그 저장 | 체크하면 로그 상자와 같은 줄을 실행 파일 옆 `MacChanger-ip.log`에도 추가 (기본 꺼짐, 켜지 않으면 어떤 파일도 만들지 않음). 켜는 순간 현재 할당된 IP를 기준 줄로 한 번 기록 |
 | 상태 표시 | 상태 라벨: `준비 / 진행 / 완료 / 실패` + 진행 단계 메시지 (전체 내용은 라벨 툴팁) |
 | 아이콘 | 실행 파일에 아이콘이 내장되어 있고(16·32 BMP + 256 PNG), 창/작업표시줄 아이콘도 EXE 리소스에서 같은 아이콘을 읽어 사용 (UNC 경로에서도 동작) |
 
@@ -39,13 +40,13 @@ MacChanger/
   app.manifest                         ← requireAdministrator, supportedOS(Win7~11), dpiAware
   app.ico                              ← 실행 파일/창 아이콘 (16·32·256)
   Program.cs                           ← 진입점, 관리자 권한 확인, 전역 예외 처리
-  MainForm.cs / MainForm.Designer.cs   ← UI (드롭다운, 원래/현재 MAC, 현재 IP, 새 MAC, 랜덤 생성, 변경 적용, 원상복구, 할당 IP 로그 저장, 상태 라벨)
+  MainForm.cs / MainForm.Designer.cs   ← UI (드롭다운, 원래/현재 MAC, 현재 IP, 새 MAC, 랜덤 생성, 변경 적용, 원상복구, 로그 옵션 4개, 상태 라벨, 할당 IP 로그 상자)
   Properties/AssemblyInfo.cs
   Core/
     MacAddressUtil.cs                  ← MAC 정규화/서식/검증/랜덤 생성(무선·유선 규칙)
     NetworkAdapterInfo.cs              ← 어댑터 정보 모델, 유선/무선/블루투스 라벨
     AdapterEnumerator.cs               ← MSFT_NetAdapter → Win32_NetworkAdapter → GetAdaptersAddresses(NetworkInterface) 열거
-    IpMonitor.cs                       ← 현재 IPv4 조회, 할당 IP 로그 파일 기록
+    IpMonitor.cs                       ← 현재 IPv4 조회, 169.254 제외, 로그 줄 만들기, 로그 파일 기록
     NdisQuery.cs                       ← IOCTL_NDIS_QUERY_GLOBAL_STATS로 공장/현재 MAC 조회
     MacRegistry.cs                     ← HKLM(64비트 뷰) NetworkAddress / EnableDHCP 확인 / Tcpip 값 정리(인터페이스 + 전역 DhcpDomain·DhcpNameServer) / 임의 하드웨어 주소 설정 확인
     AdapterController.cs               ← SetupAPI DICS_DISABLE/ENABLE(재부팅 필요 플래그 보고), WMI Enable()/Disable() 폴백
@@ -99,7 +100,7 @@ VS 2017 이상의 MSBuild(Developer Command Prompt의 `msbuild`)에서는 같은
 
 * **Tcpip 값 자동 정리**는 `EnableDHCP = 1`(DHCP 사용)인 어댑터에서만 동작하며, 그 어댑터의 `Tcpip\Parameters\Interfaces\{GUID}` 키에서 `EnableDHCP`를 제외한 **모든 값**이 삭제됩니다. DHCP 임대 정보(`DhcpIPAddress`, `DhcpNameServer`, `DhcpDomain` 등)뿐 아니라 수동으로 지정한 DNS(`NameServer`), `Domain`, `InterfaceMetric`, `MTU` 등 이 키에 저장된 설정도 함께 지워지므로, DHCP 어댑터에 DNS 등을 직접 설정해 두었다면 변경/복구 후 다시 설정하세요. 전역 `Tcpip\Parameters`의 `DhcpDomain`·`DhcpNameServer`도 삭제됩니다. 고정 IP(`EnableDHCP = 0`) 어댑터, `EnableDHCP` 값이 없는 어댑터, 그리고 어댑터를 즉시 중지하지 못한 경우(재부팅 보류)에는 아무 값도 지우지 않습니다.
 * 변경 적용과 원상복구는 확인 창 없이 즉시 실행됩니다. 실패하거나 재부팅이 필요한 경우에만 안내 창이 뜹니다.
-* **할당 IP 로그 저장**을 켜면 실행 파일과 같은 폴더에 `MacChanger-ip.log`가 만들어집니다(이 옵션을 켤 때만). 설정은 저장되지 않으므로 실행할 때마다 필요하면 다시 켜세요.
+* **할당 IP 로그 저장**을 켜면 실행 파일과 같은 폴더에 `MacChanger-ip.log`가 만들어집니다(이 옵션을 켤 때만). 로그 옵션(시간·MAC·로그 상자 표시·파일 저장)은 저장되지 않으므로 실행할 때마다 필요하면 다시 설정하세요.
 * 일부 드라이버(특히 무선, 일부 USB 이더넷)는 `NetworkAddress` 값을 지원하지 않거나 로컬 관리 주소(두 번째 자리 2/6/A/E)만 허용합니다.
 * 어댑터를 즉시 중지할 수 없는 경우(장치 관리자가 재부팅 필요 플래그 설정) 레지스트리 값은 기록되고 재부팅 후 적용됩니다. 프로그램이 이를 감지해 "재부팅 후 적용" 안내를 띄웁니다.
 * 프로그램 자체는 어떤 설정 파일/레지스트리 키도 만들지 않습니다. 다만 .NET 런타임이 일부 Windows 10 버전에서 `%LOCALAPPDATA%\Microsoft\CLR_v4.0\UsageLogs\`에 사용 로그를 남기는 것은 OS/런타임 동작으로 프로그램과 무관합니다.

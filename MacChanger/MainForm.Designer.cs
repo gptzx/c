@@ -1,4 +1,4 @@
-namespace MacChanger
+﻿namespace MacChanger
 {
     partial class MainForm
     {
@@ -33,7 +33,12 @@ namespace MacChanger
             this.btnApply = new System.Windows.Forms.Button();
             this.btnRestore = new System.Windows.Forms.Button();
             this.chkIpLog = new System.Windows.Forms.CheckBox();
+            this.lblLogOptions = new System.Windows.Forms.Label();
+            this.chkLogTime = new System.Windows.Forms.CheckBox();
+            this.chkLogMac = new System.Windows.Forms.CheckBox();
+            this.chkShowLog = new System.Windows.Forms.CheckBox();
             this.lblStatus = new System.Windows.Forms.Label();
+            this.txtIpLog = new System.Windows.Forms.TextBox();
             this.toolTip = new System.Windows.Forms.ToolTip(this.components);
             this.ipTimer = new System.Windows.Forms.Timer(this.components);
             this.worker = new System.ComponentModel.BackgroundWorker();
@@ -188,15 +193,75 @@ namespace MacChanger
             this.chkIpLog.UseVisualStyleBackColor = true;
             this.chkIpLog.CheckedChanged += new System.EventHandler(this.chkIpLog_CheckedChanged);
             // 
+            // lblLogOptions
+            // 
+            this.lblLogOptions.AutoSize = true;
+            this.lblLogOptions.Location = new System.Drawing.Point(12, 218);
+            this.lblLogOptions.Name = "lblLogOptions";
+            this.lblLogOptions.Size = new System.Drawing.Size(62, 15);
+            this.lblLogOptions.TabIndex = 15;
+            this.lblLogOptions.Text = "로그 항목:";
+            // 
+            // chkLogTime
+            // 
+            this.chkLogTime.AutoSize = true;
+            this.chkLogTime.Checked = true;
+            this.chkLogTime.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkLogTime.Location = new System.Drawing.Point(118, 216);
+            this.chkLogTime.Name = "chkLogTime";
+            this.chkLogTime.Size = new System.Drawing.Size(50, 19);
+            this.chkLogTime.TabIndex = 16;
+            this.chkLogTime.Text = "시간";
+            this.chkLogTime.UseVisualStyleBackColor = true;
+            // 
+            // chkLogMac
+            // 
+            this.chkLogMac.AutoSize = true;
+            this.chkLogMac.Checked = true;
+            this.chkLogMac.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkLogMac.Location = new System.Drawing.Point(188, 216);
+            this.chkLogMac.Name = "chkLogMac";
+            this.chkLogMac.Size = new System.Drawing.Size(55, 19);
+            this.chkLogMac.TabIndex = 17;
+            this.chkLogMac.Text = "MAC";
+            this.chkLogMac.UseVisualStyleBackColor = true;
+            // 
+            // chkShowLog
+            // 
+            this.chkShowLog.AutoSize = true;
+            this.chkShowLog.Checked = true;
+            this.chkShowLog.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkShowLog.Location = new System.Drawing.Point(362, 216);
+            this.chkShowLog.Name = "chkShowLog";
+            this.chkShowLog.Size = new System.Drawing.Size(107, 19);
+            this.chkShowLog.TabIndex = 18;
+            this.chkShowLog.Text = "로그 상자 표시";
+            this.chkShowLog.UseVisualStyleBackColor = true;
+            this.chkShowLog.CheckedChanged += new System.EventHandler(this.chkShowLog_CheckedChanged);
+            // 
             // lblStatus
             // 
             this.lblStatus.AutoEllipsis = true;
             this.lblStatus.Font = new System.Drawing.Font("맑은 고딕", 9F, System.Drawing.FontStyle.Bold);
-            this.lblStatus.Location = new System.Drawing.Point(12, 220);
+            this.lblStatus.Location = new System.Drawing.Point(12, 246);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(536, 20);
-            this.lblStatus.TabIndex = 15;
+            this.lblStatus.TabIndex = 19;
             this.lblStatus.Text = "상태: 준비";
+            // 
+            // txtIpLog
+            // 
+            this.txtIpLog.BackColor = System.Drawing.SystemColors.Window;
+            this.txtIpLog.Font = new System.Drawing.Font("Consolas", 9F);
+            this.txtIpLog.Location = new System.Drawing.Point(12, 272);
+            this.txtIpLog.Multiline = true;
+            this.txtIpLog.Name = "txtIpLog";
+            this.txtIpLog.ReadOnly = true;
+            this.txtIpLog.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            this.txtIpLog.Size = new System.Drawing.Size(536, 110);
+            this.txtIpLog.TabIndex = 20;
+            this.txtIpLog.TabStop = false;
+            this.txtIpLog.WordWrap = false;
             // 
             // ipTimer
             // 
@@ -214,8 +279,13 @@ namespace MacChanger
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(560, 250);
+            this.ClientSize = new System.Drawing.Size(560, 394);
+            this.Controls.Add(this.txtIpLog);
             this.Controls.Add(this.lblStatus);
+            this.Controls.Add(this.chkShowLog);
+            this.Controls.Add(this.chkLogMac);
+            this.Controls.Add(this.chkLogTime);
+            this.Controls.Add(this.lblLogOptions);
             this.Controls.Add(this.chkIpLog);
             this.Controls.Add(this.btnRestore);
             this.Controls.Add(this.btnApply);
@@ -261,7 +331,12 @@ namespace MacChanger
         private System.Windows.Forms.Button btnApply;
         private System.Windows.Forms.Button btnRestore;
         private System.Windows.Forms.CheckBox chkIpLog;
+        private System.Windows.Forms.Label lblLogOptions;
+        private System.Windows.Forms.CheckBox chkLogTime;
+        private System.Windows.Forms.CheckBox chkLogMac;
+        private System.Windows.Forms.CheckBox chkShowLog;
         private System.Windows.Forms.Label lblStatus;
+        private System.Windows.Forms.TextBox txtIpLog;
         private System.Windows.Forms.ToolTip toolTip;
         private System.Windows.Forms.Timer ipTimer;
         private System.ComponentModel.BackgroundWorker worker;

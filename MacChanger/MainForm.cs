@@ -28,8 +28,11 @@ namespace MacChanger
         private bool suppressSelectionChanged;
         /// <summary>마지막으로 정보를 읽은 어댑터 GUID (실제로 다른 어댑터를 선택했을 때만 IP 로그 기준을 초기화)</summary>
         private string lastInfoGuid;
-        /// <summary>선택한 어댑터에 대해 마지막으로 로그 파일에 기록한 IP. 어댑터가 내려가거나 작업을 시작하면 초기화한다.</summary>
+        /// <summary>선택한 어댑터에 대해 마지막으로 로그에 남긴 "실제 할당 IP"(169.254 제외, 정렬). 어댑터가 내려가거나 재시작되면 초기화한다.</summary>
         private string lastLoggedIp;
+        /// <summary>로그 상자를 숨겼을 때의 창 높이 (상태 라벨 아래까지)</summary>
+        private const int CollapsedClientHeight = 276;
+        private const int ExpandedClientHeight = 394;
         /// <summary>직전 RefreshIp 에서 발생한 로그 저장 오류 (없으면 null)</summary>
         private string ipLogError;
 
@@ -48,7 +51,10 @@ namespace MacChanger
             toolTip.SetToolTip(btnRandom, "무선 어댑터: 두 번째 자리 2/6/A/E, 그 외: 두 번째 자리 짝수, 나머지 11자리 0~F 무작위");
             toolTip.SetToolTip(btnApply, "확인 창 없이 바로 어댑터를 비활성화하고 NetworkAddress를 기록한 뒤(EnableDHCP = 1이면 Tcpip 값 자동 정리) 다시 활성화합니다.");
             toolTip.SetToolTip(btnRestore, "확인 창 없이 바로 NetworkAddress 값을 삭제하고(EnableDHCP = 1이면 Tcpip 값 자동 정리) 어댑터를 재시작하여 공장 MAC으로 되돌립니다.");
-            toolTip.SetToolTip(chkIpLog, "켜 두면 선택한 어댑터에 새 IP가 할당될 때마다 실행 파일 옆 " + IpMonitor.LogFileName + " 에 '시각, IP, MAC' 한 줄을 기록합니다.");
+            toolTip.SetToolTip(chkIpLog, "켜 두면 새 IP가 할당될 때마다 로그 상자와 같은 줄을 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 추가합니다. 169.254.x.x 자동 사설 주소는 기록하지 않습니다.");
+            toolTip.SetToolTip(chkLogTime, "로그 줄 맨 앞에 시각(yyyy-MM-dd HH:mm:ss)을 넣습니다.");
+            toolTip.SetToolTip(chkLogMac, "로그 줄 끝에 그때 사용 중인 MAC을 넣습니다.");
+            toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다.");
         }
 
         private NetworkAdapterInfo SelectedAdapter
@@ -165,15 +171,33 @@ namespace MacChanger
 
         private void chkIpLog_CheckedChanged(object sender, EventArgs e)
         {
-            lastLoggedIp = null;
             if (!chkIpLog.Checked)
             {
-                SetStatus("준비", "할당 IP 로그 기록을 껐습니다.");
+                SetStatus("준비", "할당 IP 로그 파일 저장을 껐습니다.");
                 return;
             }
-            RefreshIp();   // 현재 할당된 IP를 즉시 한 줄 기록
-            if (ipLogError != null) SetStatus("실패", ipLogError);
-            else SetStatus("준비", "할당 IP 로그를 실행 파일 옆 " + IpMonitor.LogFileName + " 에 기록합니다.");
+            // 켜는 순간 현재 할당된 IP를 기준 줄로 파일에만 한 번 기록한다 (로그 상자에는 이미 표시되어 있음).
+            NetworkAdapterInfo adapter = SelectedAdapter;
+            if (adapter != null && lastLoggedIp != null)
+            {
+                try
+                {
+                    IpMonitor.AppendLine(Application.ExecutablePath, IpMonitor.BuildLogLine(lastLoggedIp, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked));
+                }
+                catch (Exception ex)
+                {
+                    chkIpLog.Checked = false;
+                    SetStatus("실패", "IP 로그 저장 실패: " + ex.Message);
+                    return;
+                }
+            }
+            SetStatus("준비", "할당 IP 로그를 실행 파일 옆 " + IpMonitor.LogFileName + " 에 저장합니다.");
+        }
+
+        private void chkShowLog_CheckedChanged(object sender, EventArgs e)
+        {
+            txtIpLog.Visible = chkShowLog.Checked;
+            ClientSize = new Size(ClientSize.Width, chkShowLog.Checked ? ExpandedClientHeight : CollapsedClientHeight);
         }
 
         private void ipTimer_Tick(object sender, EventArgs e)
@@ -314,24 +338,32 @@ namespace MacChanger
             // 어댑터가 올라와 있으면 지금 사용 중인 MAC도 함께 갱신한다 (느리게 올라온 어댑터, Wi-Fi 임의 주소 변경 등).
             if (liveMac != null && !MacAddressUtil.IsAllZero(liveMac)) ShowCurrentMac(adapter, liveMac);
 
+            // 로그 기준은 169.254.x.x 를 뺀 "실제 할당" 주소 목록 — 전환 중 자동 사설 주소가 붙었다 떨어져도 중복 기록되지 않는다.
+            string assigned = ip == null ? string.Empty : IpMonitor.WithoutApipa(ip);
             string text;
             if (ip == null) text = "(어댑터 비활성 상태)";
             else if (ip.Length == 0) text = up ? "(IP 없음 — 할당 대기 중)" : "(연결 안 됨 — 링크 없음)";
-            else text = ip + (!up ? "  (링크 없음)" : IpMonitor.IsOnlyApipa(ip) ? "  (DHCP 응답 없음 — 자동 사설 주소)" : "");
+            else if (!up) text = ip + "  (링크 없음)";
+            else if (assigned.Length == 0) text = ip + "  (DHCP 응답 없음 — 자동 사설 주소)";
+            else text = ip;
             if (txtCurrentIp.Text != text) txtCurrentIp.Text = text;
 
-            if (string.IsNullOrEmpty(ip) || !up)
+            if (assigned.Length == 0 || !up)
             {
                 lastLoggedIp = null;   // 끊겼다가 다시 같은 IP를 받아도 새 할당으로 기록
                 return;
             }
             // 작업 중(busy)에는 기록하지 않는다: 어댑터가 올라온 직후의 IP는 작업 완료 후 새 MAC과 함께 기록된다.
-            if (!busy && chkIpLog.Checked && !IpMonitor.IsOnlyApipa(ip) && ip != lastLoggedIp)
+            if (busy || assigned == lastLoggedIp) return;
+
+            lastLoggedIp = assigned;
+            string line = IpMonitor.BuildLogLine(assigned, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked);
+            txtIpLog.AppendText(line + Environment.NewLine);
+            if (chkIpLog.Checked)
             {
                 try
                 {
-                    IpMonitor.AppendAssignedIp(Application.ExecutablePath, ip, adapter.CurrentMac);
-                    lastLoggedIp = ip;
+                    IpMonitor.AppendLine(Application.ExecutablePath, line);
                 }
                 catch (Exception ex)
                 {
