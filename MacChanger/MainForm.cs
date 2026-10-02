@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
@@ -258,19 +258,7 @@ namespace MacChanger
 
                 string current = MacChangeService.ReadCurrentMac(adapter);
                 txtCurrentMac.Text = current != null ? MacAddressUtil.Format(current) : "(조회 실패)";
-
-                // 드롭다운 항목 텍스트에도 최신 MAC을 반영한다 (ComboBox는 Add 시점의 문자열을 캐시하므로 항목을 다시 넣어야 한다).
-                if (current != null && !string.Equals(adapter.CurrentMac, current, StringComparison.OrdinalIgnoreCase))
-                {
-                    adapter.CurrentMac = current;
-                    int i = cboAdapters.SelectedIndex;
-                    if (i >= 0)
-                    {
-                        suppressSelectionChanged = true;
-                        try { cboAdapters.Items[i] = adapter; }
-                        finally { suppressSelectionChanged = false; }
-                    }
-                }
+                ShowCurrentMac(adapter, current);
 
                 if (current == null)
                     SetStatus("실패", "현재 MAC을 읽지 못했습니다 (어댑터가 비활성화되었거나 드라이버가 조회를 거부).");
@@ -288,6 +276,19 @@ namespace MacChanger
             }
         }
 
+        /// <summary>현재 MAC을 모델과 드롭다운 항목 텍스트에 반영한다 (ComboBox는 Add 시점의 문자열을 캐시하므로 항목을 다시 넣어야 한다).</summary>
+        private void ShowCurrentMac(NetworkAdapterInfo adapter, string current)
+        {
+            if (current == null || string.Equals(adapter.CurrentMac, current, StringComparison.OrdinalIgnoreCase)) return;
+            adapter.CurrentMac = current;
+            txtCurrentMac.Text = MacAddressUtil.Format(current);
+            int i = cboAdapters.SelectedIndex;
+            if (i < 0) return;
+            suppressSelectionChanged = true;
+            try { cboAdapters.Items[i] = adapter; }
+            finally { suppressSelectionChanged = false; }
+        }
+
         /// <summary>선택한 어댑터의 현재 IPv4를 표시하고, 로그 옵션이 켜져 있으면 새로 할당된 IP를 파일에 기록한다. 오류는 ipLogError 에 남긴다.</summary>
         private void RefreshIp()
         {
@@ -300,23 +301,26 @@ namespace MacChanger
             }
             string ip;
             bool up;
+            string liveMac;
             try
             {
-                ip = IpMonitor.ReadIPv4(adapter.InterfaceGuid, out up);
+                ip = IpMonitor.ReadIPv4(adapter.InterfaceGuid, out up, out liveMac);
             }
             catch (Exception)
             {
                 txtCurrentIp.Text = "(IP 조회 실패)";
                 return;
             }
+            // 어댑터가 올라와 있으면 지금 사용 중인 MAC도 함께 갱신한다 (느리게 올라온 어댑터, Wi-Fi 임의 주소 변경 등).
+            if (liveMac != null && !MacAddressUtil.IsAllZero(liveMac)) ShowCurrentMac(adapter, liveMac);
 
             string text;
             if (ip == null) text = "(어댑터 비활성 상태)";
             else if (ip.Length == 0) text = up ? "(IP 없음 — 할당 대기 중)" : "(연결 안 됨 — 링크 없음)";
-            else text = ip + (IpMonitor.IsOnlyApipa(ip) ? "  (DHCP 응답 없음 — 자동 사설 주소)" : "");
+            else text = ip + (!up ? "  (링크 없음)" : IpMonitor.IsOnlyApipa(ip) ? "  (DHCP 응답 없음 — 자동 사설 주소)" : "");
             if (txtCurrentIp.Text != text) txtCurrentIp.Text = text;
 
-            if (string.IsNullOrEmpty(ip))
+            if (string.IsNullOrEmpty(ip) || !up)
             {
                 lastLoggedIp = null;   // 끊겼다가 다시 같은 IP를 받아도 새 할당으로 기록
                 return;
@@ -344,7 +348,6 @@ namespace MacChanger
         {
             if (worker.IsBusy) return;
             SetBusy(true);
-            lastLoggedIp = null;   // 작업 후 받은 IP는 같은 값이라도 새 MAC과 함께 기록
             SetStatus("진행", (args.Kind == OperationKind.Apply ? "MAC 변경" : "원상복구") + " 시작...");
             worker.RunWorkerAsync(args);
         }
@@ -372,6 +375,9 @@ namespace MacChanger
             MacChangeResult result = e.Error == null ? e.Result as MacChangeResult : null;
             string finalState = result != null && result.Success ? "완료" : "실패";
             string finalMessage = e.Error != null ? e.Error.Message : result != null ? result.Message : "결과를 받지 못했습니다.";
+
+            // 어댑터가 실제로 중지되었다면 이후 받는 IP는 같은 값이라도 새 할당이므로 새 MAC과 함께 기록한다.
+            if (result != null && result.AdapterRestarted) lastLoggedIp = null;
 
             // 변경/복구 후 현재 MAC/IP를 다시 읽어 UI를 갱신한 뒤, 작업 결과 상태를 최종적으로 표시한다.
             RefreshSelectedAdapterInfo();
@@ -402,6 +408,7 @@ namespace MacChanger
             btnRandom.Enabled = !value;
             btnApply.Enabled = !value;
             btnRestore.Enabled = !value;
+            chkIpLog.Enabled = !value;
             UseWaitCursor = value;
         }
 

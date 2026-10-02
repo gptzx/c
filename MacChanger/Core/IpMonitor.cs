@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.NetworkInformation;
@@ -22,14 +22,16 @@ namespace MacChanger.Core
 
         /// <summary>
         /// 어댑터의 IPv4 주소 목록(쉼표 구분). 어댑터가 IP 스택에 없으면(비활성화 등) null, 주소가 아직 없으면 빈 문자열.
-        /// up = 링크가 올라와 있는지(OperationalStatus.Up).
+        /// up = 링크가 올라와 있는지(OperationalStatus.Up), mac = 지금 사용 중인 MAC(12자리 hex, 알 수 없으면 null).
         /// </summary>
-        public static string ReadIPv4(string interfaceGuid, out bool up)
+        public static string ReadIPv4(string interfaceGuid, out bool up, out string mac)
         {
             up = false;
+            mac = null;
             NetworkInterface ni = FindInterface(interfaceGuid);
             if (ni == null) return null;
             up = ni.OperationalStatus == OperationalStatus.Up;
+            mac = MacAddressUtil.FromBytes(ni.GetPhysicalAddress().GetAddressBytes());
             List<string> ips = new List<string>();
             foreach (UnicastIPAddressInformation u in ni.GetIPProperties().UnicastAddresses)
                 if (u.Address.AddressFamily == AddressFamily.InterNetwork) ips.Add(u.Address.ToString());
@@ -49,7 +51,7 @@ namespace MacChanger.Core
         public static void AppendAssignedIp(string exePath, string ipv4List, string mac)
         {
             string path = Path.Combine(Path.GetDirectoryName(exePath), LogFileName);
-            string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\t" + ipv4List + "\t" + MacAddressUtil.Format(mac ?? "") + Environment.NewLine;
+            string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) + "\t" + ipv4List + "\t" + MacAddressUtil.Format(mac ?? "") + Environment.NewLine;
             File.AppendAllText(path, line, new UTF8Encoding(true));
         }
     }

@@ -10,6 +10,8 @@ namespace MacChanger.Core
         public string Message { get; set; }
         /// <summary>장치 관리자가 어댑터를 즉시 재시작하지 못해 재부팅 후에야 적용되는 경우 true</summary>
         public bool RebootRequired { get; set; }
+        /// <summary>어댑터가 실제로 중지되었는지(= 이후 받는 IP는 새 할당). 비활성화 실패나 재부팅 보류면 false</summary>
+        public bool AdapterRestarted { get; set; }
         /// <summary>실패 시 사용자에게 추가로 보여줄 안내문(무선 제약, 임의 하드웨어 주소 등)</summary>
         public string Guidance { get; set; }
     }
@@ -98,6 +100,17 @@ namespace MacChanger.Core
                 log("어댑터 초기화 대기 중... (" + attempt + ")");
                 Thread.Sleep(MacWaitPollMs);
             }
+            // 시간 초과: 마지막으로 NDIS를 한 번 더 시도한 뒤(그 사이 올라왔을 수 있음) GetAdaptersAddresses/WMI 값으로 폴백
+            try
+            {
+                string mac = NdisQuery.QueryCurrentMac(adapter.InterfaceGuid);
+                if (mac != null && !MacAddressUtil.IsAllZero(mac))
+                {
+                    live = true;
+                    return mac;
+                }
+            }
+            catch (Exception) { }
             return ReadCurrentMac(adapter);
         }
 
@@ -105,9 +118,10 @@ namespace MacChanger.Core
         /// 변경 적용과 원상복구의 공통 절차: [1/4] 비활성화 → [2/4] 레지스트리 단계(registryStep) → [3/4] Tcpip 값 자동 정리 → [4/4] 활성화 → 현재 MAC 재조회.
         /// 실패하면 실패 결과를 돌려주고, 성공하면 null을 돌려주며 out 값을 채운다 (deferred 이면 재시작이 보류되어 current 는 null).
         /// </summary>
-        private static MacChangeResult RunCycle(NetworkAdapterInfo adapter, Action<string> log, string registryStepLabel, Action registryStep,
-            string enableFailHint, out bool deferred, out string tcpipWarning, out string current, out bool live)
+        private static MacChangeResult RunCycle(NetworkAdapterInfo adapter, Action<string> log, string registryStepLabel, string registryFailLabel, Action registryStep,
+            string enableFailHint, out bool restarted, out bool deferred, out string tcpipWarning, out string current, out bool live)
         {
+            restarted = false;
             deferred = false;
             tcpipWarning = null;
             current = null;
@@ -125,6 +139,7 @@ namespace MacChanger.Core
                 fail.Message = "어댑터 비활성화 실패: " + ex.Message;
                 return fail;
             }
+            restarted = !disableDeferred;
             Thread.Sleep(AfterDisableDelayMs);
 
             log("[2/4] " + registryStepLabel);
@@ -134,7 +149,7 @@ namespace MacChanger.Core
             }
             catch (Exception ex)
             {
-                fail.Message = registryStepLabel + " 실패: " + ex.Message;
+                fail.Message = registryFailLabel + " 실패: " + ex.Message;
                 log("오류로 중단 — 어댑터를 다시 활성화합니다");
                 try
                 {
@@ -192,13 +207,18 @@ namespace MacChanger.Core
             }
             string guid = adapter.InterfaceGuid;
 
-            bool deferred, live;
+            bool restarted, deferred, live;
             string tcpipWarning, current;
-            MacChangeResult fail = RunCycle(adapter, log, "레지스트리 NetworkAddress 쓰기",
+            MacChangeResult fail = RunCycle(adapter, log, "레지스트리 NetworkAddress 쓰기", "레지스트리 쓰기",
                 delegate { MacRegistry.SetNetworkAddress(guid, mac); },
                 "레지스트리 값은 기록되었습니다. 네트워크 연결(ncpa.cpl)에서 어댑터를 수동으로 '사용'으로 바꾸세요.",
-                out deferred, out tcpipWarning, out current, out live);
-            if (fail != null) return fail;
+                out restarted, out deferred, out tcpipWarning, out current, out live);
+            if (fail != null)
+            {
+                fail.AdapterRestarted = restarted;
+                return fail;
+            }
+            result.AdapterRestarted = restarted;
 
             if (deferred)
             {
@@ -231,13 +251,18 @@ namespace MacChanger.Core
             string guid = adapter.InterfaceGuid;
             bool existed = false;
 
-            bool deferred, live;
+            bool restarted, deferred, live;
             string tcpipWarning, current;
-            MacChangeResult fail = RunCycle(adapter, log, "레지스트리 NetworkAddress 값 삭제",
+            MacChangeResult fail = RunCycle(adapter, log, "레지스트리 NetworkAddress 값 삭제", "레지스트리 값 삭제",
                 delegate { existed = MacRegistry.DeleteNetworkAddress(guid); },
                 "네트워크 연결(ncpa.cpl)에서 어댑터를 수동으로 '사용'으로 바꾸세요.",
-                out deferred, out tcpipWarning, out current, out live);
-            if (fail != null) return fail;
+                out restarted, out deferred, out tcpipWarning, out current, out live);
+            if (fail != null)
+            {
+                fail.AdapterRestarted = restarted;
+                return fail;
+            }
+            result.AdapterRestarted = restarted;
 
             if (deferred)
             {
