@@ -11,3 +11,7 @@ out/
 *.user
 *.userprefs
 *.sln.docstates
+
+# Prebuilt binaries published for download (built with Roslyn against the .NET 4.0 reference assemblies)
+!dist/MacChanger.exe
+!dist/MacChanger-portable.zip

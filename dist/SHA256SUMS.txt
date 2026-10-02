@@ -1,0 +1,2 @@
+175859da383d3f173b53e2ecb9f0ff52a2fc07a1ac3302949c3c1d777e98fc99  MacChanger.exe
+69f1f898c523921373a52539f2b39cbca58cd2df225253a34cd54a2f1facd7ef  MacChanger-portable.zip
