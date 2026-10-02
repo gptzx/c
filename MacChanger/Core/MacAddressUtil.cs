@@ -1,5 +1,4 @@
-using System;
-using System.Globalization;
+﻿using System;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -40,10 +39,14 @@ namespace MacChanger.Core
         public static string FromBytes(byte[] bytes)
         {
             if (bytes == null || bytes.Length < 6) return null;
-            StringBuilder sb = new StringBuilder(12);
+            const string hex = "0123456789ABCDEF";
+            char[] c = new char[12];
             for (int i = 0; i < 6; i++)
-                sb.Append(bytes[i].ToString("X2", CultureInfo.InvariantCulture));
-            return sb.ToString();
+            {
+                c[2 * i] = hex[bytes[i] >> 4];
+                c[2 * i + 1] = hex[bytes[i] & 0x0F];
+            }
+            return new string(c);
         }
 
         /// <summary>왼쪽에서 두 번째 16진 자리(첫 옥텟의 하위 니블)</summary>

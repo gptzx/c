@@ -38,7 +38,6 @@ namespace MacChanger.Core
         {
             if (adapter == null) throw new ArgumentNullException("adapter");
             string action = enable ? "활성화" : "비활성화";
-            needReboot = false;
 
             string setupError;
             if (TrySetupApiChangeState(adapter.InterfaceGuid, enable, out needReboot, out setupError))
@@ -46,7 +45,6 @@ namespace MacChanger.Core
                 if (needReboot) log("장치 관리자가 즉시 " + action + "하지 못해 재부팅 필요 플래그를 설정했습니다");
                 return;
             }
-            needReboot = false;
             log("SetupAPI " + action + " 실패(" + setupError + ") → WMI로 재시도");
 
             int attempts = enable ? WmiEnableRetryCount : 1;
@@ -127,7 +125,6 @@ namespace MacChanger.Core
             p.ClassInstallHeader.cbSize = (uint)Marshal.SizeOf(typeof(NativeMethods.SP_CLASSINSTALL_HEADER));
             p.ClassInstallHeader.InstallFunction = NativeMethods.DIF_PROPERTYCHANGE;
             p.StateChange = enable ? NativeMethods.DICS_ENABLE : NativeMethods.DICS_DISABLE;
-            p.HwProfile = 0;
             uint size = (uint)Marshal.SizeOf(typeof(NativeMethods.SP_PROPCHANGE_PARAMS));
 
             if (enable)
@@ -139,7 +136,6 @@ namespace MacChanger.Core
             }
 
             p.Scope = NativeMethods.DICS_FLAG_CONFIGSPECIFIC;
-            p.HwProfile = 0;
             if (!NativeMethods.SetupDiSetClassInstallParams(devInfoSet, ref devInfo, ref p, size))
             {
                 error = "SetupDiSetClassInstallParams: " + Win32Message(Marshal.GetLastWin32Error());
@@ -250,7 +246,7 @@ namespace MacChanger.Core
                         found = true;
                         ManagementBaseObject inParams = null;
                         try { inParams = mo.GetMethodParameters(method); }
-                        catch (ManagementException) { inParams = null; }
+                        catch (ManagementException) { }
 
                         uint code;
                         using (ManagementBaseObject outParams = mo.InvokeMethod(method, inParams, null))

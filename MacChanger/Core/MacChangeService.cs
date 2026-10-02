@@ -34,12 +34,8 @@ namespace MacChanger.Core
         /// <summary>원래(공장) MAC. IOCTL(OID_802_3_PERMANENT_ADDRESS) → 열거 시점에 읽어 둔 MSFT_NetAdapter.PermanentAddress 순으로 시도. 실패 시 null.</summary>
         public static string ReadPermanentMac(NetworkAdapterInfo adapter)
         {
-            try
-            {
-                string mac = NdisQuery.QueryPermanentMac(adapter.InterfaceGuid);
-                if (mac != null && !MacAddressUtil.IsAllZero(mac)) return mac;
-            }
-            catch (Exception) { }
+            string mac = NdisQuery.QueryPermanentMac(adapter.InterfaceGuid);
+            if (mac != null && !MacAddressUtil.IsAllZero(mac)) return mac;
             string hint = adapter.PermanentMacHint;
             return hint != null && !MacAddressUtil.IsAllZero(hint) ? hint : null;
         }
@@ -47,12 +43,20 @@ namespace MacChanger.Core
         /// <summary>현재 MAC. IOCTL(OID_802_3_CURRENT_ADDRESS) → GetAdaptersAddresses → WMI 순으로 시도. 실패 시 null.</summary>
         public static string ReadCurrentMac(NetworkAdapterInfo adapter)
         {
-            try
+            bool live;
+            return ReadCurrentMac(adapter, out live);
+        }
+
+        /// <summary>live = NDIS 직접 조회로 읽었는지 (GetAdaptersAddresses/WMI 폴백이면 false).</summary>
+        private static string ReadCurrentMac(NetworkAdapterInfo adapter, out bool live)
+        {
+            live = false;
+            string ndis = NdisQuery.QueryCurrentMac(adapter.InterfaceGuid);
+            if (ndis != null && !MacAddressUtil.IsAllZero(ndis))
             {
-                string mac = NdisQuery.QueryCurrentMac(adapter.InterfaceGuid);
-                if (mac != null && !MacAddressUtil.IsAllZero(mac)) return mac;
+                live = true;
+                return ndis;
             }
-            catch (Exception) { }
             try
             {
                 string mac = AdapterEnumerator.GetCurrentMacViaGetAdaptersAddresses(adapter.InterfaceGuid);
@@ -81,32 +85,18 @@ namespace MacChanger.Core
             while (true)
             {
                 attempt++;
-                try
-                {
-                    string mac = NdisQuery.QueryCurrentMac(adapter.InterfaceGuid);
-                    if (mac != null && !MacAddressUtil.IsAllZero(mac))
-                    {
-                        live = true;
-                        return mac;
-                    }
-                }
-                catch (Exception) { }   // 아직 미니포트가 초기화되지 않음 → 계속 대기
-                if (DateTime.UtcNow >= deadline) break;
-                log("어댑터 초기화 대기 중... (" + attempt + ")");
-                Thread.Sleep(MacWaitPollMs);
-            }
-            // 시간 초과: 마지막으로 NDIS를 한 번 더 시도한 뒤(그 사이 올라왔을 수 있음) GetAdaptersAddresses/WMI 값으로 폴백
-            try
-            {
-                string mac = NdisQuery.QueryCurrentMac(adapter.InterfaceGuid);
+                string mac = NdisQuery.QueryCurrentMac(adapter.InterfaceGuid);   // 미니포트가 아직 초기화되지 않았으면 null → 계속 대기
                 if (mac != null && !MacAddressUtil.IsAllZero(mac))
                 {
                     live = true;
                     return mac;
                 }
+                if (DateTime.UtcNow >= deadline) break;
+                log("어댑터 초기화 대기 중... (" + attempt + ")");
+                Thread.Sleep(MacWaitPollMs);
             }
-            catch (Exception) { }
-            return ReadCurrentMac(adapter);
+            // 시간 초과: GetAdaptersAddresses/WMI 값으로 폴백 (NDIS 는 ReadCurrentMac 이 먼저 한 번 더 본다)
+            return ReadCurrentMac(adapter, out live);
         }
 
         /// <summary>

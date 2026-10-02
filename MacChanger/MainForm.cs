@@ -182,20 +182,11 @@ namespace MacChanger
             }
             // 켜는 순간 현재 할당된 IP를 기준 줄로 파일에만 한 번 기록한다 (상자는 표시 중일 때만 RefreshIp 가 채운다).
             NetworkAdapterInfo adapter = SelectedAdapter;
-            if (adapter != null && lastLoggedIp != null)
-            {
-                try
-                {
-                    IpMonitor.AppendLine(Application.ExecutablePath, IpMonitor.BuildLogLine(lastLoggedIp, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked));
-                }
-                catch (Exception ex)
-                {
-                    chkIpLog.Checked = false;
-                    SetStatus("실패", "IP 로그 저장 실패: " + ex.Message);
-                    return;
-                }
-            }
-            SetStatus("준비", "할당 IP 로그를 실행 파일 옆 " + IpMonitor.LogFileName + " 에 저장합니다.");
+            string error = adapter != null && lastLoggedIp != null
+                ? AppendToFile(IpMonitor.BuildLogLine(lastLoggedIp, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked))
+                : null;
+            if (error != null) SetStatus("실패", error);
+            else SetStatus("준비", "할당 IP 로그를 실행 파일 옆 " + IpMonitor.LogFileName + " 에 저장합니다.");
         }
 
         private void chkShowLog_CheckedChanged(object sender, EventArgs e)
@@ -209,12 +200,27 @@ namespace MacChanger
             lastBoxIp = null;
         }
 
-        /// <summary>현재 할당 IP가 상자의 마지막 줄과 다를 때만 한 줄 추가한다.</summary>
-        private void AppendToBox(string assignedIps, string mac)
+        /// <summary>상자에 한 줄 추가하고 마지막 줄의 할당 IP를 기억한다.</summary>
+        private void AppendToBox(string assignedIps, string line)
         {
-            if (assignedIps == null || assignedIps == lastBoxIp) return;
-            txtIpLog.AppendText(IpMonitor.BuildLogLine(assignedIps, mac, chkLogTime.Checked, chkLogMac.Checked) + Environment.NewLine);
+            txtIpLog.AppendText(line + Environment.NewLine);
             lastBoxIp = assignedIps;
+        }
+
+        /// <summary>저장 옵션이 켜져 있으면 파일에 한 줄 추가한다. 실패하면 옵션을 끄고 오류 메시지를 돌려준다 (성공/꺼짐이면 null).</summary>
+        private string AppendToFile(string line)
+        {
+            if (!chkIpLog.Checked) return null;
+            try
+            {
+                IpMonitor.AppendLine(Application.ExecutablePath, line);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                chkIpLog.Checked = false;   // CheckedChanged 가 먼저 '껐습니다' 상태를 쓰고, 호출자가 오류를 그 뒤에 표시한다
+                return "IP 로그 저장 실패: " + ex.Message;
+            }
         }
 
         /// <summary>로그 상자 표시 여부에 맞춰 상자와 지우기 버튼, 창 높이를 맞춘다.</summary>
@@ -222,7 +228,8 @@ namespace MacChanger
         {
             bool show = chkShowLog.Checked;
             NetworkAdapterInfo adapter = SelectedAdapter;
-            if (show && adapter != null) AppendToBox(lastLoggedIp, adapter.CurrentMac);   // 켜는 순간 현재 IP (마지막 줄과 같으면 생략)
+            if (show && adapter != null && lastLoggedIp != null && lastLoggedIp != lastBoxIp)   // 켜는 순간 현재 IP (마지막 줄과 같으면 생략)
+                AppendToBox(lastLoggedIp, IpMonitor.BuildLogLine(lastLoggedIp, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked));
             txtIpLog.Visible = show;
             btnClearLog.Enabled = show;
             // 고정 상수 대신 배율이 적용된 컨트롤 위치로 높이를 계산한다 (125%/150% DPI에서도 잘리지 않음)
@@ -389,19 +396,9 @@ namespace MacChanger
             if (busy || assigned == lastLoggedIp) return;
 
             lastLoggedIp = assigned;
-            if (chkShowLog.Checked) AppendToBox(assigned, adapter.CurrentMac);   // 숨겨진 동안에는 상자에 기록하지 않음
-            if (chkIpLog.Checked)
-            {
-                try
-                {
-                    IpMonitor.AppendLine(Application.ExecutablePath, IpMonitor.BuildLogLine(assigned, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked));
-                }
-                catch (Exception ex)
-                {
-                    chkIpLog.Checked = false;   // CheckedChanged 가 먼저 상태를 쓰고, 호출자가 ipLogError 를 그 뒤에 표시한다
-                    ipLogError = "IP 로그 저장 실패: " + ex.Message;
-                }
-            }
+            string line = IpMonitor.BuildLogLine(assigned, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked);   // 상자와 파일에 같은 줄
+            if (chkShowLog.Checked) AppendToBox(assigned, line);   // 숨겨진 동안에는 상자에 기록하지 않음
+            ipLogError = AppendToFile(line);
         }
 
         // ------------------------------------------------------------------
