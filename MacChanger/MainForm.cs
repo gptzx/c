@@ -34,6 +34,8 @@ namespace MacChanger
         private int logBottomMargin;
         /// <summary>직전 RefreshIp 에서 발생한 로그 저장 오류 (없으면 null)</summary>
         private string ipLogError;
+        /// <summary>로그 상자에 마지막으로 넣은 "실제 할당 IP" — 상자를 다시 켤 때 같은 줄을 반복하지 않기 위한 기준</summary>
+        private string lastBoxIp;
 
         public MainForm()
         {
@@ -55,7 +57,7 @@ namespace MacChanger
             toolTip.SetToolTip(chkIpLog, "켜 두면 새 IP가 할당될 때마다 로그 상자와 같은 줄을 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 추가합니다. 169.254.x.x 자동 사설 주소는 기록하지 않습니다.");
             toolTip.SetToolTip(chkLogTime, "로그 줄 맨 앞에 시각(yyyy-MM-dd HH:mm:ss)을 넣습니다.");
             toolTip.SetToolTip(chkLogMac, "로그 줄 끝에 그때 사용 중인 MAC을 넣습니다.");
-            toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다. 숨겨진 동안에는 상자에 기록하지 않고, 켜는 순간 현재 IP를 한 줄 표시합니다.");
+            toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다. 숨겨진 동안에는 상자에 기록하지 않고, 켤 때 현재 IP가 마지막 줄과 다르면 한 줄 추가합니다.");
             toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
         }
 
@@ -204,6 +206,15 @@ namespace MacChanger
         private void btnClearLog_Click(object sender, EventArgs e)
         {
             txtIpLog.Clear();
+            lastBoxIp = null;
+        }
+
+        /// <summary>현재 할당 IP가 상자의 마지막 줄과 다를 때만 한 줄 추가한다.</summary>
+        private void AppendToBox(string assignedIps, string mac)
+        {
+            if (assignedIps == null || assignedIps == lastBoxIp) return;
+            txtIpLog.AppendText(IpMonitor.BuildLogLine(assignedIps, mac, chkLogTime.Checked, chkLogMac.Checked) + Environment.NewLine);
+            lastBoxIp = assignedIps;
         }
 
         /// <summary>로그 상자 표시 여부에 맞춰 상자와 지우기 버튼, 창 높이를 맞춘다.</summary>
@@ -211,8 +222,7 @@ namespace MacChanger
         {
             bool show = chkShowLog.Checked;
             NetworkAdapterInfo adapter = SelectedAdapter;
-            if (show && !txtIpLog.Visible && lastLoggedIp != null && adapter != null)
-                txtIpLog.AppendText(IpMonitor.BuildLogLine(lastLoggedIp, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked) + Environment.NewLine);   // 켜는 순간 현재 IP
+            if (show && adapter != null) AppendToBox(lastLoggedIp, adapter.CurrentMac);   // 켜는 순간 현재 IP (마지막 줄과 같으면 생략)
             txtIpLog.Visible = show;
             btnClearLog.Enabled = show;
             // 고정 상수 대신 배율이 적용된 컨트롤 위치로 높이를 계산한다 (125%/150% DPI에서도 잘리지 않음)
@@ -379,13 +389,12 @@ namespace MacChanger
             if (busy || assigned == lastLoggedIp) return;
 
             lastLoggedIp = assigned;
-            string line = IpMonitor.BuildLogLine(assigned, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked);
-            if (chkShowLog.Checked) txtIpLog.AppendText(line + Environment.NewLine);   // 숨겨진 동안에는 상자에 기록하지 않음
+            if (chkShowLog.Checked) AppendToBox(assigned, adapter.CurrentMac);   // 숨겨진 동안에는 상자에 기록하지 않음
             if (chkIpLog.Checked)
             {
                 try
                 {
-                    IpMonitor.AppendLine(Application.ExecutablePath, line);
+                    IpMonitor.AppendLine(Application.ExecutablePath, IpMonitor.BuildLogLine(assigned, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked));
                 }
                 catch (Exception ex)
                 {

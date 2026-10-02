@@ -186,10 +186,10 @@
             // chkIpLog
             // 
             this.chkIpLog.AutoSize = true;
-            this.chkIpLog.Location = new System.Drawing.Point(340, 184);
+            this.chkIpLog.Location = new System.Drawing.Point(380, 216);
             this.chkIpLog.Name = "chkIpLog";
             this.chkIpLog.Size = new System.Drawing.Size(129, 19);
-            this.chkIpLog.TabIndex = 14;
+            this.chkIpLog.TabIndex = 19;
             this.chkIpLog.Text = "할당 IP 로그 저장";
             this.chkIpLog.UseVisualStyleBackColor = true;
             this.chkIpLog.CheckedChanged += new System.EventHandler(this.chkIpLog_CheckedChanged);
@@ -199,9 +199,9 @@
             this.lblLogOptions.AutoSize = true;
             this.lblLogOptions.Location = new System.Drawing.Point(12, 218);
             this.lblLogOptions.Name = "lblLogOptions";
-            this.lblLogOptions.Size = new System.Drawing.Size(62, 15);
+            this.lblLogOptions.Size = new System.Drawing.Size(38, 15);
             this.lblLogOptions.TabIndex = 15;
-            this.lblLogOptions.Text = "로그 항목:";
+            this.lblLogOptions.Text = "로그:";
             // 
             // chkLogTime
             // 
@@ -226,7 +226,7 @@
             // chkShowLog
             // 
             this.chkShowLog.AutoSize = true;
-            this.chkShowLog.Location = new System.Drawing.Point(340, 216);
+            this.chkShowLog.Location = new System.Drawing.Point(258, 216);
             this.chkShowLog.Name = "chkShowLog";
             this.chkShowLog.Size = new System.Drawing.Size(107, 19);
             this.chkShowLog.TabIndex = 18;
@@ -236,10 +236,10 @@
             // 
             // btnClearLog
             // 
-            this.btnClearLog.Location = new System.Drawing.Point(458, 212);
+            this.btnClearLog.Location = new System.Drawing.Point(458, 180);
             this.btnClearLog.Name = "btnClearLog";
             this.btnClearLog.Size = new System.Drawing.Size(90, 25);
-            this.btnClearLog.TabIndex = 19;
+            this.btnClearLog.TabIndex = 14;
             this.btnClearLog.Text = "로그 지우기";
             this.btnClearLog.UseVisualStyleBackColor = true;
             this.btnClearLog.Click += new System.EventHandler(this.btnClearLog_Click);
