@@ -267,12 +267,5 @@ namespace MacChanger.Core
                 if (string.Equals(a.InterfaceGuid, interfaceGuid, StringComparison.OrdinalIgnoreCase) && a.CurrentMac != null) return a.CurrentMac;
             return null;
         }
-
-        public static string GetPermanentMacViaWmi(string interfaceGuid)
-        {
-            foreach (NetworkAdapterInfo a in EnumerateMsftNetAdapter())
-                if (string.Equals(a.InterfaceGuid, interfaceGuid, StringComparison.OrdinalIgnoreCase)) return a.PermanentMacHint;
-            return null;
-        }
     }
 }

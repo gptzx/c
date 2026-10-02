@@ -31,7 +31,7 @@ namespace MacChanger.Core
         // MAC 조회 (매번 새로 조회, 저장하지 않음)
         // ------------------------------------------------------------------
 
-        /// <summary>원래(공장) MAC. IOCTL(OID_802_3_PERMANENT_ADDRESS) → WMI MSFT_NetAdapter.PermanentAddress 순으로 시도. 실패 시 null.</summary>
+        /// <summary>원래(공장) MAC. IOCTL(OID_802_3_PERMANENT_ADDRESS) → 열거 시점에 읽어 둔 MSFT_NetAdapter.PermanentAddress 순으로 시도. 실패 시 null.</summary>
         public static string ReadPermanentMac(NetworkAdapterInfo adapter)
         {
             try
@@ -40,13 +40,8 @@ namespace MacChanger.Core
                 if (mac != null && !MacAddressUtil.IsAllZero(mac)) return mac;
             }
             catch (Exception) { }
-            try
-            {
-                string mac = AdapterEnumerator.GetPermanentMacViaWmi(adapter.InterfaceGuid);
-                if (mac != null && !MacAddressUtil.IsAllZero(mac)) return mac;
-            }
-            catch (Exception) { }
-            return null;
+            string hint = adapter.PermanentMacHint;
+            return hint != null && !MacAddressUtil.IsAllZero(hint) ? hint : null;
         }
 
         /// <summary>현재 MAC. IOCTL(OID_802_3_CURRENT_ADDRESS) → GetAdaptersAddresses → WMI 순으로 시도. 실패 시 null.</summary>

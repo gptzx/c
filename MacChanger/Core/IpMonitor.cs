@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -16,8 +16,13 @@ namespace MacChanger.Core
         /// <summary>GetAdaptersAddresses(NetworkInterface) 목록에서 GUID가 일치하는 인터페이스. 없으면(비활성화 등) null.</summary>
         public static NetworkInterface FindInterface(string interfaceGuid)
         {
+            Guid target;
+            if (!Guid.TryParse(interfaceGuid, out target)) return null;
             foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
-                if (string.Equals(NetworkAdapterInfo.NormalizeGuid(ni.Id), interfaceGuid, StringComparison.OrdinalIgnoreCase)) return ni;
+            {
+                Guid id;
+                if (Guid.TryParse(ni.Id, out id) && id == target) return ni;
+            }
             return null;
         }
 
@@ -47,6 +52,7 @@ namespace MacChanger.Core
         public static string WithoutApipa(string ipv4List)
         {
             if (string.IsNullOrEmpty(ipv4List)) return string.Empty;
+            if (ipv4List.IndexOf("169.254.", StringComparison.Ordinal) < 0) return ipv4List;   // 보통의 경우: 그대로
             List<string> keep = new List<string>();
             foreach (string ip in ipv4List.Split(','))
             {

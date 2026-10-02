@@ -55,7 +55,7 @@ namespace MacChanger
             toolTip.SetToolTip(chkIpLog, "켜 두면 새 IP가 할당될 때마다 로그 상자와 같은 줄을 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 추가합니다. 169.254.x.x 자동 사설 주소는 기록하지 않습니다.");
             toolTip.SetToolTip(chkLogTime, "로그 줄 맨 앞에 시각(yyyy-MM-dd HH:mm:ss)을 넣습니다.");
             toolTip.SetToolTip(chkLogMac, "로그 줄 끝에 그때 사용 중인 MAC을 넣습니다.");
-            toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다. 숨겨진 동안에는 상자에 기록하지 않습니다.");
+            toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다. 숨겨진 동안에는 상자에 기록하지 않고, 켜는 순간 현재 IP를 한 줄 표시합니다.");
             toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
         }
 
@@ -178,7 +178,7 @@ namespace MacChanger
                 SetStatus("준비", "할당 IP 로그 파일 저장을 껐습니다.");
                 return;
             }
-            // 켜는 순간 현재 할당된 IP를 기준 줄로 파일에만 한 번 기록한다 (로그 상자에는 이미 표시되어 있음).
+            // 켜는 순간 현재 할당된 IP를 기준 줄로 파일에만 한 번 기록한다 (상자는 표시 중일 때만 RefreshIp 가 채운다).
             NetworkAdapterInfo adapter = SelectedAdapter;
             if (adapter != null && lastLoggedIp != null)
             {
@@ -210,6 +210,9 @@ namespace MacChanger
         private void ApplyLogBoxVisibility()
         {
             bool show = chkShowLog.Checked;
+            NetworkAdapterInfo adapter = SelectedAdapter;
+            if (show && !txtIpLog.Visible && lastLoggedIp != null && adapter != null)
+                txtIpLog.AppendText(IpMonitor.BuildLogLine(lastLoggedIp, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked) + Environment.NewLine);   // 켜는 순간 현재 IP
             txtIpLog.Visible = show;
             btnClearLog.Enabled = show;
             // 고정 상수 대신 배율이 적용된 컨트롤 위치로 높이를 계산한다 (125%/150% DPI에서도 잘리지 않음)
@@ -234,6 +237,7 @@ namespace MacChanger
                 SetStatus("진행", "어댑터 목록을 읽는 중...");
                 lblStatus.Update();
                 List<NetworkAdapterInfo> adapters;
+                string enumError = null;
                 try
                 {
                     adapters = AdapterEnumerator.Enumerate();
@@ -241,7 +245,7 @@ namespace MacChanger
                 catch (Exception ex)
                 {
                     adapters = new List<NetworkAdapterInfo>();
-                    SetStatus("실패", "어댑터 열거 오류: " + ex.Message);
+                    enumError = "어댑터 열거 오류: " + ex.Message;
                 }
 
                 suppressSelectionChanged = true;
@@ -268,7 +272,7 @@ namespace MacChanger
                 if (cboAdapters.Items.Count == 0)
                 {
                     txtPermanentMac.Text = txtCurrentMac.Text = txtCurrentIp.Text = string.Empty;
-                    SetStatus("실패", "네트워크 어댑터를 찾지 못했습니다.");
+                    SetStatus("실패", enumError ?? "네트워크 어댑터를 찾지 못했습니다.");
                     return;
                 }
                 RefreshSelectedAdapterInfo();
@@ -353,7 +357,7 @@ namespace MacChanger
                 return;
             }
             // 어댑터가 올라와 있으면 지금 사용 중인 MAC도 함께 갱신한다 (느리게 올라온 어댑터, Wi-Fi 임의 주소 변경 등).
-            if (liveMac != null && !MacAddressUtil.IsAllZero(liveMac)) ShowCurrentMac(adapter, liveMac);
+            if (liveMac != null && liveMac != "000000000000") ShowCurrentMac(adapter, liveMac);
 
             // 로그 기준은 169.254.x.x 를 뺀 "실제 할당" 주소 목록 — 전환 중 자동 사설 주소가 붙었다 떨어져도 중복 기록되지 않는다.
             string assigned = ip == null ? string.Empty : IpMonitor.WithoutApipa(ip);

@@ -186,7 +186,7 @@
             // chkIpLog
             // 
             this.chkIpLog.AutoSize = true;
-            this.chkIpLog.Location = new System.Drawing.Point(362, 184);
+            this.chkIpLog.Location = new System.Drawing.Point(340, 184);
             this.chkIpLog.Name = "chkIpLog";
             this.chkIpLog.Size = new System.Drawing.Size(129, 19);
             this.chkIpLog.TabIndex = 14;
@@ -226,7 +226,7 @@
             // chkShowLog
             // 
             this.chkShowLog.AutoSize = true;
-            this.chkShowLog.Location = new System.Drawing.Point(362, 216);
+            this.chkShowLog.Location = new System.Drawing.Point(340, 216);
             this.chkShowLog.Name = "chkShowLog";
             this.chkShowLog.Size = new System.Drawing.Size(107, 19);
             this.chkShowLog.TabIndex = 18;
@@ -236,9 +236,9 @@
             // 
             // btnClearLog
             // 
-            this.btnClearLog.Location = new System.Drawing.Point(474, 212);
+            this.btnClearLog.Location = new System.Drawing.Point(458, 212);
             this.btnClearLog.Name = "btnClearLog";
-            this.btnClearLog.Size = new System.Drawing.Size(74, 25);
+            this.btnClearLog.Size = new System.Drawing.Size(90, 25);
             this.btnClearLog.TabIndex = 19;
             this.btnClearLog.Text = "로그 지우기";
             this.btnClearLog.UseVisualStyleBackColor = true;

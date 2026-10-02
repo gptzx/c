@@ -1,6 +1,4 @@
 ﻿using System;
-using System.ComponentModel;
-using System.Runtime.InteropServices;
 using MacChanger.Native;
 using Microsoft.Win32.SafeHandles;
 
@@ -22,57 +20,35 @@ namespace MacChanger.Core
             return QueryMac(interfaceGuid, NativeMethods.OID_802_3_CURRENT_ADDRESS);
         }
 
+        private static readonly uint[] AccessModes = new uint[]
+        {
+            0,
+            NativeMethods.GENERIC_READ,
+            NativeMethods.GENERIC_READ | NativeMethods.GENERIC_WRITE
+        };
+
+        /// <summary>6바이트 MAC(12자리 hex). 장치를 열 수 없거나 드라이버가 OID 를 거부하면 null.</summary>
         private static string QueryMac(string interfaceGuid, uint oid)
         {
-            if (string.IsNullOrEmpty(interfaceGuid)) throw new ArgumentNullException("interfaceGuid");
-
             string path = @"\\.\" + interfaceGuid;
-            uint[] accessModes = new uint[]
+            byte[] outBuffer = new byte[6];
+            foreach (uint access in AccessModes)
             {
-                0,
-                NativeMethods.GENERIC_READ,
-                NativeMethods.GENERIC_READ | NativeMethods.GENERIC_WRITE
-            };
-
-            Exception last = null;
-            foreach (uint access in accessModes)
-            {
-                SafeFileHandle handle = null;
-                try
+                using (SafeFileHandle handle = NativeMethods.CreateFile(
+                    path, access, NativeMethods.FILE_SHARE_READ | NativeMethods.FILE_SHARE_WRITE,
+                    IntPtr.Zero, NativeMethods.OPEN_EXISTING, 0, IntPtr.Zero))
                 {
-                    handle = NativeMethods.CreateFile(
-                        path, access,
-                        NativeMethods.FILE_SHARE_READ | NativeMethods.FILE_SHARE_WRITE,
-                        IntPtr.Zero, NativeMethods.OPEN_EXISTING, 0, IntPtr.Zero);
-                    if (handle == null || handle.IsInvalid)
-                    {
-                        last = new Win32Exception(Marshal.GetLastWin32Error());
-                        continue;   // 다른 접근 모드로 다시 시도
-                    }
-
+                    if (handle.IsInvalid) continue;   // 다른 접근 모드로 다시 시도
                     uint oidValue = oid;
-                    byte[] outBuffer = new byte[6];
                     uint returned;
                     bool ok = NativeMethods.DeviceIoControl(
                         handle, NativeMethods.IOCTL_NDIS_QUERY_GLOBAL_STATS,
-                        ref oidValue, sizeof(uint),
-                        outBuffer, (uint)outBuffer.Length,
-                        out returned, IntPtr.Zero);
-                    if (!ok)
-                    {
-                        // 장치는 열렸지만 OID를 지원하지 않는 경우: 다른 접근 모드를 더 시도해도 의미 없음
-                        throw new Win32Exception(Marshal.GetLastWin32Error());
-                    }
-                    if (returned < 6)
-                        throw new InvalidOperationException("NDIS 응답 길이가 6바이트 미만입니다 (" + returned + ").");
-                    return MacAddressUtil.FromBytes(outBuffer);
-                }
-                finally
-                {
-                    if (handle != null) handle.Dispose();
+                        ref oidValue, sizeof(uint), outBuffer, (uint)outBuffer.Length, out returned, IntPtr.Zero);
+                    // 장치는 열렸지만 OID 를 지원하지 않는 경우: 다른 접근 모드를 더 시도해도 의미 없음
+                    return ok && returned >= 6 ? MacAddressUtil.FromBytes(outBuffer) : null;
                 }
             }
-            throw last ?? new InvalidOperationException("NDIS 장치를 열 수 없습니다: " + interfaceGuid);
+            return null;
         }
     }
 }

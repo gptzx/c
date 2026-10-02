@@ -9,7 +9,7 @@ Windows 7(.NET 4.0 설치됨) / 8 / 8.1 / 10 / 11에서 추가 런타임 설치 
 | 기능 | 구현 |
 |---|---|
 | 어댑터 열거 | `root\StandardCimv2\MSFT_NetAdapter` → 실패/빈 결과 시 `Win32_NetworkAdapter` → `GetAdaptersAddresses` 순으로 폴백. 드롭다운에 `[유선]/[무선]/[블루투스]/[기타]` 라벨 + 설명 + 현재 MAC 표시 (Windows 7의 `Win32_NetworkAdapter` 경로에서는 `GetAdaptersAddresses`의 IfType으로 무선 여부를 보강) |
-| 원래(공장) MAC | `\\.\{GUID}`에 `IOCTL_NDIS_QUERY_GLOBAL_STATS` + `OID_802_3_PERMANENT_ADDRESS`로 조회, 실패 시 `MSFT_NetAdapter.PermanentAddress`. 파일에 저장하지 않고 매번 조회 |
+| 원래(공장) MAC | `\\.\{GUID}`에 `IOCTL_NDIS_QUERY_GLOBAL_STATS` + `OID_802_3_PERMANENT_ADDRESS`로 조회, 실패 시 열거 시점에 읽어 둔 `MSFT_NetAdapter.PermanentAddress`. 파일에 저장하지 않고 매번 조회 |
 | 현재 MAC | `OID_802_3_CURRENT_ADDRESS` → `GetAdaptersAddresses` → WMI 순으로 조회 |
 | 랜덤 생성 | 선택한 어댑터 종류에 따라 자동. **무선**: 12자리 중 왼쪽에서 두 번째 자리만 `2/6/A/E` 중 하나(`X2/X6/XA/XE-XX-XX-XX-XX-XX`), 나머지 11자리는 `0~F` 전부 무작위(첫 자리도 고정하지 않음). **유선/기타**: 두 번째 자리만 짝수(`0/2/4/6/8/A/C/E`), 나머지 11자리 `0~F`, `00-00-00-00-00-00`과 `FF-FF-FF-FF-FF-FF` 제외 |
 | 변경 적용 | 확인 대화 상자 없이 바로 실행. (a) SetupAPI `DICS_DISABLE`(실패 시 WMI `Disable()`) → (b) `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4D36E972-…}\00XX` 중 `NetCfgInstanceId`가 일치하는 키에 `NetworkAddress`(REG_SZ, 하이픈 없는 12자리) 기록 → (c) Tcpip 값 자동 정리(아래 참고) → (d) SetupAPI `DICS_ENABLE`(실패 시 WMI `Enable()` + 재시도) → NDIS에서 현재 MAC을 다시 읽어 검증 |
@@ -17,7 +17,7 @@ Windows 7(.NET 4.0 설치됨) / 8 / 8.1 / 10 / 11에서 추가 런타임 설치 
 | 원상복구 | 확인 대화 상자 없이 바로 실행. `NetworkAddress` 값 삭제 → Tcpip 값 자동 정리 → 어댑터 재시작 → 공장 MAC과 비교 |
 | 재부팅 보류 처리 | 장치 관리자가 어댑터를 즉시 중지/재시작하지 못해 재부팅 필요 플래그(`DI_NEEDREBOOT`)를 설정하면, 잘못된 "드라이버 거부" 판정 대신 "재부팅 후 적용" 상태로 안내 |
 | 현재 IP 실시간 표시 | 선택한 어댑터의 IPv4 주소를 2초마다 다시 읽어 표시 (어댑터 비활성 / 링크 없음 / 할당 대기 / 169.254.x.x 자동 사설 주소 구분) |
-| 할당 IP 로그 | 선택한 어댑터에 새 IP가 할당될 때마다 로그 상자에 한 줄(`[시각(탭)]IP[(탭)MAC]`)을 추가. **시간**·**MAC** 항목은 각각 체크박스로 켜고 끌 수 있고(기본 꺼짐), **로그 상자 표시**로 상자를 보이거나 숨길 수 있음(기본 숨김, 숨겨진 동안에는 상자에 기록하지 않음). **로그 지우기**로 상자 내용을 비움. 169.254.x.x 자동 사설 주소는 로그에 넣지 않으며, DHCP 전환 중 169.254 주소가 잠깐 붙었다 떨어져도 같은 IP를 다시 기록하지 않음. 작업 중에는 기록하지 않고 작업 완료 후 새 MAC과 함께 기록 |
+| 할당 IP 로그 | 선택한 어댑터에 새 IP가 할당될 때마다 로그 상자에 한 줄(`[시각(탭)]IP[(탭)MAC]`)을 추가. **시간**·**MAC** 항목은 각각 체크박스로 켜고 끌 수 있고(기본 꺼짐), **로그 상자 표시**로 상자를 보이거나 숨길 수 있음(기본 숨김, 숨겨진 동안에는 상자에 기록하지 않으며 켜는 순간 현재 IP를 한 줄 표시). **로그 지우기**로 상자 내용을 비움. 169.254.x.x 자동 사설 주소는 로그에 넣지 않으며, DHCP 전환 중 169.254 주소가 잠깐 붙었다 떨어져도 같은 IP를 다시 기록하지 않음. 작업 중에는 기록하지 않고 작업 완료 후 새 MAC과 함께 기록 |
 | 할당 IP 로그 저장 | 체크하면 로그 상자와 같은 줄을 실행 파일 옆 `MacChanger-ip.log`에도 추가 (기본 꺼짐, 켜지 않으면 어떤 파일도 만들지 않음). 켜는 순간 현재 할당된 IP를 기준 줄로 한 번 기록 |
 | 상태 표시 | 상태 라벨: `준비 / 진행 / 완료 / 실패` + 진행 단계 메시지 (전체 내용은 라벨 툴팁) |
 | 아이콘 | 실행 파일에 아이콘이 내장되어 있고(16·32 BMP + 256 PNG), 창/작업표시줄 아이콘도 EXE 리소스에서 같은 아이콘을 읽어 사용 (UNC 경로에서도 동작) |
