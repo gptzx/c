@@ -238,13 +238,21 @@ namespace MacChanger
             if (!busy) SetStatus("준비", "자동 변경 정지");
         }
 
-        /// <summary>자동 변경 중이고 어댑터에 IP가 할당되어 있으면 지연 시간 뒤로 변경을 예약한다 (0초면 다음 확인 때 바로).</summary>
+        /// <summary>자동 변경 중이고 어댑터에 IP가 할당되어 있으면 지연 시간 뒤로 변경을 예약하고 남은 시간을 바로 버튼에 보여준다 (0초면 다음 1초 확인 때 바로).</summary>
         private void ScheduleAuto()
         {
             if (!autoRunning || busy || lastLoggedIp == null) return;
+            int delay = (int)nudAutoDelay.Value;
             autoPending = true;
-            autoDueTick = unchecked(Environment.TickCount + (int)nudAutoDelay.Value * 1000);
-            btnAutoToggle.Text = "정지";
+            autoDueTick = unchecked(Environment.TickCount + delay * 1000);
+            if (delay > 0)
+            {
+                // 1초 타이머의 위상을 예약 시각에 맞춘다: 다음 틱이 정확히 1초 뒤에 오므로 숫자마다 1초씩 표시되고 변경은 정확히 N초 뒤에 시작된다
+                secondTimer.Stop();
+                secondTimer.Start();
+                btnAutoToggle.Text = "정지 (" + FormatRemaining(delay) + ")";
+            }
+            else btnAutoToggle.Text = "정지";
         }
 
         private void CancelAuto()
