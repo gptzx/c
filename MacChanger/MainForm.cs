@@ -47,6 +47,7 @@ namespace MacChanger
         public MainForm()
         {
             InitializeComponent();
+            ipTimer.Interval = (int)nudIpInterval.Value;                              // IP 확인 주기의 기본값은 입력 칸 한 곳에서만 정한다
             graphHalfBounds = trafficGraph.Bounds;                                    // AutoScaleMode.Font 배율이 적용된 뒤의 값
             graphFullBounds = Rectangle.Union(txtIpLog.Bounds, trafficGraph.Bounds);   // 로그 상자를 숨기면 그 자리까지 그래프가 차지
             ApplyLogBoxVisibility();                                                  // 기본값: 로그 상자 숨김
