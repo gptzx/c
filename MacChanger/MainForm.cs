@@ -30,8 +30,10 @@ namespace MacChanger
         private string lastInfoGuid;
         /// <summary>선택한 어댑터에 대해 마지막으로 로그에 남긴 "실제 할당 IP"(169.254 제외, 정렬). 어댑터가 내려가거나 재시작되면 초기화한다.</summary>
         private string lastLoggedIp;
-        /// <summary>로그 상자 아래쪽 여백 (DPI/글꼴 배율이 적용된 뒤의 실제 픽셀) — 로그 상자를 숨길 때 창 높이 계산에 사용</summary>
-        private int logBottomMargin;
+        /// <summary>그래프 위치: 로그 상자와 반반일 때 / 로그 상자를 숨겨 아래쪽 전체 폭을 쓸 때 (DPI/글꼴 배율이 적용된 뒤의 실제 픽셀)</summary>
+        private Rectangle graphHalfBounds, graphFullBounds;
+        /// <summary>선택한 어댑터의 송수신 카운터 (1초마다 읽어 그래프에 넣는다)</summary>
+        private readonly TrafficMonitor traffic = new TrafficMonitor();
         /// <summary>직전 RefreshIp 에서 발생한 로그 저장 오류 (없으면 null)</summary>
         private string ipLogError;
         /// <summary>로그 상자에 마지막으로 넣은 "실제 할당 IP" — 상자를 다시 켤 때 같은 줄을 반복하지 않기 위한 기준</summary>
@@ -45,8 +47,9 @@ namespace MacChanger
         public MainForm()
         {
             InitializeComponent();
-            logBottomMargin = ClientSize.Height - txtIpLog.Bottom;   // AutoScaleMode.Font 배율이 적용된 뒤의 값
-            ApplyLogBoxVisibility();                                  // 기본값: 로그 상자 숨김
+            graphHalfBounds = trafficGraph.Bounds;                                    // AutoScaleMode.Font 배율이 적용된 뒤의 값
+            graphFullBounds = Rectangle.Union(txtIpLog.Bounds, trafficGraph.Bounds);   // 로그 상자를 숨기면 그 자리까지 그래프가 차지
+            ApplyLogBoxVisibility();                                                  // 기본값: 로그 상자 숨김
             try
             {
                 // 실행 파일에 내장된 아이콘(그룹 아이콘 ID 32512)을 EXE 리소스에서 직접 읽어 창/작업표시줄 아이콘으로 쓴다.
@@ -62,7 +65,8 @@ namespace MacChanger
             toolTip.SetToolTip(chkIpLog, "켜 두면 새 IP가 할당될 때마다 로그 상자와 같은 줄을 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 추가합니다. 169.254.x.x 자동 사설 주소는 기록하지 않습니다.");
             toolTip.SetToolTip(chkLogTime, "로그 줄 맨 앞에 시각(yyyy-MM-dd HH:mm:ss)을 넣습니다.");
             toolTip.SetToolTip(chkLogMac, "로그 줄 끝에 그때 사용 중인 MAC을 넣습니다.");
-            toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다. 숨겨진 동안에는 상자에 기록하지 않고, 켤 때 현재 IP가 마지막 줄과 다르면 한 줄 추가합니다.");
+            toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다 (숨기면 그래프가 아래쪽 전체 폭을 씁니다). 숨겨진 동안에는 상자에 기록하지 않고, 켤 때 현재 IP가 마지막 줄과 다르면 한 줄 추가합니다.");
+            toolTip.SetToolTip(trafficGraph, "선택한 어댑터의 송수신 속도 그래프 (빨강: 수신, 초록: 송신, 1초마다 갱신, 가로 1픽셀 = 1초). MAC을 변경하면 그래프는 유지되고 누적 데이터 양만 0부터 다시 셉니다.");
             toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
             toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크한 뒤 '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
             toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~3600; 0이면 즉시). 바꾼 값은 다음 예약부터 적용됩니다.");
@@ -85,7 +89,7 @@ namespace MacChanger
         private void MainForm_Shown(object sender, EventArgs e)
         {
             // 창이 먼저 그려진 뒤에 (WMI 조회가 몇 초 걸릴 수 있으므로) 목록을 읽는다.
-            BeginInvoke(new MethodInvoker(delegate { LoadAdapters(null); ipTimer.Start(); }));
+            BeginInvoke(new MethodInvoker(delegate { LoadAdapters(null); ipTimer.Start(); trafficTimer.Start(); }));
         }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -309,7 +313,7 @@ namespace MacChanger
             }
         }
 
-        /// <summary>로그 상자 표시 여부에 맞춰 상자와 지우기 버튼, 창 높이를 맞춘다.</summary>
+        /// <summary>로그 상자 표시 여부에 맞춰 상자와 지우기 버튼, 그래프 폭을 맞춘다 (상자를 숨기면 그래프가 아래쪽 전체 폭을 쓴다).</summary>
         private void ApplyLogBoxVisibility()
         {
             bool show = chkShowLog.Checked;
@@ -318,9 +322,7 @@ namespace MacChanger
                 AppendToBox(lastLoggedIp, IpMonitor.BuildLogLine(lastLoggedIp, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked));
             txtIpLog.Visible = show;
             btnClearLog.Enabled = show;
-            // 고정 상수 대신 배율이 적용된 컨트롤 위치로 높이를 계산한다 (125%/150% DPI에서도 잘리지 않음)
-            int bottom = show ? txtIpLog.Bottom : lblStatus.Bottom;
-            ClientSize = new Size(ClientSize.Width, bottom + logBottomMargin);
+            trafficGraph.Bounds = show ? graphHalfBounds : graphFullBounds;
         }
 
         private void ipTimer_Tick(object sender, EventArgs e)
@@ -328,6 +330,21 @@ namespace MacChanger
             RefreshIp();
             if (ipLogError != null) SetStatus("실패", ipLogError);
             RunAutoIfDue();
+        }
+
+        /// <summary>1초마다 선택한 어댑터의 송수신 카운터를 읽어 그래프에 한 샘플을 넣는다 (어댑터가 내려가 있으면 속도 0).</summary>
+        private void trafficTimer_Tick(object sender, EventArgs e)
+        {
+            if (SelectedAdapter == null) return;
+            try
+            {
+                traffic.Sample();
+            }
+            catch (Exception)
+            {
+                // 인터페이스가 사라지는 순간(GetIfEntry2 실패) — 이번 초는 속도 0으로 둔다
+            }
+            trafficGraph.AddSample(traffic.ReceivedSpeed, traffic.SentSpeed, traffic.ReceivedTotal, traffic.SentTotal);
         }
 
         // ------------------------------------------------------------------
@@ -377,6 +394,8 @@ namespace MacChanger
                 {
                     txtPermanentMac.Text = txtCurrentMac.Text = string.Empty;
                     txtCurrentIp.Text = txtMask.Text = txtGateway.Text = txtDns.Text = string.Empty;
+                    traffic.Attach(null);
+                    trafficGraph.Clear();
                     SetStatus("실패", enumError ?? "네트워크 어댑터를 찾지 못했습니다.");
                     return;
                 }
@@ -402,6 +421,11 @@ namespace MacChanger
                     lastInfoGuid = adapter.InterfaceGuid;
                     lastLoggedIp = null;   // 다른 어댑터를 골랐을 때만 기준 초기화 (단순 새로 고침은 중복 기록하지 않음)
                     CancelAuto();          // 이전 어댑터의 예약이 새 어댑터에 적용되지 않도록
+                }
+                if (!string.Equals(adapter.InterfaceGuid, traffic.InterfaceGuid, StringComparison.OrdinalIgnoreCase))
+                {
+                    traffic.Attach(adapter.InterfaceGuid);   // 그래프와 누적량은 어댑터별 — 다른 어댑터를 고르면 새로 시작
+                    trafficGraph.Clear();
                 }
 
                 string permanent = MacChangeService.ReadPermanentMac(adapter);
@@ -554,6 +578,8 @@ namespace MacChanger
 
             // 어댑터가 실제로 중지되었다면 이후 받는 IP는 같은 값이라도 새 할당이므로 새 MAC과 함께 기록한다.
             if (result != null && result.AdapterRestarted) lastLoggedIp = null;
+            // MAC 변경/복구가 끝나면 그래프는 그대로 두고 누적 송수신량만 0부터 다시 센다 (TMAC 과 같은 동작).
+            if (result != null && result.Success) traffic.ResetTotals();
 
             // 변경/복구 후 현재 MAC/IP를 다시 읽어 UI를 갱신한 뒤, 작업 결과 상태를 최종적으로 표시한다.
             RefreshSelectedAdapterInfo();

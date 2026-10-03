@@ -64,6 +64,7 @@
     <Compile Include="Core\MacRegistry.cs" />
     <Compile Include="Core\NdisQuery.cs" />
     <Compile Include="Core\NetworkAdapterInfo.cs" />
+    <Compile Include="Core\TrafficMonitor.cs" />
     <Compile Include="Native\NativeMethods.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
@@ -72,6 +73,9 @@
       <DependentUpon>MainForm.cs</DependentUpon>
     </Compile>
     <Compile Include="Program.cs" />
+    <Compile Include="TrafficGraph.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

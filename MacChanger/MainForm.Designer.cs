@@ -51,8 +51,10 @@
             this.btnClearLog = new System.Windows.Forms.Button();
             this.lblStatus = new System.Windows.Forms.Label();
             this.txtIpLog = new System.Windows.Forms.TextBox();
+            this.trafficGraph = new MacChanger.TrafficGraph();
             this.toolTip = new System.Windows.Forms.ToolTip(this.components);
             this.ipTimer = new System.Windows.Forms.Timer(this.components);
+            this.trafficTimer = new System.Windows.Forms.Timer(this.components);
             this.worker = new System.ComponentModel.BackgroundWorker();
             ((System.ComponentModel.ISupportInitialize)(this.nudAutoDelay)).BeginInit();
             this.SuspendLayout();
@@ -385,15 +387,28 @@
             this.txtIpLog.Name = "txtIpLog";
             this.txtIpLog.ReadOnly = true;
             this.txtIpLog.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-            this.txtIpLog.Size = new System.Drawing.Size(536, 110);
+            this.txtIpLog.Size = new System.Drawing.Size(262, 156);
             this.txtIpLog.TabIndex = 25;
             this.txtIpLog.TabStop = false;
             this.txtIpLog.WordWrap = false;
+            // 
+            // trafficGraph
+            // 
+            this.trafficGraph.Location = new System.Drawing.Point(286, 402);
+            this.trafficGraph.Name = "trafficGraph";
+            this.trafficGraph.Size = new System.Drawing.Size(262, 156);
+            this.trafficGraph.TabIndex = 34;
+            this.trafficGraph.TabStop = false;
             // 
             // ipTimer
             // 
             this.ipTimer.Interval = 2000;
             this.ipTimer.Tick += new System.EventHandler(this.ipTimer_Tick);
+            // 
+            // trafficTimer
+            // 
+            this.trafficTimer.Interval = 1000;
+            this.trafficTimer.Tick += new System.EventHandler(this.trafficTimer_Tick);
             // 
             // worker
             // 
@@ -406,7 +421,8 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(560, 524);
+            this.ClientSize = new System.Drawing.Size(560, 570);
+            this.Controls.Add(this.trafficGraph);
             this.Controls.Add(this.txtIpLog);
             this.Controls.Add(this.lblStatus);
             this.Controls.Add(this.btnClearLog);
@@ -489,8 +505,10 @@
         private System.Windows.Forms.Button btnClearLog;
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.TextBox txtIpLog;
+        private TrafficGraph trafficGraph;
         private System.Windows.Forms.ToolTip toolTip;
         private System.Windows.Forms.Timer ipTimer;
+        private System.Windows.Forms.Timer trafficTimer;
         private System.ComponentModel.BackgroundWorker worker;
     }
 }

@@ -56,6 +56,30 @@ namespace MacChanger.Native
         public static extern IntPtr LoadIcon(IntPtr hInstance, IntPtr lpIconName);
 
         // ------------------------------------------------------------------
+        // iphlpapi — 인터페이스 송수신 카운터 (GetIfEntry2, Windows Vista 이상, 64비트 카운터)
+        // ------------------------------------------------------------------
+        /// <summary>
+        /// MIB_IF_ROW2 (netioapi.h, 1352바이트). 문자열/주소 배열 등은 쓰지 않으므로 필요한 필드만 실제 오프셋에 놓는다
+        /// (InterfaceLuid 0, InterfaceIndex 8, InOctets 1208, OutOctets 1280 — x86/x64 공통).
+        /// </summary>
+        [StructLayout(LayoutKind.Explicit, Size = 1352)]
+        public struct MIB_IF_ROW2
+        {
+            [FieldOffset(0)] public ulong InterfaceLuid;
+            [FieldOffset(8)] public uint InterfaceIndex;
+            [FieldOffset(1208)] public ulong InOctets;
+            [FieldOffset(1280)] public ulong OutOctets;
+        }
+
+        /// <summary>인터페이스 GUID → NET_LUID. 성공하면 NO_ERROR(0).</summary>
+        [DllImport("iphlpapi.dll")]
+        public static extern int ConvertInterfaceGuidToLuid(ref Guid interfaceGuid, out ulong interfaceLuid);
+
+        /// <summary>InterfaceLuid(또는 InterfaceIndex)로 지정한 인터페이스의 MIB_IF_ROW2 를 읽는다. 성공하면 NO_ERROR(0).</summary>
+        [DllImport("iphlpapi.dll")]
+        public static extern int GetIfEntry2(ref MIB_IF_ROW2 row);
+
+        // ------------------------------------------------------------------
         // setupapi : 어댑터 비활성화/활성화 (DIF_PROPERTYCHANGE)
         // ------------------------------------------------------------------
         public static readonly Guid GUID_DEVCLASS_NET = new Guid("4D36E972-E325-11CE-BFC1-08002BE10318");
