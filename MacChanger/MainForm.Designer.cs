@@ -44,6 +44,9 @@
             this.chkAuto = new System.Windows.Forms.CheckBox();
             this.nudAutoDelay = new System.Windows.Forms.NumericUpDown();
             this.lblAutoSuffix = new System.Windows.Forms.Label();
+            this.lblIpInterval = new System.Windows.Forms.Label();
+            this.nudIpInterval = new System.Windows.Forms.NumericUpDown();
+            this.lblIpIntervalSuffix = new System.Windows.Forms.Label();
             this.lblLogOptions = new System.Windows.Forms.Label();
             this.chkLogTime = new System.Windows.Forms.CheckBox();
             this.chkLogMac = new System.Windows.Forms.CheckBox();
@@ -57,6 +60,7 @@
             this.secondTimer = new System.Windows.Forms.Timer(this.components);
             this.worker = new System.ComponentModel.BackgroundWorker();
             ((System.ComponentModel.ISupportInitialize)(this.nudAutoDelay)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.nudIpInterval)).BeginInit();
             this.SuspendLayout();
             // 
             // lblAdapter
@@ -260,7 +264,7 @@
             // chkIpLog
             // 
             this.chkIpLog.AutoSize = true;
-            this.chkIpLog.Location = new System.Drawing.Point(380, 346);
+            this.chkIpLog.Location = new System.Drawing.Point(380, 378);
             this.chkIpLog.Name = "chkIpLog";
             this.chkIpLog.Size = new System.Drawing.Size(129, 19);
             this.chkIpLog.TabIndex = 23;
@@ -318,19 +322,50 @@
             this.btnAutoToggle.UseVisualStyleBackColor = true;
             this.btnAutoToggle.Click += new System.EventHandler(this.btnAutoToggle_Click);
             // 
+            // lblIpInterval
+            // 
+            this.lblIpInterval.AutoSize = true;
+            this.lblIpInterval.Location = new System.Drawing.Point(12, 348);
+            this.lblIpInterval.Name = "lblIpInterval";
+            this.lblIpInterval.Size = new System.Drawing.Size(80, 15);
+            this.lblIpInterval.TabIndex = 35;
+            this.lblIpInterval.Text = "IP 확인 주기:";
+            // 
+            // nudIpInterval
+            // 
+            this.nudIpInterval.Increment = new decimal(new int[] { 100, 0, 0, 0 });
+            this.nudIpInterval.Location = new System.Drawing.Point(118, 344);
+            this.nudIpInterval.Maximum = new decimal(new int[] { 600000, 0, 0, 0 });
+            this.nudIpInterval.Minimum = new decimal(new int[] { 100, 0, 0, 0 });
+            this.nudIpInterval.Name = "nudIpInterval";
+            this.nudIpInterval.Size = new System.Drawing.Size(72, 23);
+            this.nudIpInterval.TabIndex = 19;
+            this.nudIpInterval.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+            this.nudIpInterval.Value = new decimal(new int[] { 1000, 0, 0, 0 });
+            this.nudIpInterval.ValueChanged += new System.EventHandler(this.nudIpInterval_ValueChanged);
+            // 
+            // lblIpIntervalSuffix
+            // 
+            this.lblIpIntervalSuffix.AutoSize = true;
+            this.lblIpIntervalSuffix.Location = new System.Drawing.Point(196, 348);
+            this.lblIpIntervalSuffix.Name = "lblIpIntervalSuffix";
+            this.lblIpIntervalSuffix.Size = new System.Drawing.Size(230, 15);
+            this.lblIpIntervalSuffix.TabIndex = 36;
+            this.lblIpIntervalSuffix.Text = "ms (IP 표시·할당 IP 로그·자동 변경 감지 간격)";
+            // 
             // lblLogOptions
             // 
             this.lblLogOptions.AutoSize = true;
-            this.lblLogOptions.Location = new System.Drawing.Point(12, 348);
+            this.lblLogOptions.Location = new System.Drawing.Point(12, 380);
             this.lblLogOptions.Name = "lblLogOptions";
             this.lblLogOptions.Size = new System.Drawing.Size(38, 15);
-            this.lblLogOptions.TabIndex = 19;
+            this.lblLogOptions.TabIndex = 37;
             this.lblLogOptions.Text = "로그:";
             // 
             // chkLogTime
             // 
             this.chkLogTime.AutoSize = true;
-            this.chkLogTime.Location = new System.Drawing.Point(118, 346);
+            this.chkLogTime.Location = new System.Drawing.Point(118, 378);
             this.chkLogTime.Name = "chkLogTime";
             this.chkLogTime.Size = new System.Drawing.Size(50, 19);
             this.chkLogTime.TabIndex = 20;
@@ -340,7 +375,7 @@
             // chkLogMac
             // 
             this.chkLogMac.AutoSize = true;
-            this.chkLogMac.Location = new System.Drawing.Point(188, 346);
+            this.chkLogMac.Location = new System.Drawing.Point(188, 378);
             this.chkLogMac.Name = "chkLogMac";
             this.chkLogMac.Size = new System.Drawing.Size(55, 19);
             this.chkLogMac.TabIndex = 21;
@@ -350,7 +385,7 @@
             // chkShowLog
             // 
             this.chkShowLog.AutoSize = true;
-            this.chkShowLog.Location = new System.Drawing.Point(258, 346);
+            this.chkShowLog.Location = new System.Drawing.Point(258, 378);
             this.chkShowLog.Name = "chkShowLog";
             this.chkShowLog.Size = new System.Drawing.Size(107, 19);
             this.chkShowLog.TabIndex = 22;
@@ -372,7 +407,7 @@
             // 
             this.lblStatus.AutoEllipsis = true;
             this.lblStatus.Font = new System.Drawing.Font("맑은 고딕", 9F, System.Drawing.FontStyle.Bold);
-            this.lblStatus.Location = new System.Drawing.Point(12, 376);
+            this.lblStatus.Location = new System.Drawing.Point(12, 408);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(536, 20);
             this.lblStatus.TabIndex = 24;
@@ -382,7 +417,7 @@
             // 
             this.txtIpLog.BackColor = System.Drawing.SystemColors.Window;
             this.txtIpLog.Font = new System.Drawing.Font("Consolas", 9F);
-            this.txtIpLog.Location = new System.Drawing.Point(12, 402);
+            this.txtIpLog.Location = new System.Drawing.Point(12, 434);
             this.txtIpLog.Multiline = true;
             this.txtIpLog.Name = "txtIpLog";
             this.txtIpLog.ReadOnly = true;
@@ -394,7 +429,7 @@
             // 
             // trafficGraph
             // 
-            this.trafficGraph.Location = new System.Drawing.Point(286, 402);
+            this.trafficGraph.Location = new System.Drawing.Point(286, 434);
             this.trafficGraph.Name = "trafficGraph";
             this.trafficGraph.Size = new System.Drawing.Size(262, 156);
             this.trafficGraph.TabIndex = 34;
@@ -402,7 +437,7 @@
             // 
             // ipTimer
             // 
-            this.ipTimer.Interval = 2000;
+            this.ipTimer.Interval = 1000;
             this.ipTimer.Tick += new System.EventHandler(this.ipTimer_Tick);
             // 
             // secondTimer
@@ -421,7 +456,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(560, 570);
+            this.ClientSize = new System.Drawing.Size(560, 602);
             this.Controls.Add(this.trafficGraph);
             this.Controls.Add(this.txtIpLog);
             this.Controls.Add(this.lblStatus);
@@ -430,6 +465,9 @@
             this.Controls.Add(this.chkLogMac);
             this.Controls.Add(this.chkLogTime);
             this.Controls.Add(this.lblLogOptions);
+            this.Controls.Add(this.lblIpIntervalSuffix);
+            this.Controls.Add(this.nudIpInterval);
+            this.Controls.Add(this.lblIpInterval);
             this.Controls.Add(this.lblAutoSuffix);
             this.Controls.Add(this.nudAutoDelay);
             this.Controls.Add(this.chkAuto);
@@ -466,6 +504,7 @@
             this.Load += new System.EventHandler(this.MainForm_Load);
             this.Shown += new System.EventHandler(this.MainForm_Shown);
             ((System.ComponentModel.ISupportInitialize)(this.nudAutoDelay)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.nudIpInterval)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
         }
@@ -498,6 +537,9 @@
         private System.Windows.Forms.CheckBox chkAuto;
         private System.Windows.Forms.NumericUpDown nudAutoDelay;
         private System.Windows.Forms.Label lblAutoSuffix;
+        private System.Windows.Forms.Label lblIpInterval;
+        private System.Windows.Forms.NumericUpDown nudIpInterval;
+        private System.Windows.Forms.Label lblIpIntervalSuffix;
         private System.Windows.Forms.Label lblLogOptions;
         private System.Windows.Forms.CheckBox chkLogTime;
         private System.Windows.Forms.CheckBox chkLogMac;

@@ -70,6 +70,7 @@ namespace MacChanger
             toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
             toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크한 뒤 '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
             toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~604800 = 최대 7일; 0이면 즉시). 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
+            toolTip.SetToolTip(nudIpInterval, "선택한 어댑터의 IP 구성을 다시 읽는 간격(밀리초, 100~600000; 기본 1000). 현재 IP 표시, 할당 IP 로그, 자동 변경의 IP 감지가 모두 이 주기로 돌아가며 바꾸면 바로 적용됩니다.");
             toolTip.SetToolTip(btnAutoToggle, "자동 변경을 시작하거나 정지합니다. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 변경이 실패하거나 재부팅이 필요하면, 또는 원상복구를 누르면 스스로 정지합니다.");
         }
 
@@ -344,11 +345,16 @@ namespace MacChanger
             trafficGraph.Bounds = show ? graphHalfBounds : graphFullBounds;
         }
 
-        /// <summary>2초마다: IP 구성 표시와 할당 IP 로그 (새 IP가 보이면 자동 변경 예약).</summary>
+        /// <summary>IP 확인 주기(기본 1초)마다: IP 구성 표시와 할당 IP 로그 (새 IP가 보이면 자동 변경 예약).</summary>
         private void ipTimer_Tick(object sender, EventArgs e)
         {
             RefreshIp();
             if (ipLogError != null) SetStatus("실패", ipLogError);
+        }
+
+        private void nudIpInterval_ValueChanged(object sender, EventArgs e)
+        {
+            ipTimer.Interval = (int)nudIpInterval.Value;   // 바로 적용 (동작 중이면 새 주기로 다시 시작)
         }
 
         /// <summary>
