@@ -13,7 +13,7 @@ namespace MacChanger
     /// </summary>
     public sealed class TrafficGraph : Control
     {
-        /// <summary>보관하는 샘플 수 — DPI/글꼴 배율이 크게 적용된 전체 폭 그래프(536 × 배율)보다도 넉넉히 두어, 버퍼가 다 찬 뒤에도 그래프 왼쪽이 비지 않고 로그 상자를 숨겨 넓어져도 이전 이력이 보인다</summary>
+        /// <summary>보관하는 샘플 수 — DPI/글꼴 배율이 크게 적용된 전체 폭 그래프의 보이는 샘플 수(536 × 배율 / PixelsPerSample)보다도 넉넉히 두어, 버퍼가 다 찬 뒤에도 그래프 왼쪽이 비지 않고 로그 상자를 숨겨 넓어져도 이전 이력이 보인다</summary>
         private const int Capacity = 4096;
         /// <summary>샘플 하나의 가로 폭(픽셀). TMAC 과 같은 밀도가 되도록 1초를 2픽셀로 그린다.</summary>
         private const int PixelsPerSample = 2;
@@ -125,10 +125,13 @@ namespace MacChanger
             }
         }
 
-        /// <summary>보이는 구간(최근 innerWidth / 2 개)의 최대값을 위 끝에 맞춰 송신·수신 꺾은선을 그린다.</summary>
+        /// <summary>
+        /// 보이는 구간(최근 (innerWidth + 1) / 2 개)의 최대값을 위 끝에 맞춰 송신·수신 꺾은선을 그린다.
+        /// 안쪽 폭이 홀수(글꼴/DPI 배율)면 가장 오래된 샘플은 왼쪽 테두리(x = 0) 밑에 놓여 x = 1 열까지 선이 이어진다.
+        /// </summary>
         private void DrawLines(Graphics g, int innerWidth, int graphHeight, int baseline)
         {
-            int n = Math.Min(count, innerWidth / PixelsPerSample);
+            int n = Math.Min(count, (innerWidth + PixelsPerSample - 1) / PixelsPerSample);
             if (n < 2) return;
             int first = (head - n + Capacity) % Capacity;   // 가장 오래된 샘플
             long max = 0;
