@@ -221,7 +221,7 @@
             // 
             // nudAutoDelay
             // 
-            this.nudAutoDelay.Location = new System.Drawing.Point(206, 216);
+            this.nudAutoDelay.Location = new System.Drawing.Point(210, 216);
             this.nudAutoDelay.Maximum = new decimal(new int[] { 3600, 0, 0, 0 });
             this.nudAutoDelay.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             this.nudAutoDelay.Name = "nudAutoDelay";
@@ -233,7 +233,7 @@
             // lblAutoSuffix
             // 
             this.lblAutoSuffix.AutoSize = true;
-            this.lblAutoSuffix.Location = new System.Drawing.Point(272, 220);
+            this.lblAutoSuffix.Location = new System.Drawing.Point(276, 220);
             this.lblAutoSuffix.Name = "lblAutoSuffix";
             this.lblAutoSuffix.Size = new System.Drawing.Size(146, 15);
             this.lblAutoSuffix.TabIndex = 18;
