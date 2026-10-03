@@ -12,8 +12,8 @@ namespace MacChanger
     /// </summary>
     public sealed class TrafficGraph : Control
     {
-        /// <summary>보관하는 샘플 수 — 그래프 폭보다 넉넉히 두어 로그 상자를 숨겨 그래프가 넓어져도 이전 이력이 보인다</summary>
-        private const int Capacity = 1024;
+        /// <summary>보관하는 샘플 수 — DPI/글꼴 배율이 크게 적용된 전체 폭 그래프(536 × 배율)보다도 넉넉히 두어, 버퍼가 다 찬 뒤에도 그래프 왼쪽이 비지 않고 로그 상자를 숨겨 넓어져도 이전 이력이 보인다</summary>
+        private const int Capacity = 4096;
         private readonly long[] received = new long[Capacity];
         private readonly long[] sent = new long[Capacity];
         private int head;    // 다음 샘플을 쓸 위치
@@ -48,6 +48,13 @@ namespace MacChanger
             sentSpeed = sentPerSecond;
             receivedTotal = receivedBytes;
             sentTotal = sentBytes;
+            Invalidate();
+        }
+
+        /// <summary>누적량 표시만 0으로 되돌린다 (MAC 변경 완료 시 — 그래프 이력과 속도는 유지).</summary>
+        public void ResetTotals()
+        {
+            receivedTotal = sentTotal = 0;
             Invalidate();
         }
 
@@ -96,7 +103,8 @@ namespace MacChanger
             };
             int labelX = 5;
             int indent = rowHeight * 2 / 3;   // "--속도" 들여쓰기
-            int valueX = labelX + indent + TextRenderer.MeasureText(g, labels[1], Font, Size.Empty, TextFlags).Width + rowHeight;
+            int separatorX = labelX + indent + TextRenderer.MeasureText(g, labels[1], Font, Size.Empty, TextFlags).Width + rowHeight / 2;   // 라벨 칸 | 값 칸 세로 구분선
+            int valueX = separatorX + rowHeight / 2;
             int valueWidth = Math.Max(1, w - 1 - labelX - valueX);
             using (Pen line = new Pen(TableLine))
             {
@@ -110,6 +118,7 @@ namespace MacChanger
                     y += rowPitch;
                 }
                 g.DrawLine(line, 1, y, w - 2, y);
+                g.DrawLine(line, separatorX, tableTop + 1, separatorX, y);
             }
         }
 

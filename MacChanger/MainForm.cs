@@ -342,7 +342,7 @@ namespace MacChanger
             }
             catch (Exception)
             {
-                // 인터페이스가 사라지는 순간(GetIfEntry2 실패) — 이번 초는 속도 0으로 둔다
+                // 조회 실패는 Sample 이 false 로 돌려주므로 여기는 P/Invoke 자체가 실패하는 경우(iphlpapi 에 GetIfEntry2 가 없는 OS 등)뿐 — 이번 초는 속도 0으로 둔다
             }
             trafficGraph.AddSample(traffic.ReceivedSpeed, traffic.SentSpeed, traffic.ReceivedTotal, traffic.SentTotal);
         }
@@ -579,7 +579,11 @@ namespace MacChanger
             // 어댑터가 실제로 중지되었다면 이후 받는 IP는 같은 값이라도 새 할당이므로 새 MAC과 함께 기록한다.
             if (result != null && result.AdapterRestarted) lastLoggedIp = null;
             // MAC 변경/복구가 끝나면 그래프는 그대로 두고 누적 송수신량만 0부터 다시 센다 (TMAC 과 같은 동작).
-            if (result != null && result.Success) traffic.ResetTotals();
+            if (result != null && result.Success)
+            {
+                traffic.ResetTotals();
+                trafficGraph.ResetTotals();   // 다음 샘플을 기다리지 않고 바로 0으로 표시
+            }
 
             // 변경/복구 후 현재 MAC/IP를 다시 읽어 UI를 갱신한 뒤, 작업 결과 상태를 최종적으로 표시한다.
             RefreshSelectedAdapterInfo();

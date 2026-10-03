@@ -5,8 +5,9 @@ using Microsoft.Win32.SafeHandles;
 namespace MacChanger.Native
 {
     /// <summary>
-    /// kernel32 / setupapi P/Invoke 선언.
-    /// 모든 구조체는 LayoutKind.Sequential로 선언하여 x86/x64 양쪽에서 Marshal.SizeOf가 올바른 크기를 돌려주도록 한다.
+    /// kernel32 / user32 / iphlpapi / setupapi P/Invoke 선언.
+    /// 구조체는 LayoutKind.Sequential로 선언하여 x86/x64 양쪽에서 Marshal.SizeOf가 올바른 크기를 돌려주도록 한다
+    /// (MIB_IF_ROW2 만 예외: 필요한 필드만 실제 오프셋에 놓는 LayoutKind.Explicit, Size = 1352 고정).
     /// </summary>
     internal static class NativeMethods
     {

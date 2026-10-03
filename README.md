@@ -56,7 +56,7 @@ MacChanger/
     AdapterController.cs               ← SetupAPI DICS_DISABLE/ENABLE(재부팅 필요 플래그 보고), WMI Enable()/Disable() 폴백
     MacChangeService.cs                ← 변경 적용 / 원상복구 절차
   Native/
-    NativeMethods.cs                   ← kernel32 / user32 / setupapi P/Invoke
+    NativeMethods.cs                   ← kernel32 / user32 / iphlpapi(ConvertInterfaceGuidToLuid·GetIfEntry2) / setupapi P/Invoke
 ```
 
 ## 빌드 방법
