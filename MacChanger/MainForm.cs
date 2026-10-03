@@ -656,7 +656,7 @@ namespace MacChanger
             btnApply.Enabled = idle;
             btnRestore.Enabled = idle;
             chkIpLog.Enabled = idle;
-            txtNewMac.Enabled = !busy;
+            txtNewMac.Enabled = idle;   // 실행 중 입력해도 다음 자동 변경이 덮어쓰므로 함께 잠근다 (포커스가 정지 버튼으로 튀는 것도 막는다)
             chkAuto.Enabled = !autoRunning;
             chkLogTime.Enabled = !autoRunning;
             chkLogMac.Enabled = !autoRunning;
