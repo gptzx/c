@@ -33,6 +33,10 @@
             this.btnApply = new System.Windows.Forms.Button();
             this.btnRestore = new System.Windows.Forms.Button();
             this.chkIpLog = new System.Windows.Forms.CheckBox();
+            this.lblAuto = new System.Windows.Forms.Label();
+            this.chkAuto = new System.Windows.Forms.CheckBox();
+            this.nudAutoDelay = new System.Windows.Forms.NumericUpDown();
+            this.lblAutoSuffix = new System.Windows.Forms.Label();
             this.lblLogOptions = new System.Windows.Forms.Label();
             this.chkLogTime = new System.Windows.Forms.CheckBox();
             this.chkLogMac = new System.Windows.Forms.CheckBox();
@@ -43,6 +47,7 @@
             this.toolTip = new System.Windows.Forms.ToolTip(this.components);
             this.ipTimer = new System.Windows.Forms.Timer(this.components);
             this.worker = new System.ComponentModel.BackgroundWorker();
+            ((System.ComponentModel.ISupportInitialize)(this.nudAutoDelay)).BeginInit();
             this.SuspendLayout();
             // 
             // lblAdapter
@@ -186,50 +191,90 @@
             // chkIpLog
             // 
             this.chkIpLog.AutoSize = true;
-            this.chkIpLog.Location = new System.Drawing.Point(380, 216);
+            this.chkIpLog.Location = new System.Drawing.Point(380, 250);
             this.chkIpLog.Name = "chkIpLog";
             this.chkIpLog.Size = new System.Drawing.Size(129, 19);
-            this.chkIpLog.TabIndex = 19;
+            this.chkIpLog.TabIndex = 23;
             this.chkIpLog.Text = "할당 IP 로그 저장";
             this.chkIpLog.UseVisualStyleBackColor = true;
             this.chkIpLog.CheckedChanged += new System.EventHandler(this.chkIpLog_CheckedChanged);
             // 
+            // lblAuto
+            // 
+            this.lblAuto.AutoSize = true;
+            this.lblAuto.Location = new System.Drawing.Point(12, 220);
+            this.lblAuto.Name = "lblAuto";
+            this.lblAuto.Size = new System.Drawing.Size(62, 15);
+            this.lblAuto.TabIndex = 15;
+            this.lblAuto.Text = "자동 변경:";
+            // 
+            // chkAuto
+            // 
+            this.chkAuto.AutoSize = true;
+            this.chkAuto.Location = new System.Drawing.Point(118, 218);
+            this.chkAuto.Name = "chkAuto";
+            this.chkAuto.Size = new System.Drawing.Size(84, 19);
+            this.chkAuto.TabIndex = 16;
+            this.chkAuto.Text = "IP 할당 후";
+            this.chkAuto.UseVisualStyleBackColor = true;
+            this.chkAuto.CheckedChanged += new System.EventHandler(this.chkAuto_CheckedChanged);
+            // 
+            // nudAutoDelay
+            // 
+            this.nudAutoDelay.Location = new System.Drawing.Point(206, 216);
+            this.nudAutoDelay.Maximum = new decimal(new int[] { 3600, 0, 0, 0 });
+            this.nudAutoDelay.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            this.nudAutoDelay.Name = "nudAutoDelay";
+            this.nudAutoDelay.Size = new System.Drawing.Size(60, 23);
+            this.nudAutoDelay.TabIndex = 17;
+            this.nudAutoDelay.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+            this.nudAutoDelay.Value = new decimal(new int[] { 10, 0, 0, 0 });
+            // 
+            // lblAutoSuffix
+            // 
+            this.lblAutoSuffix.AutoSize = true;
+            this.lblAutoSuffix.Location = new System.Drawing.Point(272, 220);
+            this.lblAutoSuffix.Name = "lblAutoSuffix";
+            this.lblAutoSuffix.Size = new System.Drawing.Size(146, 15);
+            this.lblAutoSuffix.TabIndex = 18;
+            this.lblAutoSuffix.Text = "초 뒤 새 MAC 자동 적용";
+            // 
             // lblLogOptions
             // 
             this.lblLogOptions.AutoSize = true;
-            this.lblLogOptions.Location = new System.Drawing.Point(12, 218);
+            this.lblLogOptions.Location = new System.Drawing.Point(12, 252);
             this.lblLogOptions.Name = "lblLogOptions";
             this.lblLogOptions.Size = new System.Drawing.Size(38, 15);
-            this.lblLogOptions.TabIndex = 15;
+            this.lblLogOptions.TabIndex = 19;
             this.lblLogOptions.Text = "로그:";
             // 
             // chkLogTime
             // 
             this.chkLogTime.AutoSize = true;
-            this.chkLogTime.Location = new System.Drawing.Point(118, 216);
+            this.chkLogTime.Location = new System.Drawing.Point(118, 250);
             this.chkLogTime.Name = "chkLogTime";
             this.chkLogTime.Size = new System.Drawing.Size(50, 19);
-            this.chkLogTime.TabIndex = 16;
+            this.chkLogTime.TabIndex = 20;
             this.chkLogTime.Text = "시간";
             this.chkLogTime.UseVisualStyleBackColor = true;
             // 
             // chkLogMac
             // 
             this.chkLogMac.AutoSize = true;
-            this.chkLogMac.Location = new System.Drawing.Point(188, 216);
+            this.chkLogMac.Location = new System.Drawing.Point(188, 250);
             this.chkLogMac.Name = "chkLogMac";
             this.chkLogMac.Size = new System.Drawing.Size(55, 19);
-            this.chkLogMac.TabIndex = 17;
+            this.chkLogMac.TabIndex = 21;
             this.chkLogMac.Text = "MAC";
             this.chkLogMac.UseVisualStyleBackColor = true;
             // 
             // chkShowLog
             // 
             this.chkShowLog.AutoSize = true;
-            this.chkShowLog.Location = new System.Drawing.Point(258, 216);
+            this.chkShowLog.Location = new System.Drawing.Point(258, 250);
             this.chkShowLog.Name = "chkShowLog";
             this.chkShowLog.Size = new System.Drawing.Size(107, 19);
-            this.chkShowLog.TabIndex = 18;
+            this.chkShowLog.TabIndex = 22;
             this.chkShowLog.Text = "로그 상자 표시";
             this.chkShowLog.UseVisualStyleBackColor = true;
             this.chkShowLog.CheckedChanged += new System.EventHandler(this.chkShowLog_CheckedChanged);
@@ -248,23 +293,23 @@
             // 
             this.lblStatus.AutoEllipsis = true;
             this.lblStatus.Font = new System.Drawing.Font("맑은 고딕", 9F, System.Drawing.FontStyle.Bold);
-            this.lblStatus.Location = new System.Drawing.Point(12, 246);
+            this.lblStatus.Location = new System.Drawing.Point(12, 280);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(536, 20);
-            this.lblStatus.TabIndex = 20;
+            this.lblStatus.TabIndex = 24;
             this.lblStatus.Text = "상태: 준비";
             // 
             // txtIpLog
             // 
             this.txtIpLog.BackColor = System.Drawing.SystemColors.Window;
             this.txtIpLog.Font = new System.Drawing.Font("Consolas", 9F);
-            this.txtIpLog.Location = new System.Drawing.Point(12, 272);
+            this.txtIpLog.Location = new System.Drawing.Point(12, 306);
             this.txtIpLog.Multiline = true;
             this.txtIpLog.Name = "txtIpLog";
             this.txtIpLog.ReadOnly = true;
             this.txtIpLog.ScrollBars = System.Windows.Forms.ScrollBars.Both;
             this.txtIpLog.Size = new System.Drawing.Size(536, 110);
-            this.txtIpLog.TabIndex = 21;
+            this.txtIpLog.TabIndex = 25;
             this.txtIpLog.TabStop = false;
             this.txtIpLog.WordWrap = false;
             // 
@@ -284,7 +329,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(560, 394);
+            this.ClientSize = new System.Drawing.Size(560, 428);
             this.Controls.Add(this.txtIpLog);
             this.Controls.Add(this.lblStatus);
             this.Controls.Add(this.btnClearLog);
@@ -292,6 +337,10 @@
             this.Controls.Add(this.chkLogMac);
             this.Controls.Add(this.chkLogTime);
             this.Controls.Add(this.lblLogOptions);
+            this.Controls.Add(this.lblAutoSuffix);
+            this.Controls.Add(this.nudAutoDelay);
+            this.Controls.Add(this.chkAuto);
+            this.Controls.Add(this.lblAuto);
             this.Controls.Add(this.chkIpLog);
             this.Controls.Add(this.btnRestore);
             this.Controls.Add(this.btnApply);
@@ -316,6 +365,7 @@
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
             this.Load += new System.EventHandler(this.MainForm_Load);
             this.Shown += new System.EventHandler(this.MainForm_Shown);
+            ((System.ComponentModel.ISupportInitialize)(this.nudAutoDelay)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
         }
@@ -337,6 +387,10 @@
         private System.Windows.Forms.Button btnApply;
         private System.Windows.Forms.Button btnRestore;
         private System.Windows.Forms.CheckBox chkIpLog;
+        private System.Windows.Forms.Label lblAuto;
+        private System.Windows.Forms.CheckBox chkAuto;
+        private System.Windows.Forms.NumericUpDown nudAutoDelay;
+        private System.Windows.Forms.Label lblAutoSuffix;
         private System.Windows.Forms.Label lblLogOptions;
         private System.Windows.Forms.CheckBox chkLogTime;
         private System.Windows.Forms.CheckBox chkLogMac;
