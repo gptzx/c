@@ -7,13 +7,16 @@ namespace MacChanger
 {
     /// <summary>
     /// TMAC(Technitium MAC Address Changer) 식 송수신 그래프.
-    /// 위쪽: 흰 바탕에 수신(빨강)·송신(초록) 속도 꺾은선 — 샘플 하나가 가로 1픽셀, 최신 샘플이 오른쪽 끝, 보이는 구간의 최대값을 위 끝에 맞춘다.
+    /// 위쪽: 흰 바탕에 수신(빨강)·송신(초록) 속도 꺾은선 — 1초 샘플 하나가 가로 2픽셀(TMAC 과 같은 밀도), 최신 샘플이 오른쪽 끝,
+    ///        보이는 구간의 최대값을 위 끝에 맞춘다.
     /// 아래쪽: 수신 누적량 / 속도, 송신 누적량 / 속도 네 줄 (빨강 / 초록 글자).
     /// </summary>
     public sealed class TrafficGraph : Control
     {
         /// <summary>보관하는 샘플 수 — DPI/글꼴 배율이 크게 적용된 전체 폭 그래프(536 × 배율)보다도 넉넉히 두어, 버퍼가 다 찬 뒤에도 그래프 왼쪽이 비지 않고 로그 상자를 숨겨 넓어져도 이전 이력이 보인다</summary>
         private const int Capacity = 4096;
+        /// <summary>샘플 하나의 가로 폭(픽셀). TMAC 과 같은 밀도가 되도록 1초를 2픽셀로 그린다.</summary>
+        private const int PixelsPerSample = 2;
         private readonly long[] received = new long[Capacity];
         private readonly long[] sent = new long[Capacity];
         private int head;    // 다음 샘플을 쓸 위치
@@ -122,10 +125,10 @@ namespace MacChanger
             }
         }
 
-        /// <summary>보이는 구간(최근 innerWidth 개)의 최대값을 위 끝에 맞춰 송신·수신 꺾은선을 그린다.</summary>
+        /// <summary>보이는 구간(최근 innerWidth / 2 개)의 최대값을 위 끝에 맞춰 송신·수신 꺾은선을 그린다.</summary>
         private void DrawLines(Graphics g, int innerWidth, int graphHeight, int baseline)
         {
-            int n = Math.Min(count, innerWidth);
+            int n = Math.Min(count, innerWidth / PixelsPerSample);
             if (n < 2) return;
             int first = (head - n + Capacity) % Capacity;   // 가장 오래된 샘플
             long max = 0;
@@ -136,15 +139,18 @@ namespace MacChanger
                 if (sent[idx] > max) max = sent[idx];
             }
             if (max == 0) return;   // 전부 0: 선이 테두리에 가려지므로 그릴 것이 없다
-            Point[] rx = new Point[n];
-            Point[] tx = new Point[n];
-            int x0 = 1 + innerWidth - n;   // 최신 샘플이 오른쪽 끝
+            Point[] rx = new Point[n + 1];
+            Point[] tx = new Point[n + 1];
+            int x0 = 1 + innerWidth - n * PixelsPerSample;   // 최신 샘플이 오른쪽 끝
             for (int i = 0; i < n; i++)
             {
                 int idx = (first + i) % Capacity;
-                rx[i] = new Point(x0 + i, baseline - (int)(received[idx] * graphHeight / max));
-                tx[i] = new Point(x0 + i, baseline - (int)(sent[idx] * graphHeight / max));
+                int x = x0 + i * PixelsPerSample;
+                rx[i] = new Point(x, baseline - (int)(received[idx] * graphHeight / max));
+                tx[i] = new Point(x, baseline - (int)(sent[idx] * graphHeight / max));
             }
+            rx[n] = new Point(innerWidth, rx[n - 1].Y);   // 최신 샘플 값을 오른쪽 끝까지 이어 그린다
+            tx[n] = new Point(innerWidth, tx[n - 1].Y);
             using (Pen pen = new Pen(ReceivedLine)) g.DrawLines(pen, rx);
             using (Pen pen = new Pen(SentLine)) g.DrawLines(pen, tx);   // 보통 더 작은 송신 선이 가려지지 않도록 나중에 그린다
         }

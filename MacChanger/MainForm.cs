@@ -66,10 +66,10 @@ namespace MacChanger
             toolTip.SetToolTip(chkLogTime, "로그 줄 맨 앞에 시각(yyyy-MM-dd HH:mm:ss)을 넣습니다.");
             toolTip.SetToolTip(chkLogMac, "로그 줄 끝에 그때 사용 중인 MAC을 넣습니다.");
             toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다 (숨기면 그래프가 아래쪽 전체 폭을 씁니다). 숨겨진 동안에는 상자에 기록하지 않고, 켤 때 현재 IP가 마지막 줄과 다르면 한 줄 추가합니다.");
-            toolTip.SetToolTip(trafficGraph, "선택한 어댑터의 송수신 속도 그래프 (빨강: 수신, 초록: 송신, 1초마다 갱신, 가로 1픽셀 = 1초). MAC을 변경하면 그래프는 유지되고 누적 데이터 양만 0부터 다시 셉니다.");
+            toolTip.SetToolTip(trafficGraph, "선택한 어댑터의 송수신 속도 그래프 (빨강: 수신, 초록: 송신, 1초마다 갱신, 가로 2픽셀 = 1초). MAC을 변경하면 그래프는 유지되고 누적 데이터 양만 0부터 다시 셉니다.");
             toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
             toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크한 뒤 '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
-            toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~3600; 0이면 즉시). 바꾼 값은 다음 예약부터 적용됩니다.");
+            toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~604800 = 최대 7일; 0이면 즉시). 바꾼 값은 다음 예약부터 적용됩니다.");
             toolTip.SetToolTip(btnAutoToggle, "자동 변경을 시작하거나 정지합니다. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 변경이 실패하거나 재부팅이 필요하면, 또는 원상복구를 누르면 스스로 정지합니다.");
         }
 
@@ -258,7 +258,7 @@ namespace MacChanger
             int remainingMs = unchecked(autoDueTick - Environment.TickCount);   // TickCount 가 한 바퀴 돌아도 차이는 올바르다
             if (remainingMs > 0)
             {
-                btnAutoToggle.Text = "정지 (" + (remainingMs + 999) / 1000 + "초)";
+                btnAutoToggle.Text = "정지 (" + FormatRemaining((remainingMs + 999) / 1000) + ")";
                 return;
             }
             autoPending = false;
@@ -282,6 +282,15 @@ namespace MacChanger
             args.Adapter = adapter;
             args.NewMac = mac;
             StartOperation(args);
+        }
+
+        /// <summary>남은 시간 표시: 1시간 미만 "N초", 하루 미만 "H:MM:SS", 그 이상 "D일 H:MM:SS"</summary>
+        private static string FormatRemaining(int seconds)
+        {
+            if (seconds < 3600) return seconds + "초";
+            int days = seconds / 86400;
+            string hms = seconds % 86400 / 3600 + ":" + (seconds % 3600 / 60).ToString("00") + ":" + (seconds % 60).ToString("00");
+            return days > 0 ? days + "일 " + hms : hms;
         }
 
         private void btnClearLog_Click(object sender, EventArgs e)

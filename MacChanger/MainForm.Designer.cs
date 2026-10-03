@@ -291,9 +291,9 @@
             // nudAutoDelay
             // 
             this.nudAutoDelay.Location = new System.Drawing.Point(210, 312);
-            this.nudAutoDelay.Maximum = new decimal(new int[] { 3600, 0, 0, 0 });
+            this.nudAutoDelay.Maximum = new decimal(new int[] { 604800, 0, 0, 0 });
             this.nudAutoDelay.Name = "nudAutoDelay";
-            this.nudAutoDelay.Size = new System.Drawing.Size(60, 23);
+            this.nudAutoDelay.Size = new System.Drawing.Size(72, 23);
             this.nudAutoDelay.TabIndex = 17;
             this.nudAutoDelay.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             this.nudAutoDelay.Value = new decimal(new int[] { 10, 0, 0, 0 });
@@ -301,7 +301,7 @@
             // lblAutoSuffix
             // 
             this.lblAutoSuffix.AutoSize = true;
-            this.lblAutoSuffix.Location = new System.Drawing.Point(276, 316);
+            this.lblAutoSuffix.Location = new System.Drawing.Point(288, 316);
             this.lblAutoSuffix.Name = "lblAutoSuffix";
             this.lblAutoSuffix.Size = new System.Drawing.Size(110, 15);
             this.lblAutoSuffix.TabIndex = 33;
@@ -310,9 +310,9 @@
             // btnAutoToggle
             // 
             this.btnAutoToggle.Enabled = false;
-            this.btnAutoToggle.Location = new System.Drawing.Point(458, 311);
+            this.btnAutoToggle.Location = new System.Drawing.Point(404, 311);
             this.btnAutoToggle.Name = "btnAutoToggle";
-            this.btnAutoToggle.Size = new System.Drawing.Size(90, 25);
+            this.btnAutoToggle.Size = new System.Drawing.Size(144, 25);
             this.btnAutoToggle.TabIndex = 18;
             this.btnAutoToggle.Text = "시작";
             this.btnAutoToggle.UseVisualStyleBackColor = true;
