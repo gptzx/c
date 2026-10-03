@@ -336,7 +336,7 @@
             this.nudIpInterval.Increment = new decimal(new int[] { 100, 0, 0, 0 });
             this.nudIpInterval.Location = new System.Drawing.Point(118, 344);
             this.nudIpInterval.Maximum = new decimal(new int[] { 2000, 0, 0, 0 });
-            this.nudIpInterval.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            this.nudIpInterval.Minimum = new decimal(new int[] { 100, 0, 0, 0 });
             this.nudIpInterval.Name = "nudIpInterval";
             this.nudIpInterval.Size = new System.Drawing.Size(72, 23);
             this.nudIpInterval.TabIndex = 19;
@@ -349,9 +349,9 @@
             this.lblIpIntervalSuffix.AutoSize = true;
             this.lblIpIntervalSuffix.Location = new System.Drawing.Point(196, 348);
             this.lblIpIntervalSuffix.Name = "lblIpIntervalSuffix";
-            this.lblIpIntervalSuffix.Size = new System.Drawing.Size(230, 15);
+            this.lblIpIntervalSuffix.Size = new System.Drawing.Size(22, 15);
             this.lblIpIntervalSuffix.TabIndex = 36;
-            this.lblIpIntervalSuffix.Text = "ms (IP 표시·할당 IP 로그·자동 변경 감지 간격)";
+            this.lblIpIntervalSuffix.Text = "ms";
             // 
             // lblLogOptions
             // 

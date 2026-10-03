@@ -71,8 +71,8 @@ namespace MacChanger
             toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
             toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크한 뒤 '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
             toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~604800 = 최대 7일; 0이면 즉시). 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
-            toolTip.SetToolTip(nudIpInterval, "선택한 어댑터의 IP 구성을 다시 읽는 간격(밀리초, 1~2000; 기본 1000). 현재 IP 표시, 할당 IP 로그, 자동 변경의 IP 감지가 모두 이 주기로 돌아가며 바꾸면 바로 적용됩니다. 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
-            toolTip.SetToolTip(btnAutoToggle, "자동 변경을 시작하거나 정지합니다. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 변경이 실패하거나 재부팅이 필요하면, 또는 원상복구를 누르면 스스로 정지합니다.");
+            toolTip.SetToolTip(nudIpInterval, "선택한 어댑터의 IP 구성을 다시 읽는 간격(밀리초, 100~2000; 기본 1000). 현재 IP 표시, 할당 IP 로그, 자동 변경의 IP 감지가 모두 이 주기로 돌아가며 바꾸면 바로 적용됩니다. 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
+            toolTip.SetToolTip(btnAutoToggle, "자동 변경을 시작하거나 정지합니다. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 변경이 실패하거나 재부팅이 필요하면 스스로 정지합니다. 실행 중에는 정지와 로그 지우기 외의 버튼·체크박스·어댑터 선택·입력 칸이 잠깁니다.");
         }
 
         private NetworkAdapterInfo SelectedAdapter
@@ -180,8 +180,7 @@ namespace MacChanger
                 SetStatus("실패", "어댑터를 선택하세요.");
                 return;
             }
-            // 확인 대화 상자 없이 바로 복구한다. 자동 변경 중이면 복구 직후 다시 바뀌지 않도록 정지한다.
-            if (autoRunning) StopAuto();
+            // 확인 대화 상자 없이 바로 복구한다 (자동 변경 실행 중에는 이 버튼이 잠겨 있다).
             OperationArgs args = new OperationArgs();
             args.Kind = OperationKind.Restore;
             args.Adapter = adapter;
@@ -224,8 +223,7 @@ namespace MacChanger
         private void StartAuto()
         {
             autoRunning = true;
-            nudAutoDelay.Enabled = false;    // 실행 중에는 지연 시간과 IP 확인 주기를 바꿀 수 없다 (정지한 뒤에만 변경)
-            nudIpInterval.Enabled = false;
+            UpdateControlStates();   // 실행 중에는 정지·로그 지우기 외의 조작을 잠근다
             btnAutoToggle.Text = "정지 (IP 대기)";
             if (!busy) SetStatus("준비", "자동 변경 시작: IP 할당 후 " + nudAutoDelay.Value + "초 뒤 새 MAC을 적용합니다.");
             ScheduleAuto();   // 이미 IP가 할당되어 있으면 지금부터 센다
@@ -236,8 +234,7 @@ namespace MacChanger
         {
             autoRunning = false;
             CancelAuto();
-            nudAutoDelay.Enabled = true;
-            nudIpInterval.Enabled = true;
+            UpdateControlStates();
             btnAutoToggle.Text = "시작";
             if (!busy) SetStatus("준비", "자동 변경 정지");
         }
@@ -643,14 +640,30 @@ namespace MacChanger
         private void SetBusy(bool value)
         {
             busy = value;
-            cboAdapters.Enabled = !value;
-            btnRefresh.Enabled = !value;
-            txtNewMac.Enabled = !value;
-            btnRandom.Enabled = !value;
-            btnApply.Enabled = !value;
-            btnRestore.Enabled = !value;
-            chkIpLog.Enabled = !value;
-            UseWaitCursor = value;
+            UpdateControlStates();
+        }
+
+        /// <summary>
+        /// 작업 중(busy)과 자동 변경 실행 중(autoRunning)에 맞춰 컨트롤 사용 가능 여부를 한곳에서 맞춘다.
+        /// 자동 변경 실행 중에는 정지(btnAutoToggle)와 로그 지우기(로그 상자 표시 여부를 따름) 외의 버튼·체크박스·어댑터 선택·입력 칸을 모두 잠근다.
+        /// </summary>
+        private void UpdateControlStates()
+        {
+            bool idle = !busy && !autoRunning;
+            cboAdapters.Enabled = idle;
+            btnRefresh.Enabled = idle;
+            btnRandom.Enabled = idle;
+            btnApply.Enabled = idle;
+            btnRestore.Enabled = idle;
+            chkIpLog.Enabled = idle;
+            txtNewMac.Enabled = !busy;
+            chkAuto.Enabled = !autoRunning;
+            chkLogTime.Enabled = !autoRunning;
+            chkLogMac.Enabled = !autoRunning;
+            chkShowLog.Enabled = !autoRunning;
+            nudAutoDelay.Enabled = !autoRunning;
+            nudIpInterval.Enabled = !autoRunning;
+            UseWaitCursor = busy;
         }
 
         /// <param name="state">준비 / 진행 / 완료 / 실패</param>
