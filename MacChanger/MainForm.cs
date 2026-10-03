@@ -89,7 +89,7 @@ namespace MacChanger
         private void MainForm_Shown(object sender, EventArgs e)
         {
             // 창이 먼저 그려진 뒤에 (WMI 조회가 몇 초 걸릴 수 있으므로) 목록을 읽는다.
-            BeginInvoke(new MethodInvoker(delegate { LoadAdapters(null); ipTimer.Start(); trafficTimer.Start(); }));
+            BeginInvoke(new MethodInvoker(delegate { LoadAdapters(null); ipTimer.Start(); secondTimer.Start(); }));
         }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -334,26 +334,32 @@ namespace MacChanger
             trafficGraph.Bounds = show ? graphHalfBounds : graphFullBounds;
         }
 
+        /// <summary>2초마다: IP 구성 표시와 할당 IP 로그 (새 IP가 보이면 자동 변경 예약).</summary>
         private void ipTimer_Tick(object sender, EventArgs e)
         {
             RefreshIp();
             if (ipLogError != null) SetStatus("실패", ipLogError);
-            RunAutoIfDue();
         }
 
-        /// <summary>1초마다 선택한 어댑터의 송수신 카운터를 읽어 그래프에 한 샘플을 넣는다 (어댑터가 내려가 있으면 속도 0).</summary>
-        private void trafficTimer_Tick(object sender, EventArgs e)
+        /// <summary>
+        /// 1초마다: 선택한 어댑터의 송수신 카운터를 읽어 그래프에 한 샘플을 넣고(어댑터가 내려가 있으면 속도 0),
+        /// 자동 변경 카운트다운을 1초 단위로 갱신해 예약 시각이 되면 변경을 시작한다.
+        /// </summary>
+        private void secondTimer_Tick(object sender, EventArgs e)
         {
-            if (SelectedAdapter == null) return;
-            try
+            if (SelectedAdapter != null)
             {
-                traffic.Sample();
+                try
+                {
+                    traffic.Sample();
+                }
+                catch (Exception)
+                {
+                    // 조회 실패는 Sample 이 false 로 돌려주므로 여기는 P/Invoke 자체가 실패하는 경우(iphlpapi 에 GetIfEntry2 가 없는 OS 등)뿐 — 이번 초는 속도 0으로 둔다
+                }
+                trafficGraph.AddSample(traffic.ReceivedSpeed, traffic.SentSpeed, traffic.ReceivedTotal, traffic.SentTotal);
             }
-            catch (Exception)
-            {
-                // 조회 실패는 Sample 이 false 로 돌려주므로 여기는 P/Invoke 자체가 실패하는 경우(iphlpapi 에 GetIfEntry2 가 없는 OS 등)뿐 — 이번 초는 속도 0으로 둔다
-            }
-            trafficGraph.AddSample(traffic.ReceivedSpeed, traffic.SentSpeed, traffic.ReceivedTotal, traffic.SentTotal);
+            RunAutoIfDue();
         }
 
         // ------------------------------------------------------------------
