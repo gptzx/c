@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -25,6 +25,7 @@ namespace MacChanger.Core
             public string Addresses;
             /// <summary>주소와 같은 순서의 서브넷 마스크 목록</summary>
             public string Masks;
+            /// <summary>기본 게이트웨이 목록</summary>
             public string Gateways;
             /// <summary>DNS 서버 목록 (기본, 보조 … 순서)</summary>
             public string Dns;

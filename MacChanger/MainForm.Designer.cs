@@ -302,7 +302,7 @@
             this.lblAutoSuffix.Location = new System.Drawing.Point(276, 316);
             this.lblAutoSuffix.Name = "lblAutoSuffix";
             this.lblAutoSuffix.Size = new System.Drawing.Size(110, 15);
-            this.lblAutoSuffix.TabIndex = 18;
+            this.lblAutoSuffix.TabIndex = 33;
             this.lblAutoSuffix.Text = "초 뒤 새 MAC 적용";
             // 
             // btnAutoToggle
@@ -311,7 +311,7 @@
             this.btnAutoToggle.Location = new System.Drawing.Point(458, 311);
             this.btnAutoToggle.Name = "btnAutoToggle";
             this.btnAutoToggle.Size = new System.Drawing.Size(90, 25);
-            this.btnAutoToggle.TabIndex = 32;
+            this.btnAutoToggle.TabIndex = 18;
             this.btnAutoToggle.Text = "시작";
             this.btnAutoToggle.UseVisualStyleBackColor = true;
             this.btnAutoToggle.Click += new System.EventHandler(this.btnAutoToggle_Click);

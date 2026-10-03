@@ -218,9 +218,10 @@ namespace MacChanger
         private void StartAuto()
         {
             autoRunning = true;
-            btnAutoToggle.Text = "정지";
-            ScheduleAuto();   // 이미 IP가 할당되어 있으면 지금부터 센다
+            btnAutoToggle.Text = "정지 (IP 대기)";
             if (!busy) SetStatus("준비", "자동 변경 시작: IP 할당 후 " + nudAutoDelay.Value + "초 뒤 새 MAC을 적용합니다.");
+            ScheduleAuto();   // 이미 IP가 할당되어 있으면 지금부터 센다
+            RunAutoIfDue();   // 바로 남은 시간을 보여주고, 0초면 즉시 시작
         }
 
         private void StopAuto()
@@ -237,6 +238,7 @@ namespace MacChanger
             if (!autoRunning || busy || lastLoggedIp == null) return;
             autoPending = true;
             autoDueTick = unchecked(Environment.TickCount + (int)nudAutoDelay.Value * 1000);
+            btnAutoToggle.Text = "정지";
         }
 
         private void CancelAuto()
@@ -373,7 +375,8 @@ namespace MacChanger
 
                 if (cboAdapters.Items.Count == 0)
                 {
-                    txtPermanentMac.Text = txtCurrentMac.Text = txtCurrentIp.Text = string.Empty;
+                    txtPermanentMac.Text = txtCurrentMac.Text = string.Empty;
+                    txtCurrentIp.Text = txtMask.Text = txtGateway.Text = txtDns.Text = string.Empty;
                     SetStatus("실패", enumError ?? "네트워크 어댑터를 찾지 못했습니다.");
                     return;
                 }
@@ -449,7 +452,7 @@ namespace MacChanger
             NetworkAdapterInfo adapter = SelectedAdapter;
             if (adapter == null)
             {
-                txtCurrentIp.Text = string.Empty;
+                txtCurrentIp.Text = txtMask.Text = txtGateway.Text = txtDns.Text = string.Empty;
                 return;
             }
             IpMonitor.IpInfo info;
@@ -476,7 +479,7 @@ namespace MacChanger
             else if (!up) text = ip + "  (링크 없음)";
             else if (assigned.Length == 0) text = ip + "  (DHCP 응답 없음 — 자동 사설 주소)";
             else text = ip;
-            if (txtCurrentIp.Text != text) txtCurrentIp.Text = text;
+            SetIfChanged(txtCurrentIp, text);
             SetIfChanged(txtMask, ip == null || ip.Length == 0 ? string.Empty : info.Masks);
             SetIfChanged(txtGateway, ip == null ? string.Empty : info.Gateways.Length > 0 ? info.Gateways : "(없음)");
             SetIfChanged(txtDns, ip == null ? string.Empty : info.Dns.Length > 0 ? info.Dns : "(없음)");
@@ -508,6 +511,11 @@ namespace MacChanger
         private void StartOperation(OperationArgs args)
         {
             if (worker.IsBusy) return;
+            if (autoRunning)
+            {
+                autoPending = false;   // 작업이 끝나면 새 IP 할당 시점부터 다시 센다
+                btnAutoToggle.Text = "정지";
+            }
             SetBusy(true);
             SetStatus("진행", (args.Kind == OperationKind.Apply ? "MAC 변경" : "원상복구") + " 시작...");
             worker.RunWorkerAsync(args);
