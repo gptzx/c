@@ -1,17 +1,34 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 
 namespace MacChanger.Core
 {
-    /// <summary>선택한 어댑터의 현재 IPv4 주소 조회와 "할당 IP 로그" 줄 만들기 / 파일 기록.</summary>
+    /// <summary>선택한 어댑터의 현재 IPv4 구성 조회와 "할당 IP 로그" 줄 만들기 / 파일 기록.</summary>
     public static class IpMonitor
     {
         public const string LogFileName = "MacChanger-ip.log";
+
+        /// <summary>어댑터의 현재 IPv4 구성. 목록은 쉼표로 구분하며 주소가 없으면 빈 문자열.</summary>
+        public sealed class IpInfo
+        {
+            /// <summary>링크가 올라와 있는지(OperationalStatus.Up)</summary>
+            public bool Up;
+            /// <summary>지금 사용 중인 MAC (12자리 hex, 알 수 없으면 null)</summary>
+            public string Mac;
+            /// <summary>IPv4 주소 목록(정렬됨) — 로그와 자동 변경의 기준 값</summary>
+            public string Addresses;
+            /// <summary>주소와 같은 순서의 서브넷 마스크 목록</summary>
+            public string Masks;
+            public string Gateways;
+            /// <summary>DNS 서버 목록 (기본, 보조 … 순서)</summary>
+            public string Dns;
+        }
 
         /// <summary>GetAdaptersAddresses(NetworkInterface) 목록에서 GUID가 일치하는 인터페이스. 없으면(비활성화 등) null.</summary>
         public static NetworkInterface FindInterface(string interfaceGuid)
@@ -26,23 +43,43 @@ namespace MacChanger.Core
             return null;
         }
 
-        /// <summary>
-        /// 어댑터의 IPv4 주소 목록(쉼표 구분, 정렬됨). 어댑터가 IP 스택에 없으면(비활성화 등) null, 주소가 아직 없으면 빈 문자열.
-        /// up = 링크가 올라와 있는지(OperationalStatus.Up), mac = 지금 사용 중인 MAC(12자리 hex, 알 수 없으면 null).
-        /// </summary>
-        public static string ReadIPv4(string interfaceGuid, out bool up, out string mac)
+        /// <summary>어댑터의 IPv4 구성. 어댑터가 IP 스택에 없으면(비활성화 등) null.</summary>
+        public static IpInfo ReadIpInfo(string interfaceGuid)
         {
-            up = false;
-            mac = null;
             NetworkInterface ni = FindInterface(interfaceGuid);
             if (ni == null) return null;
-            up = ni.OperationalStatus == OperationalStatus.Up;
-            mac = MacAddressUtil.FromBytes(ni.GetPhysicalAddress().GetAddressBytes());
-            List<string> ips = new List<string>();
-            foreach (UnicastIPAddressInformation u in ni.GetIPProperties().UnicastAddresses)
-                if (u.Address.AddressFamily == AddressFamily.InterNetwork) ips.Add(u.Address.ToString());
-            ips.Sort(StringComparer.Ordinal);
-            return string.Join(", ", ips.ToArray());
+            IpInfo info = new IpInfo();
+            info.Up = ni.OperationalStatus == OperationalStatus.Up;
+            info.Mac = MacAddressUtil.FromBytes(ni.GetPhysicalAddress().GetAddressBytes());
+
+            IPInterfaceProperties props = ni.GetIPProperties();
+            List<string> addresses = new List<string>();
+            List<string> masks = new List<string>();
+            List<UnicastIPAddressInformation> unicast = new List<UnicastIPAddressInformation>();
+            foreach (UnicastIPAddressInformation u in props.UnicastAddresses)
+                if (u.Address.AddressFamily == AddressFamily.InterNetwork) unicast.Add(u);
+            unicast.Sort(delegate(UnicastIPAddressInformation a, UnicastIPAddressInformation b)
+            {
+                return string.CompareOrdinal(a.Address.ToString(), b.Address.ToString());
+            });
+            foreach (UnicastIPAddressInformation u in unicast)
+            {
+                addresses.Add(u.Address.ToString());
+                masks.Add(u.IPv4Mask != null ? u.IPv4Mask.ToString() : "?");
+            }
+            info.Addresses = string.Join(", ", addresses.ToArray());
+            info.Masks = string.Join(", ", masks.ToArray());
+
+            List<string> gateways = new List<string>();
+            foreach (GatewayIPAddressInformation g in props.GatewayAddresses)
+                if (g.Address.AddressFamily == AddressFamily.InterNetwork) gateways.Add(g.Address.ToString());
+            info.Gateways = string.Join(", ", gateways.ToArray());
+
+            List<string> dns = new List<string>();
+            foreach (IPAddress d in props.DnsAddresses)
+                if (d.AddressFamily == AddressFamily.InterNetwork) dns.Add(d.ToString());
+            info.Dns = string.Join(", ", dns.ToArray());
+            return info;
         }
 
         /// <summary>

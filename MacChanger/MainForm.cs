@@ -36,10 +36,11 @@ namespace MacChanger
         private string ipLogError;
         /// <summary>로그 상자에 마지막으로 넣은 "실제 할당 IP" — 상자를 다시 켤 때 같은 줄을 반복하지 않기 위한 기준</summary>
         private string lastBoxIp;
+        /// <summary>자동 변경이 "시작" 상태인지 (체크박스는 기능 사용 여부, 버튼이 실제 시작/정지)</summary>
+        private bool autoRunning;
         /// <summary>자동 변경 예약 여부와 예약 시각(Environment.TickCount 기준 — 시스템 시계 변경에 영향받지 않음)</summary>
         private bool autoPending;
         private int autoDueTick;
-        private const string AutoSuffixText = "초 뒤 새 MAC 자동 적용";
 
         public MainForm()
         {
@@ -63,9 +64,9 @@ namespace MacChanger
             toolTip.SetToolTip(chkLogMac, "로그 줄 끝에 그때 사용 중인 MAC을 넣습니다.");
             toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다. 숨겨진 동안에는 상자에 기록하지 않고, 켤 때 현재 IP가 마지막 줄과 다르면 한 줄 추가합니다.");
             toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
-            toolTip.SetToolTip(chkAuto, "켜 두면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 자동으로 적용하고, 다시 IP를 받으면 반복합니다. "
-                + "켤 때 이미 IP가 있으면 바로 세기 시작합니다. 변경이 실패하거나 재부팅이 필요하면, 또는 원상복구를 누르면 자동으로 꺼집니다.");
-            toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 1~3600). 바꾼 값은 다음 예약부터 적용됩니다.");
+            toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크한 뒤 '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
+            toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~3600; 0이면 즉시). 바꾼 값은 다음 예약부터 적용됩니다.");
+            toolTip.SetToolTip(btnAutoToggle, "자동 변경을 시작하거나 정지합니다. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 변경이 실패하거나 재부팅이 필요하면, 또는 원상복구를 누르면 스스로 정지합니다.");
         }
 
         private NetworkAdapterInfo SelectedAdapter
@@ -173,8 +174,8 @@ namespace MacChanger
                 SetStatus("실패", "어댑터를 선택하세요.");
                 return;
             }
-            // 확인 대화 상자 없이 바로 복구한다. 자동 변경이 켜져 있으면 복구 직후 다시 바뀌지 않도록 끈다.
-            if (chkAuto.Checked) chkAuto.Checked = false;
+            // 확인 대화 상자 없이 바로 복구한다. 자동 변경 중이면 복구 직후 다시 바뀌지 않도록 정지한다.
+            if (autoRunning) StopAuto();
             OperationArgs args = new OperationArgs();
             args.Kind = OperationKind.Restore;
             args.Adapter = adapter;
@@ -204,22 +205,36 @@ namespace MacChanger
 
         private void chkAuto_CheckedChanged(object sender, EventArgs e)
         {
-            if (chkAuto.Checked)
-            {
-                ScheduleAuto();   // 이미 IP가 할당되어 있으면 지금부터 센다
-                if (!busy) SetStatus("준비", "자동 변경 켜짐: IP 할당 후 " + nudAutoDelay.Value + "초 뒤 새 MAC을 적용합니다.");
-            }
-            else
-            {
-                CancelAuto();
-                if (!busy) SetStatus("준비", "자동 변경 꺼짐");
-            }
+            btnAutoToggle.Enabled = chkAuto.Checked;
+            if (!chkAuto.Checked && autoRunning) StopAuto();
         }
 
-        /// <summary>자동 변경이 켜져 있고 어댑터에 IP가 할당되어 있으면 지연 시간 뒤로 변경을 예약한다.</summary>
+        private void btnAutoToggle_Click(object sender, EventArgs e)
+        {
+            if (autoRunning) StopAuto();
+            else StartAuto();
+        }
+
+        private void StartAuto()
+        {
+            autoRunning = true;
+            btnAutoToggle.Text = "정지";
+            ScheduleAuto();   // 이미 IP가 할당되어 있으면 지금부터 센다
+            if (!busy) SetStatus("준비", "자동 변경 시작: IP 할당 후 " + nudAutoDelay.Value + "초 뒤 새 MAC을 적용합니다.");
+        }
+
+        private void StopAuto()
+        {
+            autoRunning = false;
+            CancelAuto();
+            btnAutoToggle.Text = "시작";
+            if (!busy) SetStatus("준비", "자동 변경 정지");
+        }
+
+        /// <summary>자동 변경 중이고 어댑터에 IP가 할당되어 있으면 지연 시간 뒤로 변경을 예약한다 (0초면 다음 확인 때 바로).</summary>
         private void ScheduleAuto()
         {
-            if (!chkAuto.Checked || busy || lastLoggedIp == null) return;
+            if (!autoRunning || busy || lastLoggedIp == null) return;
             autoPending = true;
             autoDueTick = unchecked(Environment.TickCount + (int)nudAutoDelay.Value * 1000);
         }
@@ -227,20 +242,21 @@ namespace MacChanger
         private void CancelAuto()
         {
             autoPending = false;
-            lblAutoSuffix.Text = AutoSuffixText;
+            if (autoRunning) btnAutoToggle.Text = "정지 (IP 대기)";
         }
 
-        /// <summary>예약 시각이 지났으면 어댑터 종류에 맞는 랜덤 MAC을 만들어 바로 적용한다. 아직이면 남은 시간을 자동 변경 행에 보여준다.</summary>
+        /// <summary>예약 시각이 지났으면 어댑터 종류에 맞는 랜덤 MAC을 만들어 바로 적용한다. 아직이면 남은 시간을 정지 버튼에 보여준다.</summary>
         private void RunAutoIfDue()
         {
-            if (!autoPending || !chkAuto.Checked || busy) return;
+            if (!autoPending || !autoRunning || busy) return;
             int remainingMs = unchecked(autoDueTick - Environment.TickCount);   // TickCount 가 한 바퀴 돌아도 차이는 올바르다
             if (remainingMs > 0)
             {
-                lblAutoSuffix.Text = AutoSuffixText + " (" + (remainingMs + 999) / 1000 + "초 남음)";
+                btnAutoToggle.Text = "정지 (" + (remainingMs + 999) / 1000 + "초)";
                 return;
             }
-            CancelAuto();
+            autoPending = false;
+            btnAutoToggle.Text = "정지";
             NetworkAdapterInfo adapter = SelectedAdapter;
             if (adapter == null) return;
             string mac;
@@ -250,7 +266,7 @@ namespace MacChanger
             }
             catch (Exception ex)
             {
-                chkAuto.Checked = false;
+                StopAuto();
                 SetStatus("실패", "자동 변경 중단 — 랜덤 생성 오류: " + ex.Message);
                 return;
             }
@@ -408,6 +424,11 @@ namespace MacChanger
             }
         }
 
+        private static void SetIfChanged(TextBox box, string text)
+        {
+            if (box.Text != text) box.Text = text;
+        }
+
         /// <summary>현재 MAC을 모델과 드롭다운 항목 텍스트에 반영한다 (ComboBox는 Add 시점의 문자열을 캐시하므로 항목을 다시 넣어야 한다).</summary>
         private void ShowCurrentMac(NetworkAdapterInfo adapter, string current)
         {
@@ -431,20 +452,21 @@ namespace MacChanger
                 txtCurrentIp.Text = string.Empty;
                 return;
             }
-            string ip;
-            bool up;
-            string liveMac;
+            IpMonitor.IpInfo info;
             try
             {
-                ip = IpMonitor.ReadIPv4(adapter.InterfaceGuid, out up, out liveMac);
+                info = IpMonitor.ReadIpInfo(adapter.InterfaceGuid);
             }
             catch (Exception)
             {
                 txtCurrentIp.Text = "(IP 조회 실패)";
+                txtMask.Text = txtGateway.Text = txtDns.Text = string.Empty;
                 return;
             }
+            string ip = info != null ? info.Addresses : null;
+            bool up = info != null && info.Up;
             // 어댑터가 올라와 있으면 지금 사용 중인 MAC도 함께 갱신한다 (느리게 올라온 어댑터, Wi-Fi 임의 주소 변경 등).
-            if (liveMac != null && liveMac != "000000000000") ShowCurrentMac(adapter, liveMac);
+            if (info != null && info.Mac != null && info.Mac != "000000000000") ShowCurrentMac(adapter, info.Mac);
 
             // 로그 기준은 169.254.x.x 를 뺀 "실제 할당" 주소 목록 — 전환 중 자동 사설 주소가 붙었다 떨어져도 중복 기록되지 않는다.
             string assigned = ip == null ? string.Empty : IpMonitor.WithoutApipa(ip);
@@ -455,6 +477,9 @@ namespace MacChanger
             else if (assigned.Length == 0) text = ip + "  (DHCP 응답 없음 — 자동 사설 주소)";
             else text = ip;
             if (txtCurrentIp.Text != text) txtCurrentIp.Text = text;
+            SetIfChanged(txtMask, ip == null || ip.Length == 0 ? string.Empty : info.Masks);
+            SetIfChanged(txtGateway, ip == null ? string.Empty : info.Gateways.Length > 0 ? info.Gateways : "(없음)");
+            SetIfChanged(txtDns, ip == null ? string.Empty : info.Dns.Length > 0 ? info.Dns : "(없음)");
 
             if (ip == null || ip.Length == 0 || !up)
             {
@@ -513,10 +538,10 @@ namespace MacChanger
             string finalMessage = e.Error != null ? e.Error.Message : result != null ? result.Message : "결과를 받지 못했습니다.";
 
             // 실패했거나 재부팅이 필요하면 자동 변경을 멈춘다 (같은 실패를 반복하거나 대화 상자가 겹치지 않도록)
-            if (chkAuto.Checked && (result == null || !result.Success || result.RebootRequired))
+            if (autoRunning && (result == null || !result.Success || result.RebootRequired))
             {
-                chkAuto.Checked = false;
-                finalMessage += " 자동 변경을 껐습니다.";
+                StopAuto();
+                finalMessage += " 자동 변경을 정지했습니다.";
             }
 
             // 어댑터가 실제로 중지되었다면 이후 받는 IP는 같은 값이라도 새 할당이므로 새 MAC과 함께 기록한다.
@@ -537,6 +562,7 @@ namespace MacChanger
                 if (result != null && !string.IsNullOrEmpty(result.Guidance)) text += "\r\n\r\n" + result.Guidance;
                 MessageBox.Show(this, text, Program.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
+            RunAutoIfDue();   // 지연 0초: IP가 이미 있으면 기다리지 않고 바로 다음 변경
         }
 
         // ------------------------------------------------------------------

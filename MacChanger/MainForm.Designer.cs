@@ -27,6 +27,13 @@
             this.txtCurrentMac = new System.Windows.Forms.TextBox();
             this.lblIp = new System.Windows.Forms.Label();
             this.txtCurrentIp = new System.Windows.Forms.TextBox();
+            this.lblMask = new System.Windows.Forms.Label();
+            this.txtMask = new System.Windows.Forms.TextBox();
+            this.lblGateway = new System.Windows.Forms.Label();
+            this.txtGateway = new System.Windows.Forms.TextBox();
+            this.lblDns = new System.Windows.Forms.Label();
+            this.txtDns = new System.Windows.Forms.TextBox();
+            this.btnAutoToggle = new System.Windows.Forms.Button();
             this.lblNew = new System.Windows.Forms.Label();
             this.txtNewMac = new System.Windows.Forms.TextBox();
             this.btnRandom = new System.Windows.Forms.Button();
@@ -139,10 +146,70 @@
             this.txtCurrentIp.TabIndex = 8;
             this.txtCurrentIp.TabStop = false;
             // 
+            // lblMask
+            // 
+            this.lblMask.AutoSize = true;
+            this.lblMask.Location = new System.Drawing.Point(12, 146);
+            this.lblMask.Name = "lblMask";
+            this.lblMask.Size = new System.Drawing.Size(84, 15);
+            this.lblMask.TabIndex = 26;
+            this.lblMask.Text = "서브넷 마스크:";
+            // 
+            // txtMask
+            // 
+            this.txtMask.BackColor = System.Drawing.SystemColors.Window;
+            this.txtMask.Font = new System.Drawing.Font("Consolas", 10F);
+            this.txtMask.Location = new System.Drawing.Point(118, 142);
+            this.txtMask.Name = "txtMask";
+            this.txtMask.ReadOnly = true;
+            this.txtMask.Size = new System.Drawing.Size(430, 23);
+            this.txtMask.TabIndex = 27;
+            this.txtMask.TabStop = false;
+            // 
+            // lblGateway
+            // 
+            this.lblGateway.AutoSize = true;
+            this.lblGateway.Location = new System.Drawing.Point(12, 178);
+            this.lblGateway.Name = "lblGateway";
+            this.lblGateway.Size = new System.Drawing.Size(96, 15);
+            this.lblGateway.TabIndex = 28;
+            this.lblGateway.Text = "기본 게이트웨이:";
+            // 
+            // txtGateway
+            // 
+            this.txtGateway.BackColor = System.Drawing.SystemColors.Window;
+            this.txtGateway.Font = new System.Drawing.Font("Consolas", 10F);
+            this.txtGateway.Location = new System.Drawing.Point(118, 174);
+            this.txtGateway.Name = "txtGateway";
+            this.txtGateway.ReadOnly = true;
+            this.txtGateway.Size = new System.Drawing.Size(430, 23);
+            this.txtGateway.TabIndex = 29;
+            this.txtGateway.TabStop = false;
+            // 
+            // lblDns
+            // 
+            this.lblDns.AutoSize = true;
+            this.lblDns.Location = new System.Drawing.Point(12, 210);
+            this.lblDns.Name = "lblDns";
+            this.lblDns.Size = new System.Drawing.Size(62, 15);
+            this.lblDns.TabIndex = 30;
+            this.lblDns.Text = "DNS 서버:";
+            // 
+            // txtDns
+            // 
+            this.txtDns.BackColor = System.Drawing.SystemColors.Window;
+            this.txtDns.Font = new System.Drawing.Font("Consolas", 10F);
+            this.txtDns.Location = new System.Drawing.Point(118, 206);
+            this.txtDns.Name = "txtDns";
+            this.txtDns.ReadOnly = true;
+            this.txtDns.Size = new System.Drawing.Size(430, 23);
+            this.txtDns.TabIndex = 31;
+            this.txtDns.TabStop = false;
+            // 
             // lblNew
             // 
             this.lblNew.AutoSize = true;
-            this.lblNew.Location = new System.Drawing.Point(12, 146);
+            this.lblNew.Location = new System.Drawing.Point(12, 242);
             this.lblNew.Name = "lblNew";
             this.lblNew.Size = new System.Drawing.Size(55, 15);
             this.lblNew.TabIndex = 9;
@@ -151,7 +218,7 @@
             // txtNewMac
             // 
             this.txtNewMac.Font = new System.Drawing.Font("Consolas", 10F);
-            this.txtNewMac.Location = new System.Drawing.Point(118, 142);
+            this.txtNewMac.Location = new System.Drawing.Point(118, 238);
             this.txtNewMac.MaxLength = 17;
             this.txtNewMac.Name = "txtNewMac";
             this.txtNewMac.Size = new System.Drawing.Size(190, 23);
@@ -159,7 +226,7 @@
             // 
             // btnRandom
             // 
-            this.btnRandom.Location = new System.Drawing.Point(314, 141);
+            this.btnRandom.Location = new System.Drawing.Point(314, 237);
             this.btnRandom.Name = "btnRandom";
             this.btnRandom.Size = new System.Drawing.Size(90, 25);
             this.btnRandom.TabIndex = 11;
@@ -170,7 +237,7 @@
             // btnApply
             // 
             this.btnApply.Font = new System.Drawing.Font("맑은 고딕", 9F, System.Drawing.FontStyle.Bold);
-            this.btnApply.Location = new System.Drawing.Point(118, 178);
+            this.btnApply.Location = new System.Drawing.Point(118, 274);
             this.btnApply.Name = "btnApply";
             this.btnApply.Size = new System.Drawing.Size(110, 30);
             this.btnApply.TabIndex = 12;
@@ -180,7 +247,7 @@
             // 
             // btnRestore
             // 
-            this.btnRestore.Location = new System.Drawing.Point(236, 178);
+            this.btnRestore.Location = new System.Drawing.Point(236, 274);
             this.btnRestore.Name = "btnRestore";
             this.btnRestore.Size = new System.Drawing.Size(110, 30);
             this.btnRestore.TabIndex = 13;
@@ -191,7 +258,7 @@
             // chkIpLog
             // 
             this.chkIpLog.AutoSize = true;
-            this.chkIpLog.Location = new System.Drawing.Point(380, 250);
+            this.chkIpLog.Location = new System.Drawing.Point(380, 346);
             this.chkIpLog.Name = "chkIpLog";
             this.chkIpLog.Size = new System.Drawing.Size(129, 19);
             this.chkIpLog.TabIndex = 23;
@@ -202,7 +269,7 @@
             // lblAuto
             // 
             this.lblAuto.AutoSize = true;
-            this.lblAuto.Location = new System.Drawing.Point(12, 220);
+            this.lblAuto.Location = new System.Drawing.Point(12, 316);
             this.lblAuto.Name = "lblAuto";
             this.lblAuto.Size = new System.Drawing.Size(62, 15);
             this.lblAuto.TabIndex = 15;
@@ -211,7 +278,7 @@
             // chkAuto
             // 
             this.chkAuto.AutoSize = true;
-            this.chkAuto.Location = new System.Drawing.Point(118, 218);
+            this.chkAuto.Location = new System.Drawing.Point(118, 314);
             this.chkAuto.Name = "chkAuto";
             this.chkAuto.Size = new System.Drawing.Size(84, 19);
             this.chkAuto.TabIndex = 16;
@@ -221,9 +288,8 @@
             // 
             // nudAutoDelay
             // 
-            this.nudAutoDelay.Location = new System.Drawing.Point(210, 216);
+            this.nudAutoDelay.Location = new System.Drawing.Point(210, 312);
             this.nudAutoDelay.Maximum = new decimal(new int[] { 3600, 0, 0, 0 });
-            this.nudAutoDelay.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             this.nudAutoDelay.Name = "nudAutoDelay";
             this.nudAutoDelay.Size = new System.Drawing.Size(60, 23);
             this.nudAutoDelay.TabIndex = 17;
@@ -233,16 +299,27 @@
             // lblAutoSuffix
             // 
             this.lblAutoSuffix.AutoSize = true;
-            this.lblAutoSuffix.Location = new System.Drawing.Point(276, 220);
+            this.lblAutoSuffix.Location = new System.Drawing.Point(276, 316);
             this.lblAutoSuffix.Name = "lblAutoSuffix";
-            this.lblAutoSuffix.Size = new System.Drawing.Size(146, 15);
+            this.lblAutoSuffix.Size = new System.Drawing.Size(110, 15);
             this.lblAutoSuffix.TabIndex = 18;
-            this.lblAutoSuffix.Text = "초 뒤 새 MAC 자동 적용";
+            this.lblAutoSuffix.Text = "초 뒤 새 MAC 적용";
+            // 
+            // btnAutoToggle
+            // 
+            this.btnAutoToggle.Enabled = false;
+            this.btnAutoToggle.Location = new System.Drawing.Point(458, 311);
+            this.btnAutoToggle.Name = "btnAutoToggle";
+            this.btnAutoToggle.Size = new System.Drawing.Size(90, 25);
+            this.btnAutoToggle.TabIndex = 32;
+            this.btnAutoToggle.Text = "시작";
+            this.btnAutoToggle.UseVisualStyleBackColor = true;
+            this.btnAutoToggle.Click += new System.EventHandler(this.btnAutoToggle_Click);
             // 
             // lblLogOptions
             // 
             this.lblLogOptions.AutoSize = true;
-            this.lblLogOptions.Location = new System.Drawing.Point(12, 252);
+            this.lblLogOptions.Location = new System.Drawing.Point(12, 348);
             this.lblLogOptions.Name = "lblLogOptions";
             this.lblLogOptions.Size = new System.Drawing.Size(38, 15);
             this.lblLogOptions.TabIndex = 19;
@@ -251,7 +328,7 @@
             // chkLogTime
             // 
             this.chkLogTime.AutoSize = true;
-            this.chkLogTime.Location = new System.Drawing.Point(118, 250);
+            this.chkLogTime.Location = new System.Drawing.Point(118, 346);
             this.chkLogTime.Name = "chkLogTime";
             this.chkLogTime.Size = new System.Drawing.Size(50, 19);
             this.chkLogTime.TabIndex = 20;
@@ -261,7 +338,7 @@
             // chkLogMac
             // 
             this.chkLogMac.AutoSize = true;
-            this.chkLogMac.Location = new System.Drawing.Point(188, 250);
+            this.chkLogMac.Location = new System.Drawing.Point(188, 346);
             this.chkLogMac.Name = "chkLogMac";
             this.chkLogMac.Size = new System.Drawing.Size(55, 19);
             this.chkLogMac.TabIndex = 21;
@@ -271,7 +348,7 @@
             // chkShowLog
             // 
             this.chkShowLog.AutoSize = true;
-            this.chkShowLog.Location = new System.Drawing.Point(258, 250);
+            this.chkShowLog.Location = new System.Drawing.Point(258, 346);
             this.chkShowLog.Name = "chkShowLog";
             this.chkShowLog.Size = new System.Drawing.Size(107, 19);
             this.chkShowLog.TabIndex = 22;
@@ -281,7 +358,7 @@
             // 
             // btnClearLog
             // 
-            this.btnClearLog.Location = new System.Drawing.Point(458, 180);
+            this.btnClearLog.Location = new System.Drawing.Point(458, 276);
             this.btnClearLog.Name = "btnClearLog";
             this.btnClearLog.Size = new System.Drawing.Size(90, 25);
             this.btnClearLog.TabIndex = 14;
@@ -293,7 +370,7 @@
             // 
             this.lblStatus.AutoEllipsis = true;
             this.lblStatus.Font = new System.Drawing.Font("맑은 고딕", 9F, System.Drawing.FontStyle.Bold);
-            this.lblStatus.Location = new System.Drawing.Point(12, 280);
+            this.lblStatus.Location = new System.Drawing.Point(12, 376);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(536, 20);
             this.lblStatus.TabIndex = 24;
@@ -303,7 +380,7 @@
             // 
             this.txtIpLog.BackColor = System.Drawing.SystemColors.Window;
             this.txtIpLog.Font = new System.Drawing.Font("Consolas", 9F);
-            this.txtIpLog.Location = new System.Drawing.Point(12, 306);
+            this.txtIpLog.Location = new System.Drawing.Point(12, 402);
             this.txtIpLog.Multiline = true;
             this.txtIpLog.Name = "txtIpLog";
             this.txtIpLog.ReadOnly = true;
@@ -329,7 +406,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(560, 428);
+            this.ClientSize = new System.Drawing.Size(560, 524);
             this.Controls.Add(this.txtIpLog);
             this.Controls.Add(this.lblStatus);
             this.Controls.Add(this.btnClearLog);
@@ -341,6 +418,13 @@
             this.Controls.Add(this.nudAutoDelay);
             this.Controls.Add(this.chkAuto);
             this.Controls.Add(this.lblAuto);
+            this.Controls.Add(this.btnAutoToggle);
+            this.Controls.Add(this.txtDns);
+            this.Controls.Add(this.lblDns);
+            this.Controls.Add(this.txtGateway);
+            this.Controls.Add(this.lblGateway);
+            this.Controls.Add(this.txtMask);
+            this.Controls.Add(this.lblMask);
             this.Controls.Add(this.chkIpLog);
             this.Controls.Add(this.btnRestore);
             this.Controls.Add(this.btnApply);
@@ -381,6 +465,13 @@
         private System.Windows.Forms.TextBox txtCurrentMac;
         private System.Windows.Forms.Label lblIp;
         private System.Windows.Forms.TextBox txtCurrentIp;
+        private System.Windows.Forms.Label lblMask;
+        private System.Windows.Forms.TextBox txtMask;
+        private System.Windows.Forms.Label lblGateway;
+        private System.Windows.Forms.TextBox txtGateway;
+        private System.Windows.Forms.Label lblDns;
+        private System.Windows.Forms.TextBox txtDns;
+        private System.Windows.Forms.Button btnAutoToggle;
         private System.Windows.Forms.Label lblNew;
         private System.Windows.Forms.TextBox txtNewMac;
         private System.Windows.Forms.Button btnRandom;
