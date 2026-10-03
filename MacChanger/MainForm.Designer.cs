@@ -335,8 +335,8 @@
             // 
             this.nudIpInterval.Increment = new decimal(new int[] { 100, 0, 0, 0 });
             this.nudIpInterval.Location = new System.Drawing.Point(118, 344);
-            this.nudIpInterval.Maximum = new decimal(new int[] { 600000, 0, 0, 0 });
-            this.nudIpInterval.Minimum = new decimal(new int[] { 100, 0, 0, 0 });
+            this.nudIpInterval.Maximum = new decimal(new int[] { 2000, 0, 0, 0 });
+            this.nudIpInterval.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             this.nudIpInterval.Name = "nudIpInterval";
             this.nudIpInterval.Size = new System.Drawing.Size(72, 23);
             this.nudIpInterval.TabIndex = 19;
