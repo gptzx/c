@@ -110,6 +110,15 @@ namespace MacChanger.Core
             }
         }
 
+        /// <summary>클래스 키의 NetworkAddress 값 (없으면 null). 원상복구 전에 복구할 것이 남아 있는지 확인하는 데 쓴다.</summary>
+        public static string GetNetworkAddress(string interfaceGuid)
+        {
+            using (RegistryKey key = OpenAdapterClassKey(interfaceGuid, false))
+            {
+                return key.GetValue(NetworkAddressValueName) as string;
+            }
+        }
+
         /// <summary>NetworkAddress 값을 삭제하고 실제로 사라졌는지 확인한다. 값이 있었으면 true.</summary>
         public static bool DeleteNetworkAddress(string interfaceGuid)
         {

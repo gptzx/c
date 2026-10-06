@@ -84,29 +84,47 @@ namespace MacChanger.Core
         }
 
         /// <summary>
-        /// 목록에서 169.254.x.x(DHCP 응답이 없을 때 Windows가 붙이는 자동 사설 주소)를 제외한 "실제 할당된" 주소 목록.
+        /// 주소 목록에서 169.254.x.x(DHCP 응답이 없을 때 Windows가 붙이는 자동 사설 주소)를 뺀 "실제 할당된" 주소 목록과, 같은 순서의 서브넷 마스크 목록.
         /// 로그 중복 판정과 기록은 이 값으로만 한다 — DHCP 전환 중 169.254 주소가 잠깐 붙었다 떨어져도 같은 줄이 다시 기록되지 않는다.
         /// </summary>
-        public static string WithoutApipa(string ipv4List)
+        public static void FilterAssigned(string addresses, string masks, out string assignedAddresses, out string assignedMasks)
         {
-            if (string.IsNullOrEmpty(ipv4List)) return string.Empty;
-            if (ipv4List.IndexOf("169.254.", StringComparison.Ordinal) < 0) return ipv4List;   // 보통의 경우: 그대로
-            List<string> keep = new List<string>();
-            foreach (string ip in ipv4List.Split(','))
+            if (string.IsNullOrEmpty(addresses))
             {
-                string t = ip.Trim();
-                if (t.Length > 0 && !t.StartsWith("169.254.", StringComparison.Ordinal)) keep.Add(t);
+                assignedAddresses = assignedMasks = string.Empty;
+                return;
             }
-            return string.Join(", ", keep.ToArray());
+            if (addresses.IndexOf("169.254.", StringComparison.Ordinal) < 0)   // 보통의 경우: 그대로
+            {
+                assignedAddresses = addresses;
+                assignedMasks = masks ?? string.Empty;
+                return;
+            }
+            string[] ips = addresses.Split(',');
+            string[] ms = string.IsNullOrEmpty(masks) ? new string[0] : masks.Split(',');
+            List<string> keepIps = new List<string>();
+            List<string> keepMasks = new List<string>();
+            for (int i = 0; i < ips.Length; i++)
+            {
+                string ip = ips[i].Trim();
+                if (ip.Length == 0 || ip.StartsWith("169.254.", StringComparison.Ordinal)) continue;
+                keepIps.Add(ip);
+                keepMasks.Add(i < ms.Length ? ms[i].Trim() : "?");
+            }
+            assignedAddresses = string.Join(", ", keepIps.ToArray());
+            assignedMasks = string.Join(", ", keepMasks.ToArray());
         }
 
-        /// <summary>로그 한 줄: [시각(탭)]IP[(탭)MAC] — 시간과 MAC 은 옵션.</summary>
-        public static string BuildLogLine(string assignedIps, string mac, bool includeTime, bool includeMac)
+        /// <summary>로그 한 줄: [시각(탭)]IP[(탭)서브넷 마스크][(탭)기본 게이트웨이][(탭)MAC] — IP 외의 항목은 옵션. 게이트웨이가 없으면 "(없음)".</summary>
+        public static string BuildLogLine(string assignedIps, string masks, string gateways, string mac,
+                                          bool includeTime, bool includeMask, bool includeGateway, bool includeMac)
         {
             StringBuilder sb = new StringBuilder();
             if (includeTime) sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)).Append('\t');
             sb.Append(assignedIps);
-            if (includeMac) sb.Append('\t').Append(MacAddressUtil.Format(mac ?? ""));
+            if (includeMask) sb.Append('\t').Append(masks ?? string.Empty);
+            if (includeGateway) sb.Append('\t').Append(string.IsNullOrEmpty(gateways) ? "(없음)" : gateways);
+            if (includeMac) sb.Append('\t').Append(MacAddressUtil.Format(mac ?? string.Empty));
             return sb.ToString();
         }
 

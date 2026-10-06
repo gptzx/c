@@ -30,6 +30,8 @@ namespace MacChanger
         private string lastInfoGuid;
         /// <summary>선택한 어댑터에 대해 마지막으로 로그에 남긴 "실제 할당 IP"(169.254 제외, 정렬). 어댑터가 내려가거나 재시작되면 초기화한다.</summary>
         private string lastLoggedIp;
+        /// <summary>lastLoggedIp 와 함께 읽은 서브넷 마스크·기본 게이트웨이 (로그 상자를 켜거나 파일 저장을 켤 때 같은 줄을 다시 만들기 위해)</summary>
+        private string lastLoggedMask, lastLoggedGateway;
         /// <summary>그래프 위치: 로그 상자와 반반일 때 / 로그 상자를 숨겨 아래쪽 전체 폭을 쓸 때 (DPI/글꼴 배율이 적용된 뒤의 실제 픽셀)</summary>
         private Rectangle graphHalfBounds, graphFullBounds;
         /// <summary>선택한 어댑터의 송수신 카운터 (1초마다 읽어 그래프에 넣는다)</summary>
@@ -65,6 +67,8 @@ namespace MacChanger
             toolTip.SetToolTip(btnRestore, "확인 창 없이 바로 NetworkAddress 값을 삭제하고(EnableDHCP = 1이면 Tcpip 값 자동 정리) 어댑터를 재시작하여 공장 MAC으로 되돌립니다.");
             toolTip.SetToolTip(chkIpLog, "켜 두면 새 IP가 할당될 때마다 로그 상자와 같은 줄을 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 추가합니다. 169.254.x.x 자동 사설 주소는 기록하지 않습니다.");
             toolTip.SetToolTip(chkLogTime, "로그 줄 맨 앞에 시각(yyyy-MM-dd HH:mm:ss)을 넣습니다.");
+            toolTip.SetToolTip(chkLogMask, "로그 줄의 IP 뒤에 서브넷 마스크를 넣습니다.");
+            toolTip.SetToolTip(chkLogGateway, "로그 줄에 기본 게이트웨이를 넣습니다 (없으면 \"(없음)\").");
             toolTip.SetToolTip(chkLogMac, "로그 줄 끝에 그때 사용 중인 MAC을 넣습니다.");
             toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다 (숨기면 그래프가 아래쪽 전체 폭을 씁니다). 숨겨진 동안에는 상자에 기록하지 않고, 켤 때 현재 IP가 마지막 줄과 다르면 한 줄 추가합니다.");
             toolTip.SetToolTip(trafficGraph, "선택한 어댑터의 송수신 속도 그래프 (빨강: 수신, 초록: 송신, 1초마다 갱신, 가로 2픽셀 = 1초). MAC을 변경하면 그래프는 유지되고 누적 데이터 양만 0부터 다시 셉니다.");
@@ -180,11 +184,33 @@ namespace MacChanger
                 SetStatus("실패", "어댑터를 선택하세요.");
                 return;
             }
+            // 이미 공장 MAC이고 레지스트리에 NetworkAddress 값도 없으면 복구할 것이 없다 (변경 적용의 "같은 MAC" 안내와 같은 방식).
+            string currentNormalized = MacAddressUtil.Normalize(txtCurrentMac.Text);
+            string permanentNormalized = MacAddressUtil.Normalize(txtPermanentMac.Text);
+            if (currentNormalized != null && permanentNormalized != null
+                && string.Equals(currentNormalized, permanentNormalized, StringComparison.OrdinalIgnoreCase) && !HasNetworkAddressOverride(adapter))
+            {
+                SetStatus("준비", "현재 MAC이 이미 원래(공장) MAC과 같습니다. 복구할 내용이 없습니다.");
+                return;
+            }
             // 확인 대화 상자 없이 바로 복구한다 (자동 변경 실행 중에는 이 버튼이 잠겨 있다).
             OperationArgs args = new OperationArgs();
             args.Kind = OperationKind.Restore;
             args.Adapter = adapter;
             StartOperation(args);
+        }
+
+        /// <summary>레지스트리에 NetworkAddress 값이 남아 있는지. 읽지 못하면(키 없음·권한) 남아 있다고 보고 복구를 진행하게 한다.</summary>
+        private static bool HasNetworkAddressOverride(NetworkAdapterInfo adapter)
+        {
+            try
+            {
+                return MacRegistry.GetNetworkAddress(adapter.InterfaceGuid) != null;
+            }
+            catch (Exception)
+            {
+                return true;
+            }
         }
 
         private void chkIpLog_CheckedChanged(object sender, EventArgs e)
@@ -196,9 +222,7 @@ namespace MacChanger
             }
             // 켜는 순간 현재 할당된 IP를 기준 줄로 파일에만 한 번 기록한다 (상자는 표시 중일 때만 RefreshIp 가 채운다).
             NetworkAdapterInfo adapter = SelectedAdapter;
-            string error = adapter != null && lastLoggedIp != null
-                ? AppendToFile(IpMonitor.BuildLogLine(lastLoggedIp, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked))
-                : null;
+            string error = adapter != null && lastLoggedIp != null ? AppendToFile(BuildLastLogLine(adapter)) : null;
             if (error != null) SetStatus("실패", error);
             else SetStatus("준비", "할당 IP 로그를 실행 파일 옆 " + IpMonitor.LogFileName + " 에 저장합니다.");
         }
@@ -310,6 +334,13 @@ namespace MacChanger
             lastBoxIp = null;
         }
 
+        /// <summary>마지막으로 기록한 할당 IP·마스크·게이트웨이와 지금 쓰는 MAC으로, 현재 로그 옵션에 맞는 한 줄을 만든다.</summary>
+        private string BuildLastLogLine(NetworkAdapterInfo adapter)
+        {
+            return IpMonitor.BuildLogLine(lastLoggedIp, lastLoggedMask, lastLoggedGateway, adapter.CurrentMac,
+                                          chkLogTime.Checked, chkLogMask.Checked, chkLogGateway.Checked, chkLogMac.Checked);
+        }
+
         /// <summary>상자에 한 줄 추가하고 마지막 줄의 할당 IP를 기억한다.</summary>
         private void AppendToBox(string assignedIps, string line)
         {
@@ -339,7 +370,7 @@ namespace MacChanger
             bool show = chkShowLog.Checked;
             NetworkAdapterInfo adapter = SelectedAdapter;
             if (show && adapter != null && lastLoggedIp != null && lastLoggedIp != lastBoxIp)   // 켜는 순간 현재 IP (마지막 줄과 같으면 생략)
-                AppendToBox(lastLoggedIp, IpMonitor.BuildLogLine(lastLoggedIp, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked));
+                AppendToBox(lastLoggedIp, BuildLastLogLine(adapter));
             txtIpLog.Visible = show;
             btnClearLog.Enabled = show;
             trafficGraph.Bounds = show ? graphHalfBounds : graphFullBounds;
@@ -527,7 +558,8 @@ namespace MacChanger
             if (info != null && info.Mac != null && info.Mac != "000000000000") ShowCurrentMac(adapter, info.Mac);
 
             // 로그 기준은 169.254.x.x 를 뺀 "실제 할당" 주소 목록 — 전환 중 자동 사설 주소가 붙었다 떨어져도 중복 기록되지 않는다.
-            string assigned = ip == null ? string.Empty : IpMonitor.WithoutApipa(ip);
+            string assigned, assignedMasks;
+            IpMonitor.FilterAssigned(ip, info != null ? info.Masks : null, out assigned, out assignedMasks);
             string text;
             if (ip == null) text = "(어댑터 비활성 상태)";
             else if (ip.Length == 0) text = up ? "(IP 없음 — 할당 대기 중)" : "(연결 안 됨 — 링크 없음)";
@@ -554,7 +586,9 @@ namespace MacChanger
             if (busy || assigned == lastLoggedIp) return;
 
             lastLoggedIp = assigned;
-            string line = IpMonitor.BuildLogLine(assigned, adapter.CurrentMac, chkLogTime.Checked, chkLogMac.Checked);   // 상자와 파일에 같은 줄
+            lastLoggedMask = assignedMasks;
+            lastLoggedGateway = info.Gateways;
+            string line = BuildLastLogLine(adapter);   // 상자와 파일에 같은 줄
             if (chkShowLog.Checked) AppendToBox(assigned, line);   // 숨겨진 동안에는 상자에 기록하지 않음
             ipLogError = AppendToFile(line);
             ScheduleAuto();   // 새로 할당된 IP → 자동 변경 예약
@@ -659,6 +693,8 @@ namespace MacChanger
             txtNewMac.Enabled = idle;   // 실행 중 입력해도 다음 자동 변경이 덮어쓰므로 함께 잠근다 (포커스가 정지 버튼으로 튀는 것도 막는다)
             chkAuto.Enabled = !autoRunning;
             chkLogTime.Enabled = !autoRunning;
+            chkLogMask.Enabled = !autoRunning;
+            chkLogGateway.Enabled = !autoRunning;
             chkLogMac.Enabled = !autoRunning;
             chkShowLog.Enabled = !autoRunning;
             nudAutoDelay.Enabled = !autoRunning;

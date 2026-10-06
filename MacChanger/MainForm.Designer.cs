@@ -49,6 +49,8 @@
             this.lblIpIntervalSuffix = new System.Windows.Forms.Label();
             this.lblLogOptions = new System.Windows.Forms.Label();
             this.chkLogTime = new System.Windows.Forms.CheckBox();
+            this.chkLogMask = new System.Windows.Forms.CheckBox();
+            this.chkLogGateway = new System.Windows.Forms.CheckBox();
             this.chkLogMac = new System.Windows.Forms.CheckBox();
             this.chkShowLog = new System.Windows.Forms.CheckBox();
             this.btnClearLog = new System.Windows.Forms.Button();
@@ -264,10 +266,10 @@
             // chkIpLog
             // 
             this.chkIpLog.AutoSize = true;
-            this.chkIpLog.Location = new System.Drawing.Point(380, 378);
+            this.chkIpLog.Location = new System.Drawing.Point(258, 410);
             this.chkIpLog.Name = "chkIpLog";
             this.chkIpLog.Size = new System.Drawing.Size(129, 19);
-            this.chkIpLog.TabIndex = 23;
+            this.chkIpLog.TabIndex = 25;
             this.chkIpLog.Text = "할당 IP 로그 저장";
             this.chkIpLog.UseVisualStyleBackColor = true;
             this.chkIpLog.CheckedChanged += new System.EventHandler(this.chkIpLog_CheckedChanged);
@@ -372,23 +374,43 @@
             this.chkLogTime.Text = "시간";
             this.chkLogTime.UseVisualStyleBackColor = true;
             // 
+            // chkLogMask
+            // 
+            this.chkLogMask.AutoSize = true;
+            this.chkLogMask.Location = new System.Drawing.Point(180, 378);
+            this.chkLogMask.Name = "chkLogMask";
+            this.chkLogMask.Size = new System.Drawing.Size(105, 19);
+            this.chkLogMask.TabIndex = 21;
+            this.chkLogMask.Text = "서브넷 마스크";
+            this.chkLogMask.UseVisualStyleBackColor = true;
+            // 
+            // chkLogGateway
+            // 
+            this.chkLogGateway.AutoSize = true;
+            this.chkLogGateway.Location = new System.Drawing.Point(297, 378);
+            this.chkLogGateway.Name = "chkLogGateway";
+            this.chkLogGateway.Size = new System.Drawing.Size(117, 19);
+            this.chkLogGateway.TabIndex = 22;
+            this.chkLogGateway.Text = "기본 게이트웨이";
+            this.chkLogGateway.UseVisualStyleBackColor = true;
+            // 
             // chkLogMac
             // 
             this.chkLogMac.AutoSize = true;
-            this.chkLogMac.Location = new System.Drawing.Point(188, 378);
+            this.chkLogMac.Location = new System.Drawing.Point(426, 378);
             this.chkLogMac.Name = "chkLogMac";
             this.chkLogMac.Size = new System.Drawing.Size(55, 19);
-            this.chkLogMac.TabIndex = 21;
+            this.chkLogMac.TabIndex = 23;
             this.chkLogMac.Text = "MAC";
             this.chkLogMac.UseVisualStyleBackColor = true;
             // 
             // chkShowLog
             // 
             this.chkShowLog.AutoSize = true;
-            this.chkShowLog.Location = new System.Drawing.Point(258, 378);
+            this.chkShowLog.Location = new System.Drawing.Point(118, 410);
             this.chkShowLog.Name = "chkShowLog";
             this.chkShowLog.Size = new System.Drawing.Size(107, 19);
-            this.chkShowLog.TabIndex = 22;
+            this.chkShowLog.TabIndex = 24;
             this.chkShowLog.Text = "로그 상자 표시";
             this.chkShowLog.UseVisualStyleBackColor = true;
             this.chkShowLog.CheckedChanged += new System.EventHandler(this.chkShowLog_CheckedChanged);
@@ -407,29 +429,29 @@
             // 
             this.lblStatus.AutoEllipsis = true;
             this.lblStatus.Font = new System.Drawing.Font("맑은 고딕", 9F, System.Drawing.FontStyle.Bold);
-            this.lblStatus.Location = new System.Drawing.Point(12, 408);
+            this.lblStatus.Location = new System.Drawing.Point(12, 440);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(536, 20);
-            this.lblStatus.TabIndex = 24;
+            this.lblStatus.TabIndex = 38;
             this.lblStatus.Text = "상태: 준비";
             // 
             // txtIpLog
             // 
             this.txtIpLog.BackColor = System.Drawing.SystemColors.Window;
             this.txtIpLog.Font = new System.Drawing.Font("Consolas", 9F);
-            this.txtIpLog.Location = new System.Drawing.Point(12, 434);
+            this.txtIpLog.Location = new System.Drawing.Point(12, 466);
             this.txtIpLog.Multiline = true;
             this.txtIpLog.Name = "txtIpLog";
             this.txtIpLog.ReadOnly = true;
             this.txtIpLog.ScrollBars = System.Windows.Forms.ScrollBars.Both;
             this.txtIpLog.Size = new System.Drawing.Size(262, 156);
-            this.txtIpLog.TabIndex = 25;
+            this.txtIpLog.TabIndex = 39;
             this.txtIpLog.TabStop = false;
             this.txtIpLog.WordWrap = false;
             // 
             // trafficGraph
             // 
-            this.trafficGraph.Location = new System.Drawing.Point(286, 434);
+            this.trafficGraph.Location = new System.Drawing.Point(286, 466);
             this.trafficGraph.Name = "trafficGraph";
             this.trafficGraph.Size = new System.Drawing.Size(262, 156);
             this.trafficGraph.TabIndex = 34;
@@ -456,13 +478,15 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(560, 602);
+            this.ClientSize = new System.Drawing.Size(560, 634);
             this.Controls.Add(this.trafficGraph);
             this.Controls.Add(this.txtIpLog);
             this.Controls.Add(this.lblStatus);
             this.Controls.Add(this.btnClearLog);
             this.Controls.Add(this.chkShowLog);
             this.Controls.Add(this.chkLogMac);
+            this.Controls.Add(this.chkLogGateway);
+            this.Controls.Add(this.chkLogMask);
             this.Controls.Add(this.chkLogTime);
             this.Controls.Add(this.lblLogOptions);
             this.Controls.Add(this.lblIpIntervalSuffix);
@@ -542,6 +566,8 @@
         private System.Windows.Forms.Label lblIpIntervalSuffix;
         private System.Windows.Forms.Label lblLogOptions;
         private System.Windows.Forms.CheckBox chkLogTime;
+        private System.Windows.Forms.CheckBox chkLogMask;
+        private System.Windows.Forms.CheckBox chkLogGateway;
         private System.Windows.Forms.CheckBox chkLogMac;
         private System.Windows.Forms.CheckBox chkShowLog;
         private System.Windows.Forms.Button btnClearLog;
