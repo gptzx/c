@@ -205,7 +205,7 @@ namespace MacChanger
         {
             try
             {
-                return MacRegistry.GetNetworkAddress(adapter.InterfaceGuid) != null;
+                return MacRegistry.HasNetworkAddress(adapter.InterfaceGuid);
             }
             catch (Exception)
             {

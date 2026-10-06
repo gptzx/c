@@ -43,7 +43,7 @@ MacChanger/
   app.manifest                         ← requireAdministrator, supportedOS(Win7~11), dpiAware
   app.ico                              ← 실행 파일/창 아이콘 (16·32·256)
   Program.cs                           ← 진입점, 관리자 권한 확인, 전역 예외 처리
-  MainForm.cs / MainForm.Designer.cs   ← UI (드롭다운, 원래/현재 MAC, 현재 IP·서브넷 마스크·기본 게이트웨이·DNS, 새 MAC, 랜덤 생성, 변경 적용, 원상복구, 로그 지우기, 자동 변경(지연 초, 시작/정지), IP 확인 주기(ms), 로그 옵션 4개, 상태 라벨, 할당 IP 로그 상자, 송수신 그래프)
+  MainForm.cs / MainForm.Designer.cs   ← UI (드롭다운, 원래/현재 MAC, 현재 IP·서브넷 마스크·기본 게이트웨이·DNS, 새 MAC, 랜덤 생성, 변경 적용, 원상복구, 로그 지우기, 자동 변경(지연 초, 시작/정지), IP 확인 주기(ms), 로그 옵션 6개, 상태 라벨, 할당 IP 로그 상자, 송수신 그래프)
   TrafficGraph.cs                      ← TMAC 식 송수신 그래프 컨트롤 (수신 빨강 / 송신 초록 꺾은선 + 누적량·속도 네 줄)
   Properties/AssemblyInfo.cs
   Core/
@@ -108,7 +108,7 @@ VS 2017 이상의 MSBuild(Developer Command Prompt의 `msbuild`)에서는 같은
 * **Tcpip 값 자동 정리**는 `EnableDHCP = 1`(DHCP 사용)인 어댑터에서만 동작하며, 그 어댑터의 `Tcpip\Parameters\Interfaces\{GUID}` 키에서 `EnableDHCP`를 제외한 **모든 값**이 삭제됩니다. DHCP 임대 정보(`DhcpIPAddress`, `DhcpNameServer`, `DhcpDomain` 등)뿐 아니라 수동으로 지정한 DNS(`NameServer`), `Domain`, `InterfaceMetric`, `MTU` 등 이 키에 저장된 설정도 함께 지워지므로, DHCP 어댑터에 DNS 등을 직접 설정해 두었다면 변경/복구 후 다시 설정하세요. 전역 `Tcpip\Parameters`의 `DhcpDomain`·`DhcpNameServer`도 삭제됩니다. 고정 IP(`EnableDHCP = 0`) 어댑터, `EnableDHCP` 값이 없는 어댑터, 그리고 어댑터를 즉시 중지하지 못한 경우(재부팅 보류)에는 아무 값도 지우지 않습니다.
 * 변경 적용과 원상복구는 확인 창 없이 즉시 실행됩니다. 실패하거나 재부팅이 필요한 경우에만 안내 창이 뜹니다.
 * **자동 변경**은 정지하기 전까지 계속 반복됩니다(IP 할당 → N초 대기 → MAC 변경 → 어댑터 재시작 → 새 IP 할당 → …). 네트워크 연결이 주기적으로 끊기므로 필요할 때만 시작하세요. 설정은 저장되지 않습니다.
-* **할당 IP 로그 저장**을 켜면 실행 파일과 같은 폴더에 `MacChanger-ip.log`가 만들어집니다(이 옵션을 켤 때만). 로그 옵션(시간·MAC·로그 상자 표시·파일 저장)은 모두 기본 꺼짐이고 저장되지 않으므로 실행할 때마다 필요하면 다시 설정하세요.
+* **할당 IP 로그 저장**을 켜면 실행 파일과 같은 폴더에 `MacChanger-ip.log`가 만들어집니다(이 옵션을 켤 때만). 로그 옵션(시간·서브넷 마스크·기본 게이트웨이·MAC·로그 상자 표시·파일 저장)은 모두 기본 꺼짐이고 저장되지 않으므로 실행할 때마다 필요하면 다시 설정하세요.
 * 일부 드라이버(특히 무선, 일부 USB 이더넷)는 `NetworkAddress` 값을 지원하지 않거나 로컬 관리 주소(두 번째 자리 2/6/A/E)만 허용합니다.
 * 어댑터를 즉시 중지할 수 없는 경우(장치 관리자가 재부팅 필요 플래그 설정) 레지스트리 값은 기록되고 재부팅 후 적용됩니다. 프로그램이 이를 감지해 "재부팅 후 적용" 안내를 띄웁니다.
 * 프로그램 자체는 어떤 설정 파일/레지스트리 키도 만들지 않습니다. 다만 .NET 런타임이 일부 Windows 10 버전에서 `%LOCALAPPDATA%\Microsoft\CLR_v4.0\UsageLogs\`에 사용 로그를 남기는 것은 OS/런타임 동작으로 프로그램과 무관합니다.
