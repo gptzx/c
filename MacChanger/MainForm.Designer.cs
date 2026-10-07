@@ -39,13 +39,14 @@
             this.btnRandom = new System.Windows.Forms.Button();
             this.btnApply = new System.Windows.Forms.Button();
             this.btnRestore = new System.Windows.Forms.Button();
+            this.btnRenewIp = new System.Windows.Forms.Button();
             this.chkIpLog = new System.Windows.Forms.CheckBox();
             this.lblAuto = new System.Windows.Forms.Label();
             this.chkAuto = new System.Windows.Forms.CheckBox();
             this.nudAutoDelay = new System.Windows.Forms.NumericUpDown();
             this.lblAutoSuffix = new System.Windows.Forms.Label();
             this.lblIpInterval = new System.Windows.Forms.Label();
-            this.nudIpInterval = new System.Windows.Forms.NumericUpDown();
+            this.nudIpInterval = new MacChanger.IntervalUpDown();
             this.lblIpIntervalSuffix = new System.Windows.Forms.Label();
             this.lblLogOptions = new System.Windows.Forms.Label();
             this.chkLogTime = new System.Windows.Forms.CheckBox();
@@ -263,6 +264,16 @@
             this.btnRestore.UseVisualStyleBackColor = true;
             this.btnRestore.Click += new System.EventHandler(this.btnRestore_Click);
             // 
+            // btnRenewIp
+            // 
+            this.btnRenewIp.Location = new System.Drawing.Point(352, 274);
+            this.btnRenewIp.Name = "btnRenewIp";
+            this.btnRenewIp.Size = new System.Drawing.Size(100, 30);
+            this.btnRenewIp.TabIndex = 14;
+            this.btnRenewIp.Text = "IP 갱신";
+            this.btnRenewIp.UseVisualStyleBackColor = true;
+            this.btnRenewIp.Click += new System.EventHandler(this.btnRenewIp_Click);
+            // 
             // chkIpLog
             // 
             this.chkIpLog.AutoSize = true;
@@ -280,7 +291,7 @@
             this.lblAuto.Location = new System.Drawing.Point(12, 316);
             this.lblAuto.Name = "lblAuto";
             this.lblAuto.Size = new System.Drawing.Size(62, 15);
-            this.lblAuto.TabIndex = 15;
+            this.lblAuto.TabIndex = 41;
             this.lblAuto.Text = "자동 변경:";
             // 
             // chkAuto
@@ -335,10 +346,11 @@
             // 
             // nudIpInterval
             // 
+            this.nudIpInterval.ButtonMinimum = new decimal(new int[] { 100, 0, 0, 0 });
             this.nudIpInterval.Increment = new decimal(new int[] { 100, 0, 0, 0 });
             this.nudIpInterval.Location = new System.Drawing.Point(118, 344);
             this.nudIpInterval.Maximum = new decimal(new int[] { 2000, 0, 0, 0 });
-            this.nudIpInterval.Minimum = new decimal(new int[] { 100, 0, 0, 0 });
+            this.nudIpInterval.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             this.nudIpInterval.Name = "nudIpInterval";
             this.nudIpInterval.Size = new System.Drawing.Size(72, 23);
             this.nudIpInterval.TabIndex = 19;
@@ -420,7 +432,7 @@
             this.btnClearLog.Location = new System.Drawing.Point(458, 276);
             this.btnClearLog.Name = "btnClearLog";
             this.btnClearLog.Size = new System.Drawing.Size(90, 25);
-            this.btnClearLog.TabIndex = 14;
+            this.btnClearLog.TabIndex = 15;
             this.btnClearLog.Text = "로그 지우기";
             this.btnClearLog.UseVisualStyleBackColor = true;
             this.btnClearLog.Click += new System.EventHandler(this.btnClearLog_Click);
@@ -504,6 +516,7 @@
             this.Controls.Add(this.txtMask);
             this.Controls.Add(this.lblMask);
             this.Controls.Add(this.chkIpLog);
+            this.Controls.Add(this.btnRenewIp);
             this.Controls.Add(this.btnRestore);
             this.Controls.Add(this.btnApply);
             this.Controls.Add(this.btnRandom);
@@ -556,13 +569,14 @@
         private System.Windows.Forms.Button btnRandom;
         private System.Windows.Forms.Button btnApply;
         private System.Windows.Forms.Button btnRestore;
+        private System.Windows.Forms.Button btnRenewIp;
         private System.Windows.Forms.CheckBox chkIpLog;
         private System.Windows.Forms.Label lblAuto;
         private System.Windows.Forms.CheckBox chkAuto;
         private System.Windows.Forms.NumericUpDown nudAutoDelay;
         private System.Windows.Forms.Label lblAutoSuffix;
         private System.Windows.Forms.Label lblIpInterval;
-        private System.Windows.Forms.NumericUpDown nudIpInterval;
+        private IntervalUpDown nudIpInterval;
         private System.Windows.Forms.Label lblIpIntervalSuffix;
         private System.Windows.Forms.Label lblLogOptions;
         private System.Windows.Forms.CheckBox chkLogTime;

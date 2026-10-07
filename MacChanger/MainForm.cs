@@ -13,7 +13,8 @@ namespace MacChanger
         private enum OperationKind
         {
             Apply,
-            Restore
+            Restore,
+            RenewIp
         }
 
         private sealed class OperationArgs
@@ -64,6 +65,7 @@ namespace MacChanger
             toolTip.SetToolTip(txtNewMac, "12자리 16진수. 구분자(-, :, .)는 있어도 되고 없어도 됩니다. 예: 02-1A-2B-3C-4D-5E");
             toolTip.SetToolTip(btnRandom, "무선 어댑터: 두 번째 자리 2/6/A/E, 그 외: 두 번째 자리 짝수, 나머지 11자리 0~F 무작위");
             toolTip.SetToolTip(btnApply, "확인 창 없이 바로 어댑터를 비활성화하고 NetworkAddress를 기록한 뒤(EnableDHCP = 1이면 Tcpip 값 자동 정리) 다시 활성화합니다.");
+            toolTip.SetToolTip(btnRenewIp, "MAC은 그대로 두고(NetworkAddress 유지) 어댑터를 비활성화 → Tcpip 값 자동 정리(EnableDHCP = 1이면) → 활성화하여 IP만 새로 받습니다.");
             toolTip.SetToolTip(btnRestore, "확인 창 없이 바로 NetworkAddress 값을 삭제하고(EnableDHCP = 1이면 Tcpip 값 자동 정리) 어댑터를 재시작하여 공장 MAC으로 되돌립니다.");
             toolTip.SetToolTip(chkIpLog, "켜 두면 새 IP가 할당될 때마다 로그 상자와 같은 줄을 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 추가합니다. 169.254.x.x 자동 사설 주소는 기록하지 않습니다.");
             toolTip.SetToolTip(chkLogTime, "로그 줄 맨 앞에 시각(yyyy-MM-dd HH:mm:ss)을 넣습니다.");
@@ -75,7 +77,7 @@ namespace MacChanger
             toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
             toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크한 뒤 '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
             toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~604800 = 최대 7일; 0이면 즉시). 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
-            toolTip.SetToolTip(nudIpInterval, "선택한 어댑터의 IP 구성을 다시 읽는 간격(밀리초, 100~2000; 기본 1000). 현재 IP 표시, 할당 IP 로그, 자동 변경의 IP 감지가 모두 이 주기로 돌아가며 바꾸면 바로 적용됩니다. 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
+            toolTip.SetToolTip(nudIpInterval, "선택한 어댑터의 IP 구성을 다시 읽는 간격(밀리초, 기본 1000). 위/아래 버튼은 100ms 단위로 100~2000, 직접 입력하면 1~2000ms 어떤 값이든 됩니다. 현재 IP 표시, 할당 IP 로그, 자동 변경의 IP 감지가 모두 이 주기로 돌아가며 바꾸면 바로 적용됩니다. 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
             toolTip.SetToolTip(btnAutoToggle, "자동 변경을 시작하거나 정지합니다. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 변경이 실패하거나 재부팅이 필요하면 스스로 정지합니다. 실행 중에는 정지와 로그 지우기 외의 버튼·체크박스·어댑터 선택·입력 칸이 잠깁니다.");
         }
 
@@ -211,6 +213,20 @@ namespace MacChanger
             {
                 return true;
             }
+        }
+
+        private void btnRenewIp_Click(object sender, EventArgs e)
+        {
+            NetworkAdapterInfo adapter = SelectedAdapter;
+            if (adapter == null)
+            {
+                SetStatus("실패", "어댑터를 선택하세요.");
+                return;
+            }
+            OperationArgs args = new OperationArgs();
+            args.Kind = OperationKind.RenewIp;
+            args.Adapter = adapter;
+            StartOperation(args);
         }
 
         private void chkIpLog_CheckedChanged(object sender, EventArgs e)
@@ -606,7 +622,7 @@ namespace MacChanger
                 btnAutoToggle.Text = "정지";
             }
             SetBusy(true);
-            SetStatus("진행", (args.Kind == OperationKind.Apply ? "MAC 변경" : "원상복구") + " 시작...");
+            SetStatus("진행", OperationLabel(args.Kind) + " 시작...");
             worker.RunWorkerAsync(args);
         }
 
@@ -615,9 +631,22 @@ namespace MacChanger
             OperationArgs args = (OperationArgs)e.Argument;
             BackgroundWorker w = (BackgroundWorker)sender;
             Action<string> log = delegate(string message) { w.ReportProgress(0, message); };
-            e.Result = args.Kind == OperationKind.Apply
-                ? MacChangeService.Apply(args.Adapter, args.NewMac, log)
-                : MacChangeService.Restore(args.Adapter, log);
+            switch (args.Kind)
+            {
+                case OperationKind.Apply: e.Result = MacChangeService.Apply(args.Adapter, args.NewMac, log); break;
+                case OperationKind.Restore: e.Result = MacChangeService.Restore(args.Adapter, log); break;
+                default: e.Result = MacChangeService.RenewIp(args.Adapter, log); break;
+            }
+        }
+
+        private static string OperationLabel(OperationKind kind)
+        {
+            switch (kind)
+            {
+                case OperationKind.Apply: return "MAC 변경";
+                case OperationKind.Restore: return "원상복구";
+                default: return "IP 갱신";
+            }
         }
 
         private void worker_ProgressChanged(object sender, ProgressChangedEventArgs e)
@@ -689,6 +718,7 @@ namespace MacChanger
             btnRandom.Enabled = idle;
             btnApply.Enabled = idle;
             btnRestore.Enabled = idle;
+            btnRenewIp.Enabled = idle;
             chkIpLog.Enabled = idle;
             txtNewMac.Enabled = idle;   // 실행 중 입력해도 다음 자동 변경이 덮어쓰므로 함께 잠근다 (포커스가 정지 버튼으로 튀는 것도 막는다)
             chkAuto.Enabled = !autoRunning;

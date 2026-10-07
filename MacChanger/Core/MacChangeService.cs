@@ -288,6 +288,38 @@ namespace MacChanger.Core
         /// Tcpip\Parameters의 DhcpDomain/DhcpNameServer를 삭제한다. EnableDHCP가 0(고정 IP)이거나 값/키가 없으면 건너뛴다.
         /// 실패해도 예외를 던지지 않고 경고 문자열을 돌려준다 (없으면 null).
         /// </summary>
+        /// <summary>
+        /// IP 갱신: NetworkAddress 는 그대로 두어 MAC 은 바꾸지 않고, 비활성화 → Tcpip 값 자동 정리(EnableDHCP = 1 인 경우) → 활성화로 IP 만 새로 받는다.
+        /// (원상복구가 이미 공장 MAC 인 어댑터에서 하던 일과 같다.)
+        /// </summary>
+        public static MacChangeResult RenewIp(NetworkAdapterInfo adapter, Action<string> log)
+        {
+            if (adapter == null) throw new ArgumentNullException("adapter");
+            MacChangeResult result = new MacChangeResult();
+
+            bool restarted, deferred, live;
+            string tcpipWarning, current;
+            MacChangeResult fail = RunCycle(adapter, log, "레지스트리 NetworkAddress 유지 (MAC 변경 없음)", "레지스트리 단계",
+                delegate { },
+                "네트워크 연결(ncpa.cpl)에서 어댑터를 수동으로 '사용'으로 바꾸세요.",
+                out restarted, out deferred, out tcpipWarning, out current, out live);
+            if (fail != null)
+            {
+                fail.AdapterRestarted = restarted;
+                return fail;
+            }
+            result.Success = true;
+            result.AdapterRestarted = restarted;
+            if (deferred)
+            {
+                result.RebootRequired = true;
+                result.Message = "장치 관리자가 어댑터를 즉시 재시작하지 못했습니다. 재부팅 후 IP가 새로 할당됩니다." + WarningSuffix(tcpipWarning);
+                return result;
+            }
+            result.Message = "IP 갱신 완료: 어댑터를 재시작했습니다. 현재 MAC(유지): " + MacAddressUtil.Format(current) + SourceNote(live) + WarningSuffix(tcpipWarning);
+            return result;
+        }
+
         private static string CleanTcpipIfDhcp(string guid, string stepLabel, bool adapterStillRunning, Action<string> log)
         {
             if (adapterStillRunning)

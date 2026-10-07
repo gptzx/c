@@ -76,6 +76,9 @@
     <Compile Include="TrafficGraph.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="IntervalUpDown.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
