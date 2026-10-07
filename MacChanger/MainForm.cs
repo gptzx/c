@@ -62,6 +62,7 @@ namespace MacChanger
                 Icon = handle != IntPtr.Zero ? Icon.FromHandle(handle) : Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             }
             catch (Exception) { }
+            notifyIcon.Icon = Icon;   // 백그라운드 실행 중 트레이에 같은 아이콘을 보여 준다
             toolTip.SetToolTip(txtNewMac, "12자리 16진수. 구분자(-, :, .)는 있어도 되고 없어도 됩니다. 예: 02-1A-2B-3C-4D-5E");
             toolTip.SetToolTip(btnRandom, "무선 어댑터: 두 번째 자리 2/6/A/E, 그 외: 두 번째 자리 짝수, 나머지 11자리 0~F 무작위");
             toolTip.SetToolTip(btnApply, "확인 창 없이 바로 어댑터를 비활성화하고 NetworkAddress를 기록한 뒤(EnableDHCP = 1이면 Tcpip 값 자동 정리) 다시 활성화합니다.");
@@ -75,6 +76,7 @@ namespace MacChanger
             toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다 (숨기면 그래프가 아래쪽 전체 폭을 씁니다). 숨겨진 동안에는 상자에 기록하지 않고, 켤 때 현재 IP가 마지막 줄과 다르면 한 줄 추가합니다.");
             toolTip.SetToolTip(trafficGraph, "선택한 어댑터의 송수신 속도 그래프 (빨강: 수신, 초록: 송신, 1초마다 갱신, 가로 2픽셀 = 1초). MAC 변경·원상복구·IP 갱신이 끝나면 그래프는 유지되고 누적 데이터 양만 0부터 다시 셉니다.");
             toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
+            toolTip.SetToolTip(btnBackground, "창을 숨기고 트레이(알림 영역) 아이콘만 남긴 채 백그라운드에서 계속 실행합니다. 자동 변경·그래프·로그는 그대로 동작하며, 트레이 아이콘을 두 번 클릭하거나 '열기'를 누르면 창이 다시 열립니다.");
             toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크한 뒤 '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
             toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~604800 = 최대 7일; 0이면 즉시). 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
             toolTip.SetToolTip(nudIpInterval, "선택한 어댑터의 IP 구성을 다시 읽는 간격(밀리초, 기본 1000). 위/아래 버튼은 100ms 단위로 100~2000, 직접 입력하면 1~2000ms 어떤 값이든 됩니다. 현재 IP 표시, 할당 IP 로그, 자동 변경의 IP 감지가 모두 이 주기로 돌아가며 바꾸면 바로 적용됩니다. 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
@@ -104,9 +106,40 @@ namespace MacChanger
         {
             if (busy && e.CloseReason == CloseReason.UserClosing)
             {
+                RestoreFromTray();
                 MessageBox.Show(this, "작업이 진행 중입니다. 완료될 때까지 기다려 주세요.", Program.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 e.Cancel = true;
             }
+        }
+
+        // ------------------------------------------------------------------
+        // 백그라운드 실행 (트레이)
+        // ------------------------------------------------------------------
+        private void btnBackground_Click(object sender, EventArgs e)
+        {
+            notifyIcon.Visible = true;
+            Hide();   // 타이머·자동 변경·그래프는 창이 숨겨져도 그대로 돈다
+            notifyIcon.ShowBalloonTip(3000, Program.AppTitle, "백그라운드에서 계속 실행 중입니다. 트레이 아이콘을 두 번 클릭하면 창이 다시 열립니다.", ToolTipIcon.Info);
+        }
+
+        private void trayOpen_Click(object sender, EventArgs e)
+        {
+            RestoreFromTray();
+        }
+
+        private void trayExit_Click(object sender, EventArgs e)
+        {
+            Close();
+        }
+
+        /// <summary>트레이로 숨겨져 있으면 창을 다시 보이고 앞으로 가져온다 (대화 상자를 띄우기 전에도 호출).</summary>
+        private void RestoreFromTray()
+        {
+            if (Visible) return;
+            Show();
+            WindowState = FormWindowState.Normal;
+            Activate();
+            notifyIcon.Visible = false;
         }
 
         private void btnRefresh_Click(object sender, EventArgs e)
@@ -683,6 +716,7 @@ namespace MacChanger
             RefreshSelectedAdapterInfo();
             SetStatus(finalState, finalMessage + (ipLogError != null ? " / " + ipLogError : ""));
 
+            if (result != null && (result.RebootRequired || finalState == "실패")) RestoreFromTray();   // 숨긴 채로 대화 상자를 띄우지 않는다
             if (result != null && result.RebootRequired)
             {
                 MessageBox.Show(this, result.Message + "\r\n\r\n지금 재부팅하거나, 장치 관리자에서 어댑터를 '사용 안 함' → '사용'으로 직접 재시작하세요.",
