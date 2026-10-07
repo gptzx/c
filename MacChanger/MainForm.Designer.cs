@@ -243,9 +243,9 @@
             // 
             this.btnRandom.Location = new System.Drawing.Point(314, 237);
             this.btnRandom.Name = "btnRandom";
-            this.btnRandom.Size = new System.Drawing.Size(90, 25);
+            this.btnRandom.Size = new System.Drawing.Size(110, 25);
             this.btnRandom.TabIndex = 11;
-            this.btnRandom.Text = "랜덤 MAC";
+            this.btnRandom.Text = "랜덤 MAC 주소";
             this.btnRandom.UseVisualStyleBackColor = true;
             this.btnRandom.Click += new System.EventHandler(this.btnRandom_Click);
             // 

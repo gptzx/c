@@ -11,7 +11,7 @@ Windows 7(.NET 4.0 설치됨) / 8 / 8.1 / 10 / 11에서 추가 런타임 설치 
 | 어댑터 열거 | `root\StandardCimv2\MSFT_NetAdapter` → 실패/빈 결과 시 `Win32_NetworkAdapter` → `GetAdaptersAddresses` 순으로 폴백. 드롭다운에 `[유선]/[무선]/[블루투스]/[기타]` 라벨 + 설명 + 현재 MAC 표시 (Windows 7의 `Win32_NetworkAdapter` 경로에서는 `GetAdaptersAddresses`의 IfType으로 무선 여부를 보강) |
 | 원래(공장) MAC | `\\.\{GUID}`에 `IOCTL_NDIS_QUERY_GLOBAL_STATS` + `OID_802_3_PERMANENT_ADDRESS`로 조회, 실패 시 열거 시점에 읽어 둔 `MSFT_NetAdapter.PermanentAddress`. 파일에 저장하지 않고 매번 조회 |
 | 현재 MAC | `OID_802_3_CURRENT_ADDRESS` → `GetAdaptersAddresses` → WMI 순으로 조회 |
-| 랜덤 MAC | 선택한 어댑터 종류에 따라 자동. **무선**: 12자리 중 왼쪽에서 두 번째 자리만 `2/6/A/E` 중 하나(`X2/X6/XA/XE-XX-XX-XX-XX-XX`), 나머지 11자리는 `0~F` 전부 무작위(첫 자리도 고정하지 않음). **유선/기타**: 두 번째 자리만 짝수(`0/2/4/6/8/A/C/E`), 나머지 11자리 `0~F`, `00-00-00-00-00-00`과 `FF-FF-FF-FF-FF-FF` 제외 |
+| 랜덤 MAC 주소 | 선택한 어댑터 종류에 따라 자동. **무선**: 12자리 중 왼쪽에서 두 번째 자리만 `2/6/A/E` 중 하나(`X2/X6/XA/XE-XX-XX-XX-XX-XX`), 나머지 11자리는 `0~F` 전부 무작위(첫 자리도 고정하지 않음). **유선/기타**: 두 번째 자리만 짝수(`0/2/4/6/8/A/C/E`), 나머지 11자리 `0~F`, `00-00-00-00-00-00`과 `FF-FF-FF-FF-FF-FF` 제외 |
 | 변경 적용 | 확인 대화 상자 없이 바로 실행. (a) SetupAPI `DICS_DISABLE`(실패 시 WMI `Disable()`) → (b) `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4D36E972-…}\00XX` 중 `NetCfgInstanceId`가 일치하는 키에 `NetworkAddress`(REG_SZ, 하이픈 없는 12자리) 기록 → (c) Tcpip 값 자동 정리(아래 참고) → (d) SetupAPI `DICS_ENABLE`(실패 시 WMI `Enable()` + 재시도) → NDIS에서 현재 MAC을 다시 읽어 검증 |
 | Tcpip 값 자동 정리 | `Tcpip\Parameters\Interfaces\{GUID}`의 `EnableDHCP`가 **1**이면 그 키의 값을 `EnableDHCP`만 남기고 모두 삭제(하위 키는 유지)하고, 전역 `HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters`의 `DhcpDomain`·`DhcpNameServer` 값도 삭제. `EnableDHCP`가 **0**(고정 IP)이거나 값이 없으면 아무것도 지우지 않음. 변경 적용·원상복구·IP 갱신 모두에서 수행 |
 | IP 갱신 | 확인 대화 상자 없이 바로 실행. MAC은 그대로 두고(`NetworkAddress` 유지) 어댑터 비활성화 → Tcpip 값 자동 정리 → 활성화로 IP만 새로 받음 (공장 MAC 상태에서 원상복구가 하던 일과 같음) |
@@ -45,7 +45,7 @@ MacChanger/
   app.manifest                         ← requireAdministrator, supportedOS(Win7~11), dpiAware
   app.ico                              ← 실행 파일/창 아이콘 (16·32·256)
   Program.cs                           ← 진입점, 관리자 권한 확인, 전역 예외 처리
-  MainForm.cs / MainForm.Designer.cs   ← UI (드롭다운, 원래/현재 MAC, 현재 IP·서브넷 마스크·기본 게이트웨이·DNS, 새 MAC, 랜덤 MAC, 변경 적용, 원상복구, IP 갱신, 로그 지우기, 백그라운드 실행(트레이), 자동 변경(지연 초, 시작/정지), IP 확인 주기(ms), 로그 옵션 6개, 상태 라벨, 할당 IP 로그 상자, 송수신 그래프)
+  MainForm.cs / MainForm.Designer.cs   ← UI (드롭다운, 원래/현재 MAC, 현재 IP·서브넷 마스크·기본 게이트웨이·DNS, 새 MAC, 랜덤 MAC 주소, 변경 적용, 원상복구, IP 갱신, 로그 지우기, 백그라운드 실행(트레이), 자동 변경(지연 초, 시작/정지), IP 확인 주기(ms), 로그 옵션 6개, 상태 라벨, 할당 IP 로그 상자, 송수신 그래프)
   TrafficGraph.cs                      ← TMAC 식 송수신 그래프 컨트롤 (수신 빨강 / 송신 초록 꺾은선 + 누적량·속도 네 줄)
   IntervalUpDown.cs                    ← IP 확인 주기 입력 칸 (버튼은 100ms 단위·100 이상, 직접 입력은 1ms 단위)
   Properties/AssemblyInfo.cs
@@ -100,7 +100,7 @@ VS 2017 이상의 MSBuild(Developer Command Prompt의 `msbuild`)에서는 같은
 
 1. `MacChanger.exe` 실행 → UAC 승격 확인.
 2. 드롭다운에서 어댑터 선택 → 원래(공장) MAC / 현재 MAC / 현재 IP·서브넷 마스크·기본 게이트웨이·DNS가 표시됩니다. IP 구성은 **IP 확인 주기**(기본 1000ms)마다 갱신되며, 밀리초 단위로 바꿀 수 있습니다.
-3. **랜덤 MAC**을 누르거나 새 MAC을 직접 입력합니다. (`02-1A-2B-3C-4D-5E`, `021A2B3C4D5E`, `02:1A:…` 모두 허용) 랜덤 생성은 선택한 어댑터가 무선이면 두 번째 자리를 2/6/A/E로, 무선이 아니면(유선/블루투스/기타) 짝수로 만듭니다.
+3. **랜덤 MAC 주소**를 누르거나 새 MAC을 직접 입력합니다. (`02-1A-2B-3C-4D-5E`, `021A2B3C4D5E`, `02:1A:…` 모두 허용) 랜덤 생성은 선택한 어댑터가 무선이면 두 번째 자리를 2/6/A/E로, 무선이 아니면(유선/블루투스/기타) 짝수로 만듭니다.
 4. **변경 적용** → 확인 창 없이 바로 어댑터가 재시작되며, 완료 후 현재 MAC과 IP가 갱신됩니다. 진행 단계와 결과는 상태 라벨에 표시됩니다.
 5. **원상복구** → 확인 창 없이 바로 `NetworkAddress` 값을 지우고(필요 시 Tcpip 값 정리) 어댑터를 재시작하여 공장 MAC으로 돌아갑니다. 현재 MAC이 이미 공장 MAC이고 레지스트리에 `NetworkAddress` 값도 없으면 "복구할 내용이 없습니다" 안내만 하고 아무것도 하지 않습니다. (자동 변경 실행 중에는 잠겨 있으니 먼저 **정지**를 누르세요.)
 6. **IP 갱신** → MAC은 바꾸지 않고 어댑터를 재시작(필요 시 Tcpip 값 정리)하여 IP만 새로 받습니다. 현재 MAC이 공장 MAC이든 바꾼 MAC이든 그대로 유지됩니다.
