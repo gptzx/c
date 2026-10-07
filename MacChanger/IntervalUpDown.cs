@@ -13,14 +13,13 @@ namespace MacChanger
 
         public override void UpButton()
         {
-            if (ReadOnly) return;
             decimal next = Value < ButtonMinimum ? ButtonMinimum : Value + Increment;   // 100 미만에서 올리면 먼저 100으로 맞춘다
             Value = next > Maximum ? Maximum : next;
         }
 
         public override void DownButton()
         {
-            if (ReadOnly || Value <= ButtonMinimum) return;   // 버튼으로는 ButtonMinimum 아래로 내려가지 않는다
+            if (Value <= ButtonMinimum) return;   // 버튼으로는 ButtonMinimum 아래로 내려가지 않는다
             decimal next = Value - Increment;
             Value = next < ButtonMinimum ? ButtonMinimum : next;
         }

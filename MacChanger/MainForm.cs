@@ -65,7 +65,7 @@ namespace MacChanger
             toolTip.SetToolTip(txtNewMac, "12자리 16진수. 구분자(-, :, .)는 있어도 되고 없어도 됩니다. 예: 02-1A-2B-3C-4D-5E");
             toolTip.SetToolTip(btnRandom, "무선 어댑터: 두 번째 자리 2/6/A/E, 그 외: 두 번째 자리 짝수, 나머지 11자리 0~F 무작위");
             toolTip.SetToolTip(btnApply, "확인 창 없이 바로 어댑터를 비활성화하고 NetworkAddress를 기록한 뒤(EnableDHCP = 1이면 Tcpip 값 자동 정리) 다시 활성화합니다.");
-            toolTip.SetToolTip(btnRenewIp, "MAC은 그대로 두고(NetworkAddress 유지) 어댑터를 비활성화 → Tcpip 값 자동 정리(EnableDHCP = 1이면) → 활성화하여 IP만 새로 받습니다.");
+            toolTip.SetToolTip(btnRenewIp, "확인 창 없이 바로 실행합니다. MAC은 그대로 두고(NetworkAddress 유지) 어댑터를 비활성화 → Tcpip 값 자동 정리(EnableDHCP = 1이면) → 활성화하여 IP만 새로 받습니다.");
             toolTip.SetToolTip(btnRestore, "확인 창 없이 바로 NetworkAddress 값을 삭제하고(EnableDHCP = 1이면 Tcpip 값 자동 정리) 어댑터를 재시작하여 공장 MAC으로 되돌립니다.");
             toolTip.SetToolTip(chkIpLog, "켜 두면 새 IP가 할당될 때마다 로그 상자와 같은 줄을 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 추가합니다. 169.254.x.x 자동 사설 주소는 기록하지 않습니다.");
             toolTip.SetToolTip(chkLogTime, "로그 줄 맨 앞에 시각(yyyy-MM-dd HH:mm:ss)을 넣습니다.");
@@ -73,7 +73,7 @@ namespace MacChanger
             toolTip.SetToolTip(chkLogGateway, "로그 줄에 기본 게이트웨이를 넣습니다 (없으면 \"(없음)\").");
             toolTip.SetToolTip(chkLogMac, "로그 줄 끝에 그때 사용 중인 MAC을 넣습니다.");
             toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다 (숨기면 그래프가 아래쪽 전체 폭을 씁니다). 숨겨진 동안에는 상자에 기록하지 않고, 켤 때 현재 IP가 마지막 줄과 다르면 한 줄 추가합니다.");
-            toolTip.SetToolTip(trafficGraph, "선택한 어댑터의 송수신 속도 그래프 (빨강: 수신, 초록: 송신, 1초마다 갱신, 가로 2픽셀 = 1초). MAC을 변경하면 그래프는 유지되고 누적 데이터 양만 0부터 다시 셉니다.");
+            toolTip.SetToolTip(trafficGraph, "선택한 어댑터의 송수신 속도 그래프 (빨강: 수신, 초록: 송신, 1초마다 갱신, 가로 2픽셀 = 1초). MAC 변경·원상복구·IP 갱신이 끝나면 그래프는 유지되고 누적 데이터 양만 0부터 다시 셉니다.");
             toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
             toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크한 뒤 '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
             toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~604800 = 최대 7일; 0이면 즉시). 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
@@ -672,7 +672,7 @@ namespace MacChanger
 
             // 어댑터가 실제로 중지되었다면 이후 받는 IP는 같은 값이라도 새 할당이므로 새 MAC과 함께 기록한다.
             if (result != null && result.AdapterRestarted) lastLoggedIp = null;
-            // MAC 변경/복구가 끝나면 그래프는 그대로 두고 누적 송수신량만 0부터 다시 센다 (TMAC 과 같은 동작).
+            // 작업(MAC 변경·원상복구·IP 갱신)이 끝나면 그래프는 그대로 두고 누적 송수신량만 0부터 다시 센다 (TMAC 과 같은 동작).
             if (result != null && result.Success)
             {
                 traffic.ResetTotals();

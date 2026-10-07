@@ -6,7 +6,7 @@ namespace MacChanger.Core
 {
     /// <summary>
     /// 선택한 어댑터의 송수신 바이트 카운터(iphlpapi GetIfEntry2, 64비트)를 주기적으로 읽어 속도(바이트/초)와 누적량을 계산한다.
-    /// 누적량은 어댑터를 선택한 시점(또는 MAC 변경 완료 시점)부터 0으로 세고, 어댑터 재시작으로 OS 카운터가 0부터 다시 시작하면 그때부터 센다.
+    /// 누적량은 어댑터를 선택한 시점(또는 MAC 변경·원상복구·IP 갱신 완료 시점)부터 0으로 세고, 어댑터 재시작으로 OS 카운터가 0부터 다시 시작하면 그때부터 센다.
     /// </summary>
     public sealed class TrafficMonitor
     {
@@ -41,7 +41,7 @@ namespace MacChanger.Core
             ReceivedTotal = SentTotal = ReceivedSpeed = SentSpeed = 0;
         }
 
-        /// <summary>누적 송수신량을 0으로 되돌린다 (MAC 변경 완료 시). 다음 샘플의 카운터 값이 새 기준이 된다.</summary>
+        /// <summary>누적 송수신량을 0으로 되돌린다 (MAC 변경·원상복구·IP 갱신 완료 시). 다음 샘플의 카운터 값이 새 기준이 된다.</summary>
         public void ResetTotals()
         {
             hasBase = false;
