@@ -80,7 +80,7 @@ namespace MacChanger
             toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크한 뒤 '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
             toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~604800 = 최대 7일; 0이면 즉시). 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
             toolTip.SetToolTip(nudIpInterval, "선택한 어댑터의 IP 구성을 다시 읽는 간격(밀리초, 기본 1000). 위/아래 버튼은 100ms 단위로 100~2000, 직접 입력하면 1~2000ms 어떤 값이든 됩니다. 현재 IP 표시, 할당 IP 로그, 자동 변경의 IP 감지가 모두 이 주기로 돌아가며 바꾸면 바로 적용됩니다. 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
-            toolTip.SetToolTip(btnAutoToggle, "자동 변경을 시작하거나 정지합니다. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 변경이 실패하거나 재부팅이 필요하면 스스로 정지합니다. 실행 중에는 정지와 로그 지우기 외의 버튼·체크박스·어댑터 선택·입력 칸이 잠깁니다.");
+            toolTip.SetToolTip(btnAutoToggle, "자동 변경을 시작하거나 정지합니다. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 변경이 실패하거나 재부팅이 필요하면 스스로 정지합니다. 실행 중에는 정지·로그 지우기·백그라운드 실행 외의 버튼·체크박스·어댑터 선택·입력 칸이 잠깁니다.");
         }
 
         private NetworkAdapterInfo SelectedAdapter
@@ -296,7 +296,7 @@ namespace MacChanger
         private void StartAuto()
         {
             autoRunning = true;
-            UpdateControlStates();   // 실행 중에는 정지·로그 지우기 외의 조작을 잠근다
+            UpdateControlStates();   // 실행 중에는 정지·로그 지우기·백그라운드 실행 외의 조작을 잠근다
             btnAutoToggle.Text = "정지 (IP 대기)";
             if (!busy) SetStatus("준비", "자동 변경 시작: IP 할당 후 " + nudAutoDelay.Value + "초 뒤 새 MAC을 적용합니다.");
             ScheduleAuto();   // 이미 IP가 할당되어 있으면 지금부터 센다
@@ -716,7 +716,7 @@ namespace MacChanger
             RefreshSelectedAdapterInfo();
             SetStatus(finalState, finalMessage + (ipLogError != null ? " / " + ipLogError : ""));
 
-            if (result != null && (result.RebootRequired || finalState == "실패")) RestoreFromTray();   // 숨긴 채로 대화 상자를 띄우지 않는다
+            if (finalState == "실패" || (result != null && result.RebootRequired)) RestoreFromTray();   // 숨긴 채로 대화 상자를 띄우지 않는다
             if (result != null && result.RebootRequired)
             {
                 MessageBox.Show(this, result.Message + "\r\n\r\n지금 재부팅하거나, 장치 관리자에서 어댑터를 '사용 안 함' → '사용'으로 직접 재시작하세요.",
@@ -742,7 +742,7 @@ namespace MacChanger
 
         /// <summary>
         /// 작업 중(busy)과 자동 변경 실행 중(autoRunning)에 맞춰 컨트롤 사용 가능 여부를 한곳에서 맞춘다.
-        /// 자동 변경 실행 중에는 정지(btnAutoToggle)와 로그 지우기(로그 상자 표시 여부를 따름) 외의 버튼·체크박스·어댑터 선택·입력 칸을 모두 잠근다.
+        /// 자동 변경 실행 중에는 정지(btnAutoToggle), 로그 지우기(로그 상자 표시 여부를 따름), 백그라운드 실행 외의 버튼·체크박스·어댑터 선택·입력 칸을 모두 잠근다.
         /// </summary>
         private void UpdateControlStates()
         {

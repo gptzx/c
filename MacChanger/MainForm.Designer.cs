@@ -296,7 +296,7 @@
             this.btnBackground.Location = new System.Drawing.Point(440, 406);
             this.btnBackground.Name = "btnBackground";
             this.btnBackground.Size = new System.Drawing.Size(108, 25);
-            this.btnBackground.TabIndex = 26;
+            this.btnBackground.TabIndex = 32;
             this.btnBackground.Text = "백그라운드 실행";
             this.btnBackground.UseVisualStyleBackColor = true;
             this.btnBackground.Click += new System.EventHandler(this.btnBackground_Click);

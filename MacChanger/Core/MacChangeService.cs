@@ -388,7 +388,7 @@ namespace MacChanger.Core
             {
                 sb.AppendLine("무선 어댑터는 드라이버/OS 제약으로 두 번째 자리가 2/6/A/E(유니캐스트·로컬 관리 주소)가 아니면 변경이 무시될 수 있습니다.");
                 if (!MacAddressUtil.IsLocallyAdministered(mac))
-                    sb.AppendLine("무선 어댑터를 선택한 상태에서 '랜덤 생성'을 눌러 두 번째 자리가 2/6/A/E인 주소(X2/X6/XA/XE-XX-XX-XX-XX-XX)를 만든 뒤 다시 적용해 보세요.");
+                    sb.AppendLine("무선 어댑터를 선택한 상태에서 '랜덤 MAC 주소'를 눌러 두 번째 자리가 2/6/A/E인 주소(X2/X6/XA/XE-XX-XX-XX-XX-XX)를 만든 뒤 다시 적용해 보세요.");
                 if (SafeRandomMacState(adapter.InterfaceGuid) == true)
                     sb.AppendLine("이 Wi-Fi 인터페이스에 '임의 하드웨어 주소'가 켜져 있습니다. 설정 > 네트워크 및 인터넷 > Wi-Fi에서 끄고 다시 시도하세요.");
                 else
