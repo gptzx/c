@@ -85,7 +85,7 @@ namespace MacChanger
             toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크한 뒤 '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
             toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~604800 = 최대 7일; 0이면 즉시). 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
             toolTip.SetToolTip(nudIpInterval, "선택한 어댑터의 IP 구성을 다시 읽는 간격(밀리초, 기본 1000). 위/아래 버튼은 100ms 단위로 100~2000, 직접 입력하면 1~2000ms 어떤 값이든 됩니다. 현재 IP 표시, 할당 IP 로그, 자동 변경의 IP 감지가 모두 이 주기로 돌아가며 바꾸면 바로 적용됩니다. 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
-            toolTip.SetToolTip(btnAutoToggle, "자동 변경을 시작하거나 정지합니다. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 변경이 실패하거나 재부팅이 필요하면 스스로 정지합니다. 실행 중에는 정지·로그 지우기·백그라운드 실행 외의 버튼·체크박스·어댑터 선택·입력 칸이 잠깁니다.");
+            toolTip.SetToolTip(btnAutoToggle, "자동 변경을 시작하거나 정지합니다. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 변경이 실패하거나 재부팅이 필요하면, 또는 '지정 IP 할당 시 자동 정지'에 적은 IP가 할당되면 스스로 정지합니다. 실행 중에는 정지·로그 지우기·백그라운드 실행 외의 버튼·체크박스·어댑터 선택·입력 칸이 잠깁니다.");
         }
 
         private NetworkAdapterInfo SelectedAdapter
@@ -310,6 +310,7 @@ namespace MacChanger
             UpdateControlStates();   // 실행 중에는 정지·로그 지우기·백그라운드 실행 외의 조작을 잠근다
             btnAutoToggle.Text = "정지 (IP 대기)";
             if (!busy) SetStatus("준비", "자동 변경 시작: IP 할당 후 " + nudAutoDelay.Value + "초 뒤 새 MAC을 적용합니다.");
+            if (AutoStopIfTargetAssigned(lastLoggedIp)) return;   // 지정 IP가 이미 할당되어 있으면 바꾸지 않고 바로 정지
             ScheduleAuto();   // 이미 IP가 할당되어 있으면 지금부터 센다
             RunAutoIfDue();   // 바로 남은 시간을 보여주고, 0초면 즉시 시작
         }
@@ -356,6 +357,7 @@ namespace MacChanger
                 btnAutoToggle.Text = "정지 (" + FormatRemaining((remainingMs + 999) / 1000) + ")";
                 return;
             }
+            if (AutoStopIfTargetAssigned(lastLoggedIp)) return;   // 변경 직전 마지막 확인: 지정 IP가 할당되어 있으면 바꾸지 않는다
             autoPending = false;
             btnAutoToggle.Text = "정지";
             NetworkAdapterInfo adapter = SelectedAdapter;
@@ -379,14 +381,40 @@ namespace MacChanger
             StartOperation(args);
         }
 
-        /// <summary>자동 정지 대상 IP 입력값을 IPv4(점 네 개) 형식으로 읽는다. 비었거나 형식이 틀리면 null.</summary>
+        /// <summary>
+        /// 자동 정지 대상 IP 입력값을 10진수 IPv4(점 네 개, 각 0~255)로 읽어 표준 표기(앞자리 0 제거)로 돌려준다. 비었거나 형식이 틀리면 null.
+        /// IPAddress.TryParse 는 앞자리 0을 8진수(010 → 8), 0x 를 16진수로 읽으므로 쓰지 않는다.
+        /// </summary>
         private string ParseStopIp()
         {
-            string text = txtAutoStopIp.Text.Trim();
-            System.Net.IPAddress address;
-            if (text.Split('.').Length != 4 || !System.Net.IPAddress.TryParse(text, out address)
-                || address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork) return null;
-            return address.ToString();
+            string[] parts = txtAutoStopIp.Text.Trim().Split('.');
+            if (parts.Length != 4) return null;
+            int[] octets = new int[4];
+            for (int i = 0; i < 4; i++)
+            {
+                string part = parts[i];
+                if (part.Length == 0 || part.Length > 3) return null;
+                int value = 0;
+                foreach (char c in part)
+                {
+                    if (c < '0' || c > '9') return null;
+                    value = value * 10 + (c - '0');
+                }
+                if (value > 255) return null;
+                octets[i] = value;
+            }
+            return octets[0] + "." + octets[1] + "." + octets[2] + "." + octets[3];
+        }
+
+        /// <summary>자동 변경 중 "지정 IP 할당 시 자동 정지"의 IP가 할당 목록에 있으면 자동 변경을 정지한다. 정지했으면 true.</summary>
+        private bool AutoStopIfTargetAssigned(string assignedIps)
+        {
+            if (busy || !autoRunning || !chkAutoStopIp.Checked || string.IsNullOrEmpty(assignedIps)) return false;
+            string stopIp = ParseStopIp();
+            if (stopIp == null || !ContainsIp(assignedIps, stopIp)) return false;
+            StopAuto();
+            SetStatus("완료", "지정한 IP " + stopIp + " 가 할당되어 자동 변경을 정지했습니다.");
+            return true;
         }
 
         /// <summary>쉼표로 구분된 IP 목록에 ip 가 정확히 들어 있는지.</summary>
@@ -661,15 +689,7 @@ namespace MacChanger
                 return;
             }
             // 지정 IP 자동 정지: 자동 변경 중 대상 IP가 할당되면 바로 멈춘다 (로그 중복 판정과 상관없이 매번 확인, IP 줄은 아래에서 평소처럼 기록)
-            if (!busy && autoRunning && chkAutoStopIp.Checked)
-            {
-                string stopIp = ParseStopIp();
-                if (stopIp != null && ContainsIp(assigned, stopIp))
-                {
-                    StopAuto();
-                    SetStatus("완료", "지정한 IP " + stopIp + " 가 할당되어 자동 변경을 정지했습니다.");
-                }
-            }
+            AutoStopIfTargetAssigned(assigned);
             // 작업 중(busy)에는 기록하지 않는다: 어댑터가 올라온 직후의 IP는 작업 완료 후 새 MAC과 함께 기록된다.
             if (busy || assigned == lastLoggedIp) return;
 
@@ -753,7 +773,9 @@ namespace MacChanger
             }
 
             // 변경/복구 후 현재 MAC/IP를 다시 읽어 UI를 갱신한 뒤, 작업 결과 상태를 최종적으로 표시한다.
-            RefreshSelectedAdapterInfo();
+            bool autoBefore = autoRunning;   // 실패/재부팅으로 위에서 이미 정지했다면 false
+            RefreshSelectedAdapterInfo();    // 새 IP가 지정 IP면 여기서 자동 변경이 정지된다
+            if (autoBefore && !autoRunning) finalMessage += " 지정한 IP " + ParseStopIp() + " 가 할당되어 자동 변경을 정지했습니다.";
             SetStatus(finalState, finalMessage + (ipLogError != null ? " / " + ipLogError : ""));
 
             if (finalState == "실패" || (result != null && result.RebootRequired)) RestoreFromTray();   // 숨긴 채로 대화 상자를 띄우지 않는다

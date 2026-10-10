@@ -176,13 +176,10 @@ namespace MacChanger.Core
         }
 
         /// <summary>
-        /// Tcpip\Parameters\Interfaces\{GUID} 키에서 EnableDHCP를 제외한 모든 값(value)을 삭제한다. 하위 키는 건드리지 않는다.
-        /// 키가 없으면 아무것도 하지 않는다. 삭제되지 않은 값이 있으면 예외.
-        /// </summary>
-        /// <summary>
-        /// 인터페이스 Tcpip 키의 값을 정리한다. EnableDHCP 는 항상 남긴다.
+        /// Tcpip\Parameters\Interfaces\{GUID} 키의 값을 정리한다. EnableDHCP 는 항상 남긴다.
         /// NameServer 에 값 데이터가 있고 resetDns 가 false 면 NameServer 도 함께 남기고,
-        /// 값이 비어 있거나 항목이 없거나 resetDns 가 true 면 NameServer 도 지운다. NameServer 를 남겼으면 true.
+        /// 값이 비어 있거나 항목이 없거나 resetDns 가 true 면 NameServer 도 지운다. 하위 키는 건드리지 않는다.
+        /// NameServer 를 남겼으면 true, 키가 없으면 false. 삭제되지 않은 값이 있으면 예외.
         /// </summary>
         public static bool CleanTcpipInterfaceValues(string interfaceGuid, bool resetDns)
         {

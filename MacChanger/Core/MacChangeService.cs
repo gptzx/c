@@ -320,8 +320,8 @@ namespace MacChanger.Core
         // ------------------------------------------------------------------
 
         /// <summary>
-        /// Tcpip 값 자동 정리. 인터페이스 키의 EnableDHCP가 1이면 그 키의 값(EnableDHCP 제외)과 전역
-        /// Tcpip\Parameters의 DhcpDomain/DhcpNameServer를 삭제한다. EnableDHCP가 0(고정 IP)이거나 값/키가 없으면 건너뛴다.
+        /// Tcpip 값 자동 정리. 인터페이스 키의 EnableDHCP가 1이면 그 키의 값(EnableDHCP 는 항상, NameServer 는 값이 있고
+        /// resetDns 가 false 면 남김)과 전역 Tcpip\Parameters의 DhcpDomain/DhcpNameServer를 삭제한다. EnableDHCP가 0(고정 IP)이거나 값/키가 없으면 건너뛴다.
         /// 실패해도 예외를 던지지 않고 경고 문자열을 돌려준다 (없으면 null).
         /// </summary>
         private static string CleanTcpipIfDhcp(string guid, string stepLabel, bool adapterStillRunning, bool resetDns, Action<string> log)
