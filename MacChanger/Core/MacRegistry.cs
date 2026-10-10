@@ -24,6 +24,7 @@ namespace MacChanger.Core
         public const string NetCfgInstanceIdValueName = "NetCfgInstanceId";
         public const string NetworkAddressValueName = "NetworkAddress";
         public const string EnableDhcpValueName = "EnableDHCP";
+        public const string NameServerValueName = "NameServer";
         public const string RandomMacStateValueName = "RandomMacState";
 
         private static RegistryKey OpenHklm64()
@@ -178,16 +179,24 @@ namespace MacChanger.Core
         /// Tcpip\Parameters\Interfaces\{GUID} 키에서 EnableDHCP를 제외한 모든 값(value)을 삭제한다. 하위 키는 건드리지 않는다.
         /// 키가 없으면 아무것도 하지 않는다. 삭제되지 않은 값이 있으면 예외.
         /// </summary>
-        public static void CleanTcpipInterfaceValues(string interfaceGuid)
+        /// <summary>
+        /// 인터페이스 Tcpip 키의 값을 정리한다. EnableDHCP 는 항상 남긴다.
+        /// NameServer 에 값 데이터가 있고 resetDns 가 false 면 NameServer 도 함께 남기고,
+        /// 값이 비어 있거나 항목이 없거나 resetDns 가 true 면 NameServer 도 지운다. NameServer 를 남겼으면 true.
+        /// </summary>
+        public static bool CleanTcpipInterfaceValues(string interfaceGuid, bool resetDns)
         {
             List<string> failed = new List<string>();
+            bool keepNameServer;
             using (RegistryKey hklm = OpenHklm64())
             using (RegistryKey key = hklm.OpenSubKey(TcpipInterfacesKeyPath + "\\" + interfaceGuid, true))
             {
-                if (key == null) return;
+                if (key == null) return false;
+                keepNameServer = !resetDns && HasData(key.GetValue(NameServerValueName));
                 foreach (string valueName in key.GetValueNames())
                 {
                     if (string.Equals(valueName, EnableDhcpValueName, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (keepNameServer && string.Equals(valueName, NameServerValueName, StringComparison.OrdinalIgnoreCase)) continue;
                     key.DeleteValue(valueName, false);
                     if (key.GetValue(valueName) != null) failed.Add(valueName.Length == 0 ? "(기본값)" : valueName);
                 }
@@ -195,6 +204,25 @@ namespace MacChanger.Core
             }
             if (failed.Count > 0)
                 throw new InvalidOperationException("삭제되지 않은 값: " + string.Join(", ", failed.ToArray()));
+            return keepNameServer;
+        }
+
+        /// <summary>레지스트리 값에 실제 데이터가 있는지 (null, 빈 문자열, 공백뿐인 문자열, 빈 배열은 데이터 없음).</summary>
+        public static bool HasData(object value)
+        {
+            if (value == null) return false;
+            string text = value as string;
+            if (text != null) return text.Trim().Length > 0;
+            string[] multi = value as string[];
+            if (multi != null)
+            {
+                foreach (string item in multi)
+                    if (item != null && item.Trim().Length > 0) return true;
+                return false;
+            }
+            byte[] bytes = value as byte[];
+            if (bytes != null) return bytes.Length > 0;
+            return true;   // DWORD/QWORD 같은 숫자 값은 존재 자체가 데이터
         }
 
         /// <summary>

@@ -22,6 +22,8 @@ namespace MacChanger
             public OperationKind Kind;
             public NetworkAdapterInfo Adapter;
             public string NewMac;
+            /// <summary>Tcpip 값 정리 때 NameServer 에 값이 있어도 지울지 (DNS 초기화 옵션, UI 스레드에서 작업 시작 시 읽어 둔다)</summary>
+            public bool ResetDns;
         }
 
         private bool busy;
@@ -76,6 +78,9 @@ namespace MacChanger
             toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다 (숨기면 그래프가 아래쪽 전체 폭을 씁니다). 숨겨진 동안에는 상자에 기록하지 않고, 켤 때 현재 IP가 마지막 줄과 다르면 한 줄 추가합니다.");
             toolTip.SetToolTip(trafficGraph, "선택한 어댑터의 송수신 속도 그래프 (빨강: 수신, 초록: 송신, 1초마다 갱신, 가로 2픽셀 = 1초). MAC 변경·원상복구·IP 갱신이 끝나면 그래프는 유지되고 누적 데이터 양만 0부터 다시 셉니다.");
             toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
+            toolTip.SetToolTip(chkResetDns, "변경 적용·원상복구·IP 갱신 때 Tcpip 값을 정리하면서 직접 지정한 DNS(NameServer)도 지웁니다. 끄면 NameServer 에 값이 있을 때 EnableDHCP 와 함께 남깁니다.");
+            toolTip.SetToolTip(chkAutoStopIp, "자동 변경 중 오른쪽 칸에 적은 IP가 할당되면 자동 변경을 스스로 정지합니다.");
+            toolTip.SetToolTip(txtAutoStopIp, "자동 정지할 IPv4 주소 (예: 123.123.123.123). 자동 변경이 실행 중일 때는 바꿀 수 없습니다.");
             toolTip.SetToolTip(btnBackground, "창을 숨기고 트레이(알림 영역) 아이콘만 남긴 채 백그라운드에서 계속 실행합니다. 자동 변경·그래프·로그는 그대로 동작하며, 트레이 아이콘을 두 번 클릭하거나 '열기'를 누르면 창이 다시 열립니다.");
             toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크한 뒤 '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
             toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~604800 = 최대 7일; 0이면 즉시). 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
@@ -295,6 +300,12 @@ namespace MacChanger
 
         private void StartAuto()
         {
+            if (chkAutoStopIp.Checked && ParseStopIp() == null)
+            {
+                SetStatus("실패", "자동 정지할 IP 주소 형식이 올바르지 않습니다 (예: 123.123.123.123). 고친 뒤 다시 시작하세요.");
+                txtAutoStopIp.Focus();
+                return;
+            }
             autoRunning = true;
             UpdateControlStates();   // 실행 중에는 정지·로그 지우기·백그라운드 실행 외의 조작을 잠근다
             btnAutoToggle.Text = "정지 (IP 대기)";
@@ -366,6 +377,24 @@ namespace MacChanger
             args.Adapter = adapter;
             args.NewMac = mac;
             StartOperation(args);
+        }
+
+        /// <summary>자동 정지 대상 IP 입력값을 IPv4(점 네 개) 형식으로 읽는다. 비었거나 형식이 틀리면 null.</summary>
+        private string ParseStopIp()
+        {
+            string text = txtAutoStopIp.Text.Trim();
+            System.Net.IPAddress address;
+            if (text.Split('.').Length != 4 || !System.Net.IPAddress.TryParse(text, out address)
+                || address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork) return null;
+            return address.ToString();
+        }
+
+        /// <summary>쉼표로 구분된 IP 목록에 ip 가 정확히 들어 있는지.</summary>
+        private static bool ContainsIp(string ipList, string ip)
+        {
+            foreach (string item in ipList.Split(','))
+                if (item.Trim() == ip) return true;
+            return false;
         }
 
         /// <summary>남은 시간 표시: 1시간 미만 "N초", 하루 미만 "H:MM:SS", 그 이상 "D일 H:MM:SS"</summary>
@@ -631,6 +660,16 @@ namespace MacChanger
                 CancelAuto();   // 임대가 빠져 169.254 만 남은 동안은 변경하지 않는다 (기준 IP 는 유지 — 같은 IP가 돌아오면 중복 기록하지 않음)
                 return;
             }
+            // 지정 IP 자동 정지: 자동 변경 중 대상 IP가 할당되면 바로 멈춘다 (로그 중복 판정과 상관없이 매번 확인, IP 줄은 아래에서 평소처럼 기록)
+            if (!busy && autoRunning && chkAutoStopIp.Checked)
+            {
+                string stopIp = ParseStopIp();
+                if (stopIp != null && ContainsIp(assigned, stopIp))
+                {
+                    StopAuto();
+                    SetStatus("완료", "지정한 IP " + stopIp + " 가 할당되어 자동 변경을 정지했습니다.");
+                }
+            }
             // 작업 중(busy)에는 기록하지 않는다: 어댑터가 올라온 직후의 IP는 작업 완료 후 새 MAC과 함께 기록된다.
             if (busy || assigned == lastLoggedIp) return;
 
@@ -654,6 +693,7 @@ namespace MacChanger
                 autoPending = false;   // 작업이 끝나면 새 IP 할당 시점부터 다시 센다
                 btnAutoToggle.Text = "정지";
             }
+            args.ResetDns = chkResetDns.Checked;
             SetBusy(true);
             SetStatus("진행", OperationLabel(args.Kind) + " 시작...");
             worker.RunWorkerAsync(args);
@@ -666,9 +706,9 @@ namespace MacChanger
             Action<string> log = delegate(string message) { w.ReportProgress(0, message); };
             switch (args.Kind)
             {
-                case OperationKind.Apply: e.Result = MacChangeService.Apply(args.Adapter, args.NewMac, log); break;
-                case OperationKind.Restore: e.Result = MacChangeService.Restore(args.Adapter, log); break;
-                default: e.Result = MacChangeService.RenewIp(args.Adapter, log); break;
+                case OperationKind.Apply: e.Result = MacChangeService.Apply(args.Adapter, args.NewMac, args.ResetDns, log); break;
+                case OperationKind.Restore: e.Result = MacChangeService.Restore(args.Adapter, args.ResetDns, log); break;
+                default: e.Result = MacChangeService.RenewIp(args.Adapter, args.ResetDns, log); break;
             }
         }
 
@@ -763,6 +803,9 @@ namespace MacChanger
             chkShowLog.Enabled = !autoRunning;
             nudAutoDelay.Enabled = !autoRunning;
             nudIpInterval.Enabled = !autoRunning;
+            chkAutoStopIp.Enabled = !autoRunning;
+            txtAutoStopIp.Enabled = !autoRunning;
+            chkResetDns.Enabled = !autoRunning;
             UseWaitCursor = busy;
         }
 
