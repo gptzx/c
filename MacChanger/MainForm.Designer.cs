@@ -52,7 +52,7 @@
             this.txtAutoStopIp = new System.Windows.Forms.TextBox();
             this.chkResetDns = new System.Windows.Forms.CheckBox();
             this.lblWait = new System.Windows.Forms.Label();
-            this.chkWaitTimeout = new System.Windows.Forms.CheckBox();
+            this.lblWaitPrefix = new System.Windows.Forms.Label();
             this.nudWaitTimeout = new System.Windows.Forms.NumericUpDown();
             this.lblWaitSuffix = new System.Windows.Forms.Label();
             this.lblLogOptions = new System.Windows.Forms.Label();
@@ -359,6 +359,7 @@
             // 
             // nudAutoDelay
             // 
+            this.nudAutoDelay.Enabled = false;
             this.nudAutoDelay.Location = new System.Drawing.Point(210, 293);
             this.nudAutoDelay.Maximum = new decimal(new int[] { 604800, 0, 0, 0 });
             this.nudAutoDelay.Name = "nudAutoDelay";
@@ -438,21 +439,19 @@
             this.lblWait.TabIndex = 28;
             this.lblWait.Text = "할당 대기:";
             // 
-            // chkWaitTimeout
+            // lblWaitPrefix
             // 
-            this.chkWaitTimeout.AutoSize = true;
-            this.chkWaitTimeout.Location = new System.Drawing.Point(118, 326);
-            this.chkWaitTimeout.Name = "chkWaitTimeout";
-            this.chkWaitTimeout.Size = new System.Drawing.Size(105, 19);
-            this.chkWaitTimeout.TabIndex = 29;
-            this.chkWaitTimeout.Text = "IP 할당 대기가";
-            this.chkWaitTimeout.UseVisualStyleBackColor = true;
-            this.chkWaitTimeout.CheckedChanged += new System.EventHandler(this.autoOption_CheckedChanged);
+            this.lblWaitPrefix.AutoSize = true;
+            this.lblWaitPrefix.Location = new System.Drawing.Point(118, 328);
+            this.lblWaitPrefix.Name = "lblWaitPrefix";
+            this.lblWaitPrefix.Size = new System.Drawing.Size(86, 15);
+            this.lblWaitPrefix.TabIndex = 29;
+            this.lblWaitPrefix.Text = "IP 할당 대기가";
             // 
             // nudWaitTimeout
             // 
             this.nudWaitTimeout.Enabled = false;
-            this.nudWaitTimeout.Location = new System.Drawing.Point(232, 324);
+            this.nudWaitTimeout.Location = new System.Drawing.Point(210, 324);
             this.nudWaitTimeout.Maximum = new decimal(new int[] { 60, 0, 0, 0 });
             this.nudWaitTimeout.Minimum = new decimal(new int[] { 10, 0, 0, 0 });
             this.nudWaitTimeout.Name = "nudWaitTimeout";
@@ -464,7 +463,7 @@
             // lblWaitSuffix
             // 
             this.lblWaitSuffix.AutoSize = true;
-            this.lblWaitSuffix.Location = new System.Drawing.Point(298, 328);
+            this.lblWaitSuffix.Location = new System.Drawing.Point(276, 328);
             this.lblWaitSuffix.Name = "lblWaitSuffix";
             this.lblWaitSuffix.Size = new System.Drawing.Size(150, 15);
             this.lblWaitSuffix.TabIndex = 31;
@@ -479,7 +478,7 @@
             this.chkAutoStopIp.TabIndex = 35;
             this.chkAutoStopIp.Text = "지정 IP 할당 시 자동 정지";
             this.chkAutoStopIp.UseVisualStyleBackColor = true;
-            this.chkAutoStopIp.CheckedChanged += new System.EventHandler(this.autoOption_CheckedChanged);
+            this.chkAutoStopIp.CheckedChanged += new System.EventHandler(this.chkAutoStopIp_CheckedChanged);
             // 
             // txtAutoStopIp
             // 
@@ -629,7 +628,7 @@
             this.Controls.Add(this.chkResetDns);
             this.Controls.Add(this.lblWaitSuffix);
             this.Controls.Add(this.nudWaitTimeout);
-            this.Controls.Add(this.chkWaitTimeout);
+            this.Controls.Add(this.lblWaitPrefix);
             this.Controls.Add(this.lblWait);
             this.Controls.Add(this.txtAutoStopIp);
             this.Controls.Add(this.chkAutoStopIp);
@@ -721,7 +720,7 @@
         private System.Windows.Forms.TextBox txtAutoStopIp;
         private System.Windows.Forms.CheckBox chkResetDns;
         private System.Windows.Forms.Label lblWait;
-        private System.Windows.Forms.CheckBox chkWaitTimeout;
+        private System.Windows.Forms.Label lblWaitPrefix;
         private System.Windows.Forms.NumericUpDown nudWaitTimeout;
         private System.Windows.Forms.Label lblWaitSuffix;
         private System.Windows.Forms.Label lblLogOptions;

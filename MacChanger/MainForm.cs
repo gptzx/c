@@ -88,15 +88,14 @@ namespace MacChanger
             toolTip.SetToolTip(trafficGraph, "선택한 어댑터의 송수신 속도 그래프 (빨강: 수신, 초록: 송신, 1초마다 갱신, 가로 2픽셀 = 1초). MAC 변경·원상복구·IP 갱신이 끝나면 그래프는 유지되고 누적 데이터 양만 0부터 다시 셉니다.");
             toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
             toolTip.SetToolTip(chkResetDns, "변경 적용·원상복구·IP 갱신 때 Tcpip 값을 정리하면서 직접 지정한 DNS(NameServer)도 지웁니다. 끄면 NameServer 에 값이 있을 때 EnableDHCP 와 함께 남깁니다.");
-            toolTip.SetToolTip(chkAutoStopIp, "자동 변경 중 오른쪽 칸에 적은 IP 또는 대역에 속하는 IP가 할당되면 자동 변경을 스스로 정지합니다. 체크해야 입력 칸이 열립니다.");
+            toolTip.SetToolTip(chkAutoStopIp, "자동 변경 중 오른쪽 칸에 적은 IP 또는 대역에 속하는 IP가 할당되면 자동 변경을 스스로 정지합니다. 체크해야 입력 칸이 열리고, 체크를 풀면 입력한 값은 지워집니다.");
             toolTip.SetToolTip(txtAutoStopIp, "정지할 IP 또는 대역. 123 → 123.0.0.0~123.255.255.255, 123.123 → 123.123.0.0/16, 123.123.123 → 123.123.123.0/24, 123.123.123.123 → 그 주소만. 자동 변경이 실행 중일 때는 바꿀 수 없습니다.");
-            toolTip.SetToolTip(chkWaitTimeout, "자동 변경 중 어댑터가 올라와 있는데도 IP를 받지 못하는(할당 대기 중 / 자동 사설 주소) 상태가 오른쪽 초를 넘기면 새 랜덤 MAC을 적용합니다. IP를 받을 때까지 반복합니다.");
-            toolTip.SetToolTip(nudWaitTimeout, "IP 할당 대기를 얼마나 기다릴지(초, 10~60). 자동 변경이 실행 중일 때는 바꿀 수 없습니다.");
+            toolTip.SetToolTip(nudWaitTimeout, "자동 변경 중 어댑터가 올라와 있는데도 IP를 받지 못하는(할당 대기 중 / 자동 사설 주소) 상태가 이 초(10~60)를 넘기면 새 랜덤 MAC을 적용합니다. IP를 받을 때까지 반복합니다. 자동 변경을 체크해야 바꿀 수 있고 실행 중에는 잠깁니다.");
             toolTip.SetToolTip(btnBackground, "창을 숨기고 트레이(알림 영역) 아이콘만 남긴 채 백그라운드에서 계속 실행합니다. 자동 변경·그래프·로그는 그대로 동작하며, 트레이 아이콘을 두 번 클릭하거나 '열기'를 누르면 창이 다시 열립니다.");
-            toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크한 뒤 '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
-            toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~604800 = 최대 7일; 0이면 즉시). 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
+            toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크하면 지연 초와 할당 대기 초를 바꿀 수 있고, '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
+            toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~604800 = 최대 7일; 0이면 즉시). 자동 변경을 체크해야 바꿀 수 있고 실행 중에는 잠깁니다 — 정지한 뒤 바꾸세요.");
             toolTip.SetToolTip(nudIpInterval, "선택한 어댑터의 IP 구성을 다시 읽는 간격(밀리초, 기본 1000). 위/아래 버튼은 100ms 단위로 100~2000, 직접 입력하면 1~2000ms 어떤 값이든 됩니다. 현재 IP 표시, 할당 IP 로그, 자동 변경의 IP 감지가 모두 이 주기로 돌아가며 바꾸면 바로 적용됩니다. 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
-            toolTip.SetToolTip(btnAutoToggle, "자동 변경을 시작하거나 정지합니다. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 변경이 실패하거나 재부팅이 필요하면, 또는 '지정 IP 할당 시 자동 정지'에 적은 IP나 대역에 속하는 IP가 할당되면 스스로 정지합니다. '할당 대기' 옵션이 켜져 있으면 IP를 받지 못한 채 설정한 초를 넘길 때 새 MAC을 적용합니다. 실행 중에는 정지·로그 지우기·백그라운드 실행 외의 버튼·체크박스·어댑터 선택·입력 칸이 잠깁니다.");
+            toolTip.SetToolTip(btnAutoToggle, "자동 변경을 시작하거나 정지합니다. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 변경이 실패하거나 재부팅이 필요하면, 또는 '지정 IP 할당 시 자동 정지'에 적은 IP나 대역에 속하는 IP가 할당되면 스스로 정지합니다. IP를 받지 못한 채 '할당 대기' 초를 넘기면 새 MAC을 적용합니다. 실행 중에는 정지·로그 지우기·백그라운드 실행 외의 버튼·체크박스·어댑터 선택·입력 칸이 잠깁니다.");
         }
 
         private NetworkAdapterInfo SelectedAdapter
@@ -299,13 +298,14 @@ namespace MacChanger
 
         private void chkAuto_CheckedChanged(object sender, EventArgs e)
         {
-            btnAutoToggle.Enabled = chkAuto.Checked;
             if (!chkAuto.Checked && autoRunning) StopAuto();
+            UpdateControlStates();   // 시작 버튼, 지연 초, 할당 대기 초는 체크해야 열린다
         }
 
-        private void autoOption_CheckedChanged(object sender, EventArgs e)
+        private void chkAutoStopIp_CheckedChanged(object sender, EventArgs e)
         {
-            UpdateControlStates();   // 지정 IP 칸과 대기 초 칸은 각 체크박스를 켜야 열린다
+            if (!chkAutoStopIp.Checked) txtAutoStopIp.Text = string.Empty;   // 체크를 풀면 입력한 IP/대역은 지운다
+            UpdateControlStates();   // 지정 IP 칸은 체크해야 열린다
         }
 
         private void btnAutoToggle_Click(object sender, EventArgs e)
@@ -327,7 +327,7 @@ namespace MacChanger
             autoRunning = true;
             UpdateControlStates();   // 실행 중에는 정지·로그 지우기·백그라운드 실행 외의 조작을 잠근다
             btnAutoToggle.Text = "정지 (IP 대기)";
-            if (!busy) SetStatus("준비", "자동 변경 시작: IP 할당 후 " + nudAutoDelay.Value + "초 뒤 새 MAC을 적용합니다.");
+            if (!busy) SetStatus("준비", "자동 변경 시작: IP 할당 후 " + nudAutoDelay.Value + "초 뒤, 또는 IP 할당 대기가 " + nudWaitTimeout.Value + "초를 넘으면 새 MAC을 적용합니다.");
             if (AutoStopIfTargetAssigned(lastLoggedIp)) return;   // 지정 IP가 이미 할당되어 있으면 바꾸지 않고 바로 정지
             ScheduleAuto();   // 이미 IP가 할당되어 있으면 지금부터 센다
             RunAutoIfDue();   // 바로 남은 시간을 보여주고, 0초면 즉시 시작
@@ -413,7 +413,7 @@ namespace MacChanger
 
         /// <summary>
         /// 할당 대기 상태를 추적한다. 대기 중이면 시작 시각을 기억하고(자동 변경 중이면 버튼에 경과 초 표시),
-        /// 자동 변경 중이고 옵션이 켜져 있으며 설정한 초를 넘겼으면 true 를 돌려준다 (호출자가 새 MAC 적용). 작업 중에는 세지 않는다.
+        /// 자동 변경 중에 설정한 할당 대기 초를 넘겼으면 true 를 돌려준다 (호출자가 새 MAC 적용). 작업 중에는 세지 않는다.
         /// </summary>
         private bool TrackWaiting(bool isWaiting, int nowTick)
         {
@@ -430,7 +430,7 @@ namespace MacChanger
             if (!autoRunning) return false;
             int elapsedMs = unchecked(nowTick - waitingSinceTick);
             btnAutoToggle.Text = "정지 (IP 대기 " + elapsedMs / 1000 + "초)";
-            if (!chkWaitTimeout.Checked || elapsedMs < (int)nudWaitTimeout.Value * 1000) return false;
+            if (elapsedMs < (int)nudWaitTimeout.Value * 1000) return false;
             waiting = false;   // 변경 뒤 어댑터가 다시 올라오면 새로 센다
             return true;
         }
@@ -907,12 +907,12 @@ namespace MacChanger
             chkLogGateway.Enabled = !autoRunning;
             chkLogMac.Enabled = !autoRunning;
             chkShowLog.Enabled = !autoRunning;
-            nudAutoDelay.Enabled = !autoRunning;
+            btnAutoToggle.Enabled = chkAuto.Checked;                     // 실행 중에도 정지할 수 있어야 하므로 잠그지 않는다
+            nudAutoDelay.Enabled = !autoRunning && chkAuto.Checked;        // 지연 초와 할당 대기 초는 자동 변경을 체크해야 열린다
+            nudWaitTimeout.Enabled = !autoRunning && chkAuto.Checked;
             nudIpInterval.Enabled = !autoRunning;
             chkAutoStopIp.Enabled = !autoRunning;
             txtAutoStopIp.Enabled = !autoRunning && chkAutoStopIp.Checked;   // 체크해야 입력 칸이 열린다
-            chkWaitTimeout.Enabled = !autoRunning;
-            nudWaitTimeout.Enabled = !autoRunning && chkWaitTimeout.Checked;
             chkResetDns.Enabled = !autoRunning;
             UseWaitCursor = busy;
         }
