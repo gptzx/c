@@ -74,28 +74,31 @@ namespace MacChanger
             }
             catch (Exception) { }
             notifyIcon.Icon = Icon;   // 백그라운드 실행 중 트레이에 같은 아이콘을 보여 준다
-            toolTip.SetToolTip(txtNewMac, "12자리 16진수. 구분자(-, :, .)는 있어도 되고 없어도 됩니다. 예: 02-1A-2B-3C-4D-5E");
-            toolTip.SetToolTip(btnRandom, "무선 어댑터: 두 번째 자리 2/6/A/E, 그 외: 두 번째 자리 짝수, 나머지 11자리 0~F 무작위");
-            toolTip.SetToolTip(btnApply, "확인 창 없이 바로 어댑터를 비활성화하고 NetworkAddress를 기록한 뒤(EnableDHCP = 1이면 Tcpip 값 자동 정리) 다시 활성화합니다.");
-            toolTip.SetToolTip(btnRenewIp, "확인 창 없이 바로 실행합니다. MAC은 그대로 두고(NetworkAddress 유지) 어댑터를 비활성화 → Tcpip 값 자동 정리(EnableDHCP = 1이면) → 활성화하여 IP만 새로 받습니다.");
-            toolTip.SetToolTip(btnRestore, "확인 창 없이 바로 NetworkAddress 값을 삭제하고(EnableDHCP = 1이면 Tcpip 값 자동 정리) 어댑터를 재시작하여 공장 MAC으로 되돌립니다.");
-            toolTip.SetToolTip(chkIpLog, "켜 두면 새 IP가 할당될 때마다 로그 상자와 같은 줄을 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 추가합니다. 169.254.x.x 자동 사설 주소는 기록하지 않습니다.");
-            toolTip.SetToolTip(chkLogTime, "로그 줄 맨 앞에 시각(yyyy-MM-dd HH:mm:ss)을 넣습니다.");
-            toolTip.SetToolTip(chkLogMask, "로그 줄의 IP 뒤에 서브넷 마스크를 넣습니다.");
-            toolTip.SetToolTip(chkLogGateway, "로그 줄에 기본 게이트웨이를 넣습니다 (없으면 \"(없음)\").");
-            toolTip.SetToolTip(chkLogMac, "로그 줄 끝에 그때 사용 중인 MAC을 넣습니다.");
-            toolTip.SetToolTip(chkShowLog, "할당된 IP 주소 로그 상자를 보이거나 숨깁니다 (숨기면 그래프가 아래쪽 전체 폭을 씁니다). 숨겨진 동안에는 상자에 기록하지 않고, 켤 때 현재 IP가 마지막 줄과 다르면 한 줄 추가합니다.");
-            toolTip.SetToolTip(trafficGraph, "선택한 어댑터의 송수신 속도 그래프 (빨강: 수신, 초록: 송신, 1초마다 갱신, 가로 2픽셀 = 1초). MAC 변경·원상복구·IP 갱신이 끝나면 그래프는 유지되고 누적 데이터 양만 0부터 다시 셉니다.");
-            toolTip.SetToolTip(btnClearLog, "로그 상자의 내용을 지웁니다 (파일에는 영향 없음).");
-            toolTip.SetToolTip(chkResetDns, "변경 적용·원상복구·IP 갱신 때 Tcpip 값을 정리하면서 직접 지정한 DNS(NameServer)도 지웁니다. 끄면 NameServer 에 값이 있을 때 EnableDHCP 와 함께 남깁니다.");
-            toolTip.SetToolTip(chkAutoStopIp, "자동 변경 중 오른쪽 칸에 적은 IP 또는 대역에 속하는 IP가 할당되면 자동 변경을 스스로 정지합니다. 체크해야 입력 칸이 열리고, 체크를 풀면 입력한 값은 지워집니다.");
-            toolTip.SetToolTip(txtAutoStopIp, "정지할 IP 또는 대역. 123 → 123.0.0.0~123.255.255.255, 123.123 → 123.123.0.0/16, 123.123.123 → 123.123.123.0/24, 123.123.123.123 → 그 주소만. 자동 변경이 실행 중일 때는 바꿀 수 없습니다.");
-            toolTip.SetToolTip(nudWaitTimeout, "자동 변경 중 어댑터가 올라와 있는데도 IP를 받지 못하는(할당 대기 중 / 자동 사설 주소) 상태가 이 초(10~60)를 넘기면 새 랜덤 MAC을 적용합니다. IP를 받을 때까지 반복합니다. 자동 변경을 체크해야 바꿀 수 있고 실행 중에는 잠깁니다.");
-            toolTip.SetToolTip(btnBackground, "창을 숨기고 트레이(알림 영역) 아이콘만 남긴 채 백그라운드에서 계속 실행합니다. 자동 변경·그래프·로그는 그대로 동작하며, 트레이 아이콘을 두 번 클릭하거나 '열기'를 누르면 창이 다시 열립니다.");
-            toolTip.SetToolTip(chkAuto, "자동 변경 기능을 사용합니다. 체크하면 지연 초와 할당 대기 초를 바꿀 수 있고, '시작'을 누르면 선택한 어댑터에 IP가 할당될 때마다 지정한 초 뒤에 랜덤 MAC을 적용하고, 다시 IP를 받으면 반복합니다.");
-            toolTip.SetToolTip(nudAutoDelay, "IP 할당을 감지한 뒤 MAC 변경까지 기다리는 시간(초, 0~604800 = 최대 7일; 0이면 즉시). 자동 변경을 체크해야 바꿀 수 있고 실행 중에는 잠깁니다 — 정지한 뒤 바꾸세요.");
-            toolTip.SetToolTip(nudIpInterval, "선택한 어댑터의 IP 구성을 다시 읽는 간격(밀리초, 기본 1000). 위/아래 버튼은 100ms 단위로 100~2000, 직접 입력하면 1~2000ms 어떤 값이든 됩니다. 현재 IP 표시, 할당 IP 로그, 자동 변경의 IP 감지가 모두 이 주기로 돌아가며 바꾸면 바로 적용됩니다. 자동 변경이 실행 중일 때는 바꿀 수 없습니다 — 정지한 뒤 바꾸세요.");
-            toolTip.SetToolTip(btnAutoToggle, "자동 변경을 시작하거나 정지합니다. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 변경이 실패하거나 재부팅이 필요하면, 또는 '지정 IP 할당 시 자동 정지'에 적은 IP나 대역에 속하는 IP가 할당되면 스스로 정지합니다. IP를 받지 못한 채 '할당 대기' 초를 넘기면 새 MAC을 적용합니다. 실행 중에는 정지·로그 지우기·백그라운드 실행 외의 버튼·체크박스·어댑터 선택·입력 칸이 잠깁니다.");
+            // 툴팁: 컨트롤마다 핵심 동작 한 줄 (+ 필요한 예시 한 줄). 세부 규칙은 README
+            toolTip.SetToolTip(cboAdapters, "MAC을 바꿀 네트워크 어댑터");
+            toolTip.SetToolTip(btnRefresh, "어댑터 목록과 현재 정보를 다시 읽습니다.");
+            toolTip.SetToolTip(txtNewMac, "적용할 MAC 주소 — 16진수 12자리 (-, :, . 구분자는 있어도 없어도 됨)\n예: 02-1A-2B-3C-4D-5E");
+            toolTip.SetToolTip(btnRandom, "어댑터 종류(유선/무선)에 맞는 랜덤 MAC을 새 MAC 칸에 채웁니다.");
+            toolTip.SetToolTip(chkResetDns, "변경 적용·원상복구·IP 갱신 때 직접 지정한 DNS도 함께 지웁니다. (DHCP 어댑터만)");
+            toolTip.SetToolTip(btnApply, "새 MAC을 바로 적용합니다. (어댑터 재시작, 확인 창 없음)");
+            toolTip.SetToolTip(btnRenewIp, "MAC은 그대로 두고 IP만 새로 받습니다. (어댑터 재시작, 확인 창 없음)");
+            toolTip.SetToolTip(btnRestore, "원래(공장) MAC으로 되돌립니다. (어댑터 재시작, 확인 창 없음)");
+            toolTip.SetToolTip(btnClearLog, "로그 상자를 비웁니다. (로그 파일은 그대로)");
+            toolTip.SetToolTip(chkAuto, "자동 변경 사용 — '시작'을 누르면 IP를 받을 때마다 지정한 초 뒤에 랜덤 MAC을 적용합니다.");
+            toolTip.SetToolTip(nudAutoDelay, "IP를 받은 뒤 MAC을 바꾸기까지 기다리는 초 (0 = 즉시, 최대 7일)");
+            toolTip.SetToolTip(btnAutoToggle, "자동 변경 시작 / 정지\n변경 실패·재부팅 필요·지정 IP 할당 시 스스로 멈춥니다.");
+            toolTip.SetToolTip(nudWaitTimeout, "자동 변경 중 IP를 못 받은 채 새 MAC을 적용하기까지 기다리는 초 (10~60)");
+            toolTip.SetToolTip(nudIpInterval, "IP를 다시 읽는 간격 (ms) — 위/아래 버튼은 100 단위로 100~2000, 직접 입력은 1~2000");
+            toolTip.SetToolTip(chkAutoStopIp, "오른쪽 칸의 IP(또는 그 대역의 IP)를 받으면 자동 변경을 멈춥니다.");
+            toolTip.SetToolTip(txtAutoStopIp, "멈출 IP 또는 대역\n123 → 123.*.*.*   123.123 → 123.123.*.*   123.123.123 → 123.123.123.*");
+            toolTip.SetToolTip(chkLogTime, "로그에 시각을 함께 기록합니다.");
+            toolTip.SetToolTip(chkLogMask, "로그에 서브넷 마스크를 함께 기록합니다.");
+            toolTip.SetToolTip(chkLogGateway, "로그에 기본 게이트웨이를 함께 기록합니다.");
+            toolTip.SetToolTip(chkLogMac, "로그에 그 시점의 MAC을 함께 기록합니다.");
+            toolTip.SetToolTip(chkShowLog, "할당 IP 로그 상자를 보이거나 숨깁니다. (숨기면 그래프가 전체 폭)\n숨긴 동안은 상자에 기록하지 않습니다.");
+            toolTip.SetToolTip(chkIpLog, "새 IP를 받을 때마다 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 기록합니다.");
+            toolTip.SetToolTip(btnBackground, "창을 숨기고 트레이 아이콘으로 계속 실행합니다.\n트레이 아이콘을 두 번 클릭하면 창이 다시 열립니다.");
+            toolTip.SetToolTip(trafficGraph, "송수신 속도 그래프 (빨강: 수신, 초록: 송신)");
         }
 
         private NetworkAdapterInfo SelectedAdapter
