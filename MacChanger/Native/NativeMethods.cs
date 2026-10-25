@@ -80,16 +80,21 @@ namespace MacChanger.Native
         public static extern int GetIfEntry2(ref MIB_IF_ROW2 row);
 
         // ------------------------------------------------------------------
-        // setupapi : 어댑터 비활성화/활성화 (DIF_PROPERTYCHANGE)
+        // setupapi : 어댑터 재시작/비활성화/활성화 (DIF_PROPERTYCHANGE)
         // ------------------------------------------------------------------
         public static readonly Guid GUID_DEVCLASS_NET = new Guid("4D36E972-E325-11CE-BFC1-08002BE10318");
 
         public const uint DIGCF_PRESENT = 0x00000002;
         public const uint SPDRP_DRIVER = 0x00000009;
+        /// <summary>장치의 ConfigFlags (REG_DWORD) — CONFIGFLAG_DISABLED 가 켜져 있으면 "사용 안 함" 상태</summary>
+        public const uint SPDRP_CONFIGFLAGS = 0x0000000A;
+        public const uint CONFIGFLAG_DISABLED = 0x00000001;
 
         public const uint DIF_PROPERTYCHANGE = 0x00000012;
         public const uint DICS_ENABLE = 0x00000001;
         public const uint DICS_DISABLE = 0x00000002;
+        /// <summary>장치를 멈췄다가 바로 다시 시작 (장치 관리자가 속성 변경을 반영할 때, devcon restart 와 같은 방식)</summary>
+        public const uint DICS_PROPCHANGE = 0x00000003;
         public const uint DICS_FLAG_GLOBAL = 0x00000001;
         public const uint DICS_FLAG_CONFIGSPECIFIC = 0x00000002;
 

@@ -10,14 +10,29 @@ using MacChanger.Native;
 namespace MacChanger.Core
 {
     /// <summary>
-    /// 어댑터 비활성화/활성화.
-    /// 1) SetupAPI DIF_PROPERTYCHANGE (DICS_DISABLE / DICS_ENABLE) — devcon과 같은 방식
-    /// 2) 실패 시 WMI Win32_NetworkAdapter.Disable()/Enable() → MSFT_NetAdapter.Disable()/Enable()
+    /// 어댑터 재시작 / 비활성화 / 활성화.
+    /// - Restart: SetupAPI DIF_PROPERTYCHANGE + DICS_PROPCHANGE 한 번 — 장치 관리자(어댑터 속성 창)가 고급 속성 변경을 반영할 때,
+    ///   그리고 devcon restart 가 쓰는 방식. "사용 안 함" 상태를 거치지 않고 장치를 멈췄다가 바로 다시 시작한다.
+    /// - Disable/Enable: DICS_DISABLE / DICS_ENABLE (devcon 과 같은 방식), 실패 시 WMI Win32_NetworkAdapter → MSFT_NetAdapter 의 Disable()/Enable().
     /// </summary>
     public static class AdapterController
     {
         public const int WmiEnableRetryCount = 3;
         public const int WmiRetryDelayMs = 1500;
+
+        /// <summary>
+        /// 재시작(DICS_PROPCHANGE). needReboot 가 true 이면 PnP 관리자가 장치를 멈추지 못해(드라이버 거부 등) 재부팅 필요 플래그만 설정한 것이므로
+        /// 어댑터는 옛 설정 그대로 동작 중이다. 어댑터가 "사용 안 함"(CONFIGFLAG_DISABLED) 상태면 PROPCHANGE 로는 올라오지 않으므로 대신 활성화(DICS_ENABLE)한다 —
+        /// 시작하면서 NetworkAddress 를 읽으므로 결과는 같다. SetupAPI 경로가 실패하면 예외 — 호출자가 비활성화/활성화로 대신한다 (WMI 에는 재시작이 없다).
+        /// </summary>
+        public static void Restart(NetworkAdapterInfo adapter, Action<string> log, out bool needReboot)
+        {
+            if (adapter == null) throw new ArgumentNullException("adapter");
+            string error;
+            if (!TrySetupApiChangeState(adapter.InterfaceGuid, NativeMethods.DICS_PROPCHANGE, out needReboot, out error))
+                throw new InvalidOperationException(error);
+            if (needReboot) log("장치 관리자가 즉시 재시작하지 못해 재부팅 필요 플래그를 설정했습니다");
+        }
 
         /// <summary>
         /// 비활성화. needReboot가 true이면 장치 관리자(PnP)가 즉시 중지하지 못해 재부팅 필요 플래그(DI_NEEDREBOOT/DI_NEEDRESTART)를
@@ -40,7 +55,7 @@ namespace MacChanger.Core
             string action = enable ? "활성화" : "비활성화";
 
             string setupError;
-            if (TrySetupApiChangeState(adapter.InterfaceGuid, enable, out needReboot, out setupError))
+            if (TrySetupApiChangeState(adapter.InterfaceGuid, enable ? NativeMethods.DICS_ENABLE : NativeMethods.DICS_DISABLE, out needReboot, out setupError))
             {
                 if (needReboot) log("장치 관리자가 즉시 " + action + "하지 못해 재부팅 필요 플래그를 설정했습니다");
                 return;
@@ -64,7 +79,7 @@ namespace MacChanger.Core
         // ------------------------------------------------------------------
         // SetupAPI
         // ------------------------------------------------------------------
-        private static bool TrySetupApiChangeState(string interfaceGuid, bool enable, out bool needReboot, out string error)
+        private static bool TrySetupApiChangeState(string interfaceGuid, uint stateChange, out bool needReboot, out string error)
         {
             needReboot = false;
             error = null;
@@ -101,7 +116,9 @@ namespace MacChanger.Core
                     catch (Exception) { continue; }
                     if (id == null || !string.Equals(id, interfaceGuid, StringComparison.OrdinalIgnoreCase)) continue;
 
-                    return ChangeDeviceState(devInfoSet, ref devInfo, enable, out needReboot, out error);
+                    if (stateChange == NativeMethods.DICS_PROPCHANGE && IsDisabled(devInfoSet, ref devInfo))
+                        stateChange = NativeMethods.DICS_ENABLE;   // "사용 안 함" 어댑터는 재시작 대신 활성화해야 올라온다
+                    return ChangeDeviceState(devInfoSet, ref devInfo, stateChange, out needReboot, out error);
                 }
             }
             catch (Exception ex)
@@ -116,7 +133,8 @@ namespace MacChanger.Core
             }
         }
 
-        private static bool ChangeDeviceState(IntPtr devInfoSet, ref NativeMethods.SP_DEVINFO_DATA devInfo, bool enable, out bool needReboot, out string error)
+        /// <summary>DIF_PROPERTYCHANGE 호출 (devcon 과 같은 순서): ENABLE 만 전역을 먼저 시도하고, 모든 상태를 현재 하드웨어 프로필(HwProfile 0)에 적용한다.</summary>
+        private static bool ChangeDeviceState(IntPtr devInfoSet, ref NativeMethods.SP_DEVINFO_DATA devInfo, uint stateChange, out bool needReboot, out string error)
         {
             needReboot = false;
             error = null;
@@ -124,10 +142,10 @@ namespace MacChanger.Core
             NativeMethods.SP_PROPCHANGE_PARAMS p = new NativeMethods.SP_PROPCHANGE_PARAMS();
             p.ClassInstallHeader.cbSize = (uint)Marshal.SizeOf(typeof(NativeMethods.SP_CLASSINSTALL_HEADER));
             p.ClassInstallHeader.InstallFunction = NativeMethods.DIF_PROPERTYCHANGE;
-            p.StateChange = enable ? NativeMethods.DICS_ENABLE : NativeMethods.DICS_DISABLE;
+            p.StateChange = stateChange;
             uint size = (uint)Marshal.SizeOf(typeof(NativeMethods.SP_PROPCHANGE_PARAMS));
 
-            if (enable)
+            if (stateChange == NativeMethods.DICS_ENABLE)
             {
                 // devcon과 동일: 전역(GLOBAL) 활성화를 먼저 시도하고 결과는 무시한 뒤, 현재 하드웨어 프로필에 적용한다.
                 p.Scope = NativeMethods.DICS_FLAG_GLOBAL;
@@ -135,7 +153,7 @@ namespace MacChanger.Core
                     NativeMethods.SetupDiCallClassInstaller(NativeMethods.DIF_PROPERTYCHANGE, devInfoSet, ref devInfo);
             }
 
-            p.Scope = NativeMethods.DICS_FLAG_CONFIGSPECIFIC;
+            p.Scope = NativeMethods.DICS_FLAG_CONFIGSPECIFIC;   // PROPCHANGE 는 Scope 와 무관하게 장치를 멈췄다 다시 시작한다 (MS 문서)
             if (!NativeMethods.SetupDiSetClassInstallParams(devInfoSet, ref devInfo, ref p, size))
             {
                 error = "SetupDiSetClassInstallParams: " + Win32Message(Marshal.GetLastWin32Error());
@@ -154,6 +172,18 @@ namespace MacChanger.Core
 
             needReboot = CheckNeedReboot(devInfoSet, ref devInfo);
             return true;
+        }
+
+        /// <summary>장치의 ConfigFlags 에 CONFIGFLAG_DISABLED 가 켜져 있는지 ("사용 안 함"). 읽지 못하면 false.</summary>
+        private static bool IsDisabled(IntPtr devInfoSet, ref NativeMethods.SP_DEVINFO_DATA devInfo)
+        {
+            uint regType;
+            uint required;
+            byte[] buffer = new byte[4];
+            if (!NativeMethods.SetupDiGetDeviceRegistryProperty(devInfoSet, ref devInfo, NativeMethods.SPDRP_CONFIGFLAGS, out regType, buffer, (uint)buffer.Length, out required))
+                return false;
+            if (required < 4) return false;
+            return (BitConverter.ToUInt32(buffer, 0) & NativeMethods.CONFIGFLAG_DISABLED) != 0;
         }
 
         private static bool CheckNeedReboot(IntPtr devInfoSet, ref NativeMethods.SP_DEVINFO_DATA devInfo)

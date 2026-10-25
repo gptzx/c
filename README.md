@@ -12,11 +12,12 @@ Windows 7(.NET 4.0 설치됨) / 8 / 8.1 / 10 / 11에서 추가 런타임 설치 
 | 원래(공장) MAC | `\\.\{GUID}`에 `IOCTL_NDIS_QUERY_GLOBAL_STATS` + `OID_802_3_PERMANENT_ADDRESS`로 조회, 실패 시 열거 시점에 읽어 둔 `MSFT_NetAdapter.PermanentAddress`. 파일에 저장하지 않고 매번 조회 |
 | 현재 MAC | `OID_802_3_CURRENT_ADDRESS` → `GetAdaptersAddresses` → WMI 순으로 조회 |
 | 랜덤 MAC 주소 | 선택한 어댑터 종류에 따라 자동. **무선**: 12자리 중 왼쪽에서 두 번째 자리만 `2/6/A/E` 중 하나(`X2/X6/XA/XE-XX-XX-XX-XX-XX`), 나머지 11자리는 `0~F` 전부 무작위(첫 자리도 고정하지 않음). **유선/기타**: 두 번째 자리만 짝수(`0/2/4/6/8/A/C/E`), 나머지 11자리 `0~F`, `00-00-00-00-00-00`과 `FF-FF-FF-FF-FF-FF` 제외 |
-| 변경 적용 | 확인 대화 상자 없이 바로 실행. (a) SetupAPI `DICS_DISABLE`(실패 시 WMI `Disable()`) → (b) `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4D36E972-…}\00XX` 중 `NetCfgInstanceId`가 일치하는 키에 `NetworkAddress`(REG_SZ, 하이픈 없는 12자리) 기록 → (c) Tcpip 값 자동 정리(아래 참고) → (d) SetupAPI `DICS_ENABLE`(실패 시 WMI `Enable()` + 재시도) → NDIS에서 현재 MAC을 다시 읽어 검증 |
+| 변경 적용 | 확인 대화 상자 없이 바로 실행. (a) `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4D36E972-…}\00XX` 중 `NetCfgInstanceId`가 일치하는 키에 `NetworkAddress`(REG_SZ, 하이픈 없는 12자리) 기록 → (b) Tcpip 값 자동 정리(아래 참고) → (c) 어댑터 재시작 → NDIS에서 현재 MAC을 다시 읽어 검증 |
+| 어댑터 재시작 방식 | 랜카드 속성 창(고급 탭)에서 값을 바꾸고 확인을 눌렀을 때와 같은 SetupAPI `DIF_PROPERTYCHANGE` + `DICS_PROPCHANGE` 한 번(devcon `restart`와 동일). "사용 안 함" 상태를 거치지 않고 장치를 멈췄다가 바로 다시 시작하므로 네트워크 아이콘이 잠깐 사라졌다 나타나는 정도로 끝나고, 예전의 비활성화 → 활성화 두 단계보다 빠름. 이미 "사용 안 함"인 어댑터는 재시작 대신 활성화(`DICS_ENABLE`)해서 올림. SetupAPI 호출 자체가 안 되는 환경에서만 예전 방식(`DICS_DISABLE` → `DICS_ENABLE`, 실패 시 WMI `Disable()`/`Enable()`)으로 대신함 |
 | Tcpip 값 자동 정리 | `Tcpip\Parameters\Interfaces\{GUID}`의 `EnableDHCP`가 **1**이면 그 키의 값을 정리(하위 키는 유지): `NameServer`(직접 지정한 DNS)에 값이 있으면 `EnableDHCP`와 `NameServer`를 남기고, `NameServer`가 비어 있거나 없으면 `EnableDHCP`만 남기고 나머지를 모두 삭제. **DNS 초기화**를 체크하면 `NameServer`에 값이 있어도 `EnableDHCP`만 남김. 전역 `HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters`의 `DhcpDomain`·`DhcpNameServer` 값도 삭제. `EnableDHCP`가 **0**(고정 IP)이거나 값이 없으면 아무것도 지우지 않음. 변경 적용·원상복구·IP 갱신 모두에서 수행 |
-| IP 갱신 | 확인 대화 상자 없이 바로 실행. MAC은 그대로 두고(`NetworkAddress` 유지) 어댑터 비활성화 → Tcpip 값 자동 정리 → 활성화로 IP만 새로 받음 (공장 MAC 상태에서 원상복구가 하던 일과 같음) |
+| IP 갱신 | 확인 대화 상자 없이 바로 실행. MAC은 그대로 두고(`NetworkAddress` 유지) Tcpip 값 자동 정리 → 어댑터 재시작으로 IP만 새로 받음 (공장 MAC 상태에서 원상복구가 하던 일과 같음) |
 | 원상복구 | 확인 대화 상자 없이 바로 실행. `NetworkAddress` 값 삭제 → Tcpip 값 자동 정리 → 어댑터 재시작 → 공장 MAC과 비교. 현재 MAC이 이미 공장 MAC이고 `NetworkAddress` 값도 없으면 "복구할 내용이 없습니다" 안내만 표시 |
-| 재부팅 보류 처리 | 장치 관리자가 어댑터를 즉시 중지/재시작하지 못해 재부팅 필요 플래그(`DI_NEEDREBOOT`)를 설정하면, 잘못된 "드라이버 거부" 판정 대신 "재부팅 후 적용" 상태로 안내 |
+| 재부팅 보류 처리 | PnP 관리자가 어댑터를 즉시 재시작하지 못해(드라이버가 중지를 거부) 재부팅 필요 플래그(`DI_NEEDREBOOT`)를 설정하면, 잘못된 "드라이버 거부" 판정 대신 "재부팅 후 적용" 상태로 안내 |
 | 현재 IP 실시간 표시 | 선택한 어댑터의 IPv4 주소, 서브넷 마스크, 기본 게이트웨이, DNS 서버(기본·보조 모두)를 **IP 확인 주기**마다 다시 읽어 표시 (어댑터 비활성 / 링크 없음 / 할당 대기 / 169.254.x.x 자동 사설 주소 구분). 표시 기준은 `ipconfig`와 같음: 랜선이 빠지는 등 링크가 없으면 남아 있는 주소를 보이지 않고, 실제 IP를 받았으면 함께 붙어 있던 169.254 주소는 보이지 않음 |
 | IP 확인 주기 | IP 구성을 다시 읽는 간격을 밀리초 단위로 직접 설정 (기본 **1000ms**, 바꾸면 바로 적용). 위/아래 버튼(키보드 화살표·마우스 휠 포함)은 100ms 단위로 100~2000ms 안에서만 움직이고, 직접 입력하면 1~2000ms 어떤 값이든 됨. 현재 IP 표시·할당 IP 로그·자동 변경의 IP 감지가 모두 이 주기로 동작. 자동 변경이 실행 중일 때는 잠기며 정지한 뒤에만 바꿀 수 있음 |
 | 자동 변경 | **IP 할당 후 [N]초 뒤 새 MAC 적용**을 체크하고 **시작**을 누르면 선택한 어댑터에 IP가 할당될 때마다(같은 IP를 다시 받아도) N초(0~604800 = 최대 7일, 기본 10; 0이면 1초 이내에 바로) 뒤에 어댑터 종류에 맞는 랜덤 MAC을 확인 창 없이 적용하고, 재시작 후 IP를 받으면 다시 반복. 같은 버튼(**정지**)을 다시 누르면 멈춤. 시작할 때 이미 IP가 있으면 바로 세기 시작하며, 남은 시간은 버튼에 "정지 (N초)"(1시간 이상이면 "H:MM:SS", 하루 이상이면 "D일 H:MM:SS")로 1초마다 갱신해 표시. 실행 중에는 **정지**·**로그 지우기**·**백그라운드 실행** 버튼만 쓸 수 있고 나머지 버튼·체크박스("IP 할당 후" 포함)·어댑터 선택·지연 시간·할당 대기 초·IP 확인 주기·자동 정지·DNS 초기화는 모두 잠김(정지한 뒤에만 바꿀 수 있음). 변경이 실패하거나 재부팅이 필요하면 스스로 정지. **자동 정지**: IP 확인 주기 줄의 "지정 IP 할당 시 자동 정지"를 체크하면 입력 칸이 열리고(체크를 풀면 입력한 값은 지워지고 칸이 잠김), IP 또는 대역을 적어 두면 자동 변경 중 그에 속하는 IP가 할당되는 순간 자동 변경을 스스로 정지. `123` → 123.0.0.0~123.255.255.255(/8), `123.123` → /16, `123.123.123` → /24, `123.123.123.123` → 그 주소만. 시작할 때나 MAC을 바꾸기 직전에 이미 해당 IP가 할당되어 있으면 바꾸지 않고 바로 정지하며, IP 줄은 평소처럼 기록. 옥텟은 10진수로 읽음(`192.168.001.010` = `192.168.1.10`); 형식이 틀리면 시작하지 않음. **할당 대기 초과 시 새 MAC**: 자동 변경 중 어댑터는 올라왔는데 실제 IP를 못 받는 상태(할당 대기 중 / 169.254 자동 사설 주소만 있음)가 "IP 할당 대기가 [N]초를 넘으면 새 MAC 적용"의 N초(10~60, 기본 30)를 넘기면 새 랜덤 MAC을 적용하고, IP를 받을 때까지 반복(별도 체크 없이 자동 변경에 항상 포함). 대기한 시간은 버튼에 "정지 (IP 대기 N초)"로 표시. 지연 초와 할당 대기 초 두 칸은 "IP 할당 후"를 체크해야 열리고, 체크를 풀면 둘 다 잠김 |
@@ -31,7 +32,7 @@ Windows 7(.NET 4.0 설치됨) / 8 / 8.1 / 10 / 11에서 추가 런타임 설치 
 
 * `app.manifest`에 `requestedExecutionLevel level="requireAdministrator"`가 포함되어 UAC 승격을 요구합니다.
 * 레지스트리는 항상 `RegistryView.Registry64`로 열어 64비트 OS에서 32비트 프로세스로 실행되어도 WOW64 리다이렉션 문제가 없습니다. (32비트 OS에서는 Registry64 지정이 무시됩니다.)
-* 빌드는 **AnyCPU(Prefer32Bit=false)**이므로 64비트 OS에서는 64비트 프로세스로 실행됩니다. 32비트 프로세스로 실행되면 `SetupDiCallClassInstaller`가 `ERROR_IN_WOW64`로 실패하는데, 이 경우 자동으로 WMI 폴백을 사용합니다.
+* 빌드는 **AnyCPU(Prefer32Bit=false)**이므로 64비트 OS에서는 64비트 프로세스로 실행됩니다. 32비트 프로세스로 실행되면 `SetupDiCallClassInstaller`가 `ERROR_IN_WOW64`로 실패하는데, 이 경우 `DICS_PROPCHANGE` 재시작 대신 예전 방식(비활성화 → 활성화, 각각 WMI `Disable()`/`Enable()` 폴백)을 자동으로 사용합니다.
 * 무선 어댑터는 드라이버/OS 제약으로 두 번째 자리가 `2/6/A/E`(로컬 관리 주소)가 아니면 변경이 무시될 수 있습니다. 랜덤 생성이 무선 어댑터에서 이 규칙을 자동으로 따릅니다. 적용 후 현재 MAC이 요청값과 다르면 안내 메시지를 띄웁니다. Windows 10 이상의 Wi-Fi "임의 하드웨어 주소" 설정이 켜져 있으면(`HKLM\SOFTWARE\Microsoft\WlanSvc\Interfaces\{GUID}\RandomMacState` 또는 `%ProgramData%\Microsoft\Wlansvc\Profiles\Interfaces\{GUID}\*.xml`의 `<enableRandomization>true</enableRandomization>`) 경고합니다.
 
 ## 파일 구성
@@ -57,7 +58,7 @@ MacChanger/
     TrafficMonitor.cs                  ← 송수신 바이트 카운터 읽기(GetIfEntry2), 속도·누적량 계산, MAC 변경·원상복구·IP 갱신 시 누적량 초기화, KB/MB 서식
     NdisQuery.cs                       ← IOCTL_NDIS_QUERY_GLOBAL_STATS로 공장/현재 MAC 조회
     MacRegistry.cs                     ← HKLM(64비트 뷰) NetworkAddress / EnableDHCP 확인 / Tcpip 값 정리(인터페이스 + 전역 DhcpDomain·DhcpNameServer) / 임의 하드웨어 주소 설정 확인
-    AdapterController.cs               ← SetupAPI DICS_DISABLE/ENABLE(재부팅 필요 플래그 보고), WMI Enable()/Disable() 폴백
+    AdapterController.cs               ← SetupAPI DICS_PROPCHANGE 재시작(재부팅 필요 플래그 보고), 폴백 DICS_DISABLE/ENABLE + WMI Enable()/Disable()
     MacChangeService.cs                ← 변경 적용 / 원상복구 / IP 갱신 절차
   Native/
     NativeMethods.cs                   ← kernel32 / user32 / iphlpapi(ConvertInterfaceGuidToLuid·GetIfEntry2) / setupapi P/Invoke
@@ -110,7 +111,7 @@ VS 2017 이상의 MSBuild(Developer Command Prompt의 `msbuild`)에서는 같은
 
 ## 주의 사항
 
-* **Tcpip 값 자동 정리**는 `EnableDHCP = 1`(DHCP 사용)인 어댑터에서만 동작하며, 그 어댑터의 `Tcpip\Parameters\Interfaces\{GUID}` 키에서 `EnableDHCP`(그리고 값이 있는 `NameServer`)를 제외한 값이 삭제됩니다. 직접 지정한 DNS(`NameServer`)는 값이 있으면 보존되지만, DHCP 임대 정보(`DhcpIPAddress`, `DhcpNameServer`, `DhcpDomain` 등)와 `Domain`, `InterfaceMetric`, `MTU` 등 이 키의 다른 설정은 함께 지워지므로 직접 설정해 두었다면 변경/복구/IP 갱신 후 다시 설정하세요. **DNS 초기화**를 켜면 직접 지정한 DNS도 지워집니다. 전역 `Tcpip\Parameters`의 `DhcpDomain`·`DhcpNameServer`도 삭제됩니다. 고정 IP(`EnableDHCP = 0`) 어댑터, `EnableDHCP` 값이 없는 어댑터, 그리고 어댑터를 즉시 중지하지 못한 경우(재부팅 보류)에는 아무 값도 지우지 않습니다.
+* **Tcpip 값 자동 정리**는 `EnableDHCP = 1`(DHCP 사용)인 어댑터에서만 동작하며, 그 어댑터의 `Tcpip\Parameters\Interfaces\{GUID}` 키에서 `EnableDHCP`(그리고 값이 있는 `NameServer`)를 제외한 값이 삭제됩니다. 직접 지정한 DNS(`NameServer`)는 값이 있으면 보존되지만, DHCP 임대 정보(`DhcpIPAddress`, `DhcpNameServer`, `DhcpDomain` 등)와 `Domain`, `InterfaceMetric`, `MTU` 등 이 키의 다른 설정은 함께 지워지므로 직접 설정해 두었다면 변경/복구/IP 갱신 후 다시 설정하세요. **DNS 초기화**를 켜면 직접 지정한 DNS도 지워집니다. 전역 `Tcpip\Parameters`의 `DhcpDomain`·`DhcpNameServer`도 삭제됩니다. 고정 IP(`EnableDHCP = 0`) 어댑터와 `EnableDHCP` 값이 없는 어댑터에서는 아무 값도 지우지 않습니다. 정리는 어댑터 재시작 직전에 이루어지며(장치가 다시 올라올 때 DHCP 클라이언트가 이 키를 새로 읽어 임대 값이 없으면 DHCPDISCOVER 부터 시작), 재시작이 재부팅 뒤로 보류되더라도 지워진 임대 값은 다음 임대 때 다시 채워집니다. 이 키의 하위 키(Wi-Fi 의 SSID 별 임대 캐시 등)는 건드리지 않습니다.
 * 변경 적용, 원상복구, IP 갱신은 확인 창 없이 즉시 실행됩니다. 실패하거나 재부팅이 필요한 경우에만 안내 창이 뜹니다.
 * **자동 변경**은 정지하기 전까지 계속 반복됩니다(IP 할당 → N초 대기 → MAC 변경 → 어댑터 재시작 → 새 IP 할당 → …). 네트워크 연결이 주기적으로 끊기므로 필요할 때만 시작하세요. 설정은 저장되지 않습니다.
 * **할당 IP 로그 저장**을 켜면 실행 파일과 같은 폴더에 `MacChanger-ip.log`가 만들어집니다(이 옵션을 켤 때만). 로그 옵션(시간·서브넷 마스크·기본 게이트웨이·MAC·로그 상자 표시·파일 저장)은 모두 기본 꺼짐이고 저장되지 않으므로 실행할 때마다 필요하면 다시 설정하세요.

@@ -10,7 +10,7 @@ namespace MacChanger.Core
         public string Message { get; set; }
         /// <summary>장치 관리자가 어댑터를 즉시 재시작하지 못해 재부팅 후에야 적용되는 경우 true</summary>
         public bool RebootRequired { get; set; }
-        /// <summary>어댑터가 실제로 중지되었는지(= 이후 받는 IP는 새 할당). 비활성화 실패나 재부팅 보류면 false</summary>
+        /// <summary>어댑터가 실제로 멈췄다 다시 올라왔는지(폴백에서는 멈추기라도 했는지 = 이후 받는 IP는 새 할당). 어댑터를 건드리기 전 실패나 재부팅 보류면 false</summary>
         public bool AdapterRestarted { get; set; }
         /// <summary>실패 시 사용자에게 추가로 보여줄 안내문(무선 제약, 임의 하드웨어 주소 등)</summary>
         public string Guidance { get; set; }
@@ -21,10 +21,10 @@ namespace MacChanger.Core
     /// </summary>
     public static class MacChangeService
     {
-        /// <summary>어댑터 활성화 후 NDIS 장치가 다시 열릴 때까지 기다리는 최대 시간</summary>
+        /// <summary>어댑터 재시작 후 NDIS 장치가 다시 열릴 때까지 기다리는 최대 시간</summary>
         public const int MacWaitTimeoutMs = 20000;
         public const int MacWaitPollMs = 1000;
-        /// <summary>비활성화 직후 레지스트리를 쓰기 전 잠시 대기</summary>
+        /// <summary>(폴백 경로) 비활성화 직후 활성화하기 전 잠시 대기</summary>
         public const int AfterDisableDelayMs = 700;
 
         // ------------------------------------------------------------------
@@ -100,12 +100,15 @@ namespace MacChanger.Core
         }
 
         /// <summary>
-        /// 변경 적용·원상복구·IP 갱신의 공통 절차: [1/4] 비활성화 → [2/4] 레지스트리 단계(registryStep) → [3/4] Tcpip 값 자동 정리 → [4/4] 활성화 → 현재 MAC 재조회.
-        /// 실패 결과에는 어댑터가 실제로 중지되었는지(AdapterRestarted)가 이미 채워져 있다.
+        /// 변경 적용·원상복구·IP 갱신의 공통 절차: [1/3] 레지스트리 단계(registryStep) → [2/3] Tcpip 값 자동 정리 → [3/3] 어댑터 재시작 → 현재 MAC 재조회.
+        /// 재시작은 장치 관리자(어댑터 속성 창)가 고급 속성 변경을 반영할 때와 같은 DICS_PROPCHANGE 한 번이다 — "사용 안 함" 상태를 거치지 않고
+        /// 장치를 멈췄다가 바로 다시 시작하므로 빠르고, 드라이버는 다시 올라오면서 레지스트리의 NetworkAddress 를 읽는다.
+        /// SetupAPI 경로를 쓸 수 없는 환경에서만 예전 방식(비활성화 → 활성화, WMI 폴백 포함)으로 대신한다.
+        /// 실패 결과에는 어댑터가 실제로 재시작되었는지(AdapterRestarted)가 이미 채워져 있다.
         /// 실패하면 실패 결과를 돌려주고, 성공하면 null을 돌려주며 out 값을 채운다 (deferred 이면 재시작이 보류되어 current 는 null).
         /// </summary>
         private static MacChangeResult RunCycle(NetworkAdapterInfo adapter, Action<string> log, string registryStepLabel, string registryFailLabel, Action registryStep,
-            string enableFailHint, bool resetDns, out bool restarted, out bool deferred, out string tcpipWarning, out string current, out bool live)
+            string registryDoneNote, bool resetDns, out bool restarted, out bool deferred, out string tcpipWarning, out string current, out bool live)
         {
             restarted = false;
             deferred = false;
@@ -114,54 +117,34 @@ namespace MacChanger.Core
             live = false;
             MacChangeResult fail = new MacChangeResult();
 
-            log("[1/4] 어댑터 비활성화");
-            bool disableDeferred;
-            try
-            {
-                AdapterController.Disable(adapter, log, out disableDeferred);
-            }
-            catch (Exception ex)
-            {
-                fail.Message = "어댑터 비활성화 실패: " + ex.Message;
-                return fail;
-            }
-            restarted = !disableDeferred;
-            fail.AdapterRestarted = restarted;   // 이후 실패해도 어댑터는 이미 중지되었으므로 호출자가 그대로 돌려준다
-            Thread.Sleep(AfterDisableDelayMs);
-
-            log("[2/4] " + registryStepLabel);
+            log("[1/3] " + registryStepLabel);
             try
             {
                 registryStep();
             }
             catch (Exception ex)
             {
-                fail.Message = registryFailLabel + " 실패: " + ex.Message;
-                log("오류로 중단 — 어댑터를 다시 활성화합니다");
-                try
-                {
-                    bool needReboot;
-                    AdapterController.Enable(adapter, log, out needReboot);
-                }
-                catch (Exception) { }
+                fail.Message = registryFailLabel + " 실패: " + ex.Message;   // 어댑터는 건드리지 않았으므로 되돌릴 것이 없다
                 return fail;
             }
 
-            tcpipWarning = CleanTcpipIfDhcp(adapter.InterfaceGuid, "[3/4]", disableDeferred, resetDns, log);
+            // 재시작 전에 정리한다: 장치가 다시 올라오면 DHCP 클라이언트가 이 키를 새로 읽으므로, 임대 값이 없으면 새 IP를 받는다.
+            tcpipWarning = CleanTcpipIfDhcp(adapter.InterfaceGuid, "[2/3]", resetDns, log);
+            if (tcpipWarning != null) log("[2/3] 경고: " + tcpipWarning);
 
-            log("[4/4] 어댑터 활성화");
-            bool enableDeferred;
+            log("[3/3] 어댑터 재시작");
             try
             {
-                AdapterController.Enable(adapter, log, out enableDeferred);
+                AdapterController.Restart(adapter, log, out deferred);
+                restarted = !deferred;
             }
             catch (Exception ex)
             {
-                fail.Message = "어댑터 활성화 실패: " + ex.Message + "\r\n" + enableFailHint;
-                return fail;
+                log("재시작 실패(" + ex.Message + ") → 비활성화/활성화로 재시도");
+                MacChangeResult fallbackFail = DisableEnableCycle(adapter, log, ex.Message, registryDoneNote, out restarted, out deferred);
+                if (fallbackFail != null) return fallbackFail;
             }
-
-            deferred = disableDeferred || enableDeferred;
+            fail.AdapterRestarted = restarted;
             if (deferred) return null;   // 어댑터가 실제로 재시작되지 않았으므로 검증 생략 — 호출자가 재부팅 안내
 
             current = WaitForCurrentMac(adapter, log, out live);
@@ -173,7 +156,47 @@ namespace MacChanger.Core
             return null;
         }
 
-        /// <summary>어댑터 활성화에 실패했을 때 덧붙이는 안내 (세 작업 공통)</summary>
+        /// <summary>
+        /// 폴백: 비활성화 → 활성화 (예전 방식). 성공하면 null, 실패하면 실패 결과(AdapterRestarted 는 비활성화가 실제로 됐는지).
+        /// restartError 는 앞서 실패한 재시작의 오류, registryDoneNote 는 이미 끝난 레지스트리 단계 안내("새 MAC은 기록되었습니다." 등, 없으면 null) — 실패 메시지에 붙인다.
+        /// </summary>
+        private static MacChangeResult DisableEnableCycle(NetworkAdapterInfo adapter, Action<string> log, string restartError, string registryDoneNote, out bool restarted, out bool deferred)
+        {
+            string note = string.IsNullOrEmpty(registryDoneNote) ? "" : registryDoneNote + " ";
+            restarted = false;
+            deferred = false;
+            MacChangeResult fail = new MacChangeResult();
+            bool disableDeferred;
+            try
+            {
+                AdapterController.Disable(adapter, log, out disableDeferred);
+            }
+            catch (Exception ex)
+            {
+                fail.Message = "어댑터 재시작 실패: " + restartError + " / 비활성화도 실패: " + ex.Message + "\r\n" + note + RestartHint;
+                return fail;
+            }
+            restarted = !disableDeferred;
+            fail.AdapterRestarted = restarted;   // 이후 실패해도 어댑터는 이미 중지되었으므로 호출자가 그대로 돌려준다
+            Thread.Sleep(AfterDisableDelayMs);
+            bool enableDeferred;
+            try
+            {
+                AdapterController.Enable(adapter, log, out enableDeferred);
+            }
+            catch (Exception ex)
+            {
+                // 비활성화가 재부팅 뒤로 보류되어 어댑터가 아직 동작 중이면 '사용 안 함 → 사용' 안내가 맞다
+                fail.Message = "어댑터 활성화 실패: " + ex.Message + "\r\n" + note + (disableDeferred ? RestartHint : EnableHint);
+                return fail;
+            }
+            deferred = disableDeferred || enableDeferred;
+            return null;
+        }
+
+        /// <summary>어댑터를 재시작하지 못했을 때(아직 동작 중) 덧붙이는 안내</summary>
+        private const string RestartHint = "네트워크 연결(ncpa.cpl)에서 어댑터를 직접 '사용 안 함' → '사용'으로 바꾸세요.";
+        /// <summary>(폴백) 비활성화는 됐지만 활성화에 실패했을 때 덧붙이는 안내</summary>
         private const string EnableHint = "네트워크 연결(ncpa.cpl)에서 어댑터를 직접 '사용'으로 바꾸세요.";
 
         private static string SourceNote(bool live)
@@ -200,8 +223,7 @@ namespace MacChanger.Core
             string tcpipWarning, current;
             MacChangeResult fail = RunCycle(adapter, log, "새 MAC 기록", "새 MAC 기록",
                 delegate { MacRegistry.SetNetworkAddress(guid, mac); },
-                "새 MAC은 기록되었습니다. " + EnableHint,
-                resetDns, out restarted, out deferred, out tcpipWarning, out current, out live);
+                "새 MAC은 기록되었습니다.", resetDns, out restarted, out deferred, out tcpipWarning, out current, out live);
             if (fail != null) return fail;
             result.AdapterRestarted = restarted;
 
@@ -239,8 +261,7 @@ namespace MacChanger.Core
             string tcpipWarning, current;
             MacChangeResult fail = RunCycle(adapter, log, "MAC 설정 삭제", "MAC 설정 삭제",
                 delegate { existed = MacRegistry.DeleteNetworkAddress(guid); },
-                EnableHint,
-                resetDns, out restarted, out deferred, out tcpipWarning, out current, out live);
+                "MAC 설정은 지웠습니다.", resetDns, out restarted, out deferred, out tcpipWarning, out current, out live);
             if (fail != null) return fail;
             result.AdapterRestarted = restarted;
 
@@ -278,7 +299,7 @@ namespace MacChanger.Core
         // IP 갱신
         // ------------------------------------------------------------------
         /// <summary>
-        /// IP 갱신: NetworkAddress 는 그대로 두어 MAC 은 바꾸지 않고, 비활성화 → Tcpip 값 자동 정리(EnableDHCP = 1 인 경우) → 활성화로 IP 만 새로 받는다.
+        /// IP 갱신: NetworkAddress 는 그대로 두어 MAC 은 바꾸지 않고, Tcpip 값 자동 정리(EnableDHCP = 1 인 경우) → 어댑터 재시작(DICS_PROPCHANGE)으로 IP 만 새로 받는다.
         /// (원상복구가 이미 공장 MAC 인 어댑터에서 하던 일과 같다.) 재시작 전후 MAC 을 비교해 실제로 유지되었는지 알려준다.
         /// </summary>
         public static MacChangeResult RenewIp(NetworkAdapterInfo adapter, bool resetDns, Action<string> log)
@@ -291,8 +312,7 @@ namespace MacChanger.Core
             string tcpipWarning, current;
             MacChangeResult fail = RunCycle(adapter, log, "MAC 설정 유지 (변경 없음)", "MAC 설정 확인",
                 delegate { },
-                EnableHint,
-                resetDns, out restarted, out deferred, out tcpipWarning, out current, out live);
+                null, resetDns, out restarted, out deferred, out tcpipWarning, out current, out live);
             if (fail != null) return fail;
             result.Success = true;
             result.AdapterRestarted = restarted;
@@ -321,17 +341,12 @@ namespace MacChanger.Core
         // ------------------------------------------------------------------
 
         /// <summary>
-        /// Tcpip 값 자동 정리. 인터페이스 키의 EnableDHCP가 1이면 그 키의 값(EnableDHCP 는 항상, NameServer 는 값이 있고
+        /// Tcpip 값 자동 정리 (재시작 직전에 수행). 인터페이스 키의 EnableDHCP가 1이면 그 키의 값(EnableDHCP 는 항상, NameServer 는 값이 있고
         /// resetDns 가 false 면 남김)과 전역 Tcpip\Parameters의 DhcpDomain/DhcpNameServer를 삭제한다. EnableDHCP가 0(고정 IP)이거나 값/키가 없으면 건너뛴다.
         /// 실패해도 예외를 던지지 않고 경고 문자열을 돌려준다 (없으면 null).
         /// </summary>
-        private static string CleanTcpipIfDhcp(string guid, string stepLabel, bool adapterStillRunning, bool resetDns, Action<string> log)
+        private static string CleanTcpipIfDhcp(string guid, string stepLabel, bool resetDns, Action<string> log)
         {
-            if (adapterStillRunning)
-            {
-                log(stepLabel + " Tcpip 값 정리 건너뜀 (어댑터가 아직 동작 중)");
-                return null;
-            }
             try
             {
                 bool keyExists;
