@@ -167,16 +167,18 @@ namespace MacChanger.Core
             current = WaitForCurrentMac(adapter, log, out live);
             if (current == null)
             {
-                fail.Message = "어댑터가 다시 올라오지 않았습니다(" + (MacWaitTimeoutMs / 1000) + "초 동안 MAC을 읽지 못함). "
-                    + "장치 관리자 또는 네트워크 연결(ncpa.cpl)에서 어댑터 상태를 확인한 뒤 '새로 고침'을 누르세요.";
+                fail.Message = "어댑터가 " + (MacWaitTimeoutMs / 1000) + "초 안에 다시 올라오지 않았습니다. 네트워크 연결(ncpa.cpl)에서 어댑터 상태를 확인한 뒤 '새로 고침'을 누르세요.";
                 return fail;
             }
             return null;
         }
 
+        /// <summary>어댑터 활성화에 실패했을 때 덧붙이는 안내 (세 작업 공통)</summary>
+        private const string EnableHint = "네트워크 연결(ncpa.cpl)에서 어댑터를 직접 '사용'으로 바꾸세요.";
+
         private static string SourceNote(bool live)
         {
-            return live ? "" : " (NDIS 직접 조회가 불가능해 GetAdaptersAddresses/WMI 값 기준)";
+            return live ? "" : " (드라이버 직접 조회 불가 — 시스템 값 기준)";
         }
 
         // ------------------------------------------------------------------
@@ -196,9 +198,9 @@ namespace MacChanger.Core
 
             bool restarted, deferred, live;
             string tcpipWarning, current;
-            MacChangeResult fail = RunCycle(adapter, log, "레지스트리 NetworkAddress 쓰기", "레지스트리 쓰기",
+            MacChangeResult fail = RunCycle(adapter, log, "새 MAC 기록", "새 MAC 기록",
                 delegate { MacRegistry.SetNetworkAddress(guid, mac); },
-                "레지스트리 값은 기록되었습니다. 네트워크 연결(ncpa.cpl)에서 어댑터를 수동으로 '사용'으로 바꾸세요.",
+                "새 MAC은 기록되었습니다. " + EnableHint,
                 resetDns, out restarted, out deferred, out tcpipWarning, out current, out live);
             if (fail != null) return fail;
             result.AdapterRestarted = restarted;
@@ -207,8 +209,7 @@ namespace MacChanger.Core
             {
                 result.Success = true;
                 result.RebootRequired = true;
-                result.Message = "레지스트리에 NetworkAddress = " + MacAddressUtil.Format(mac) + "를 기록했지만 장치 관리자가 어댑터를 즉시 재시작하지 못했습니다. "
-                    + "재부팅 후 새 MAC이 적용됩니다." + WarningSuffix(tcpipWarning);
+                result.Message = "새 MAC " + MacAddressUtil.Format(mac) + " 을(를) 기록했지만 어댑터를 바로 재시작하지 못했습니다. 재부팅 후 적용됩니다." + WarningSuffix(tcpipWarning);
                 return result;
             }
             if (string.Equals(current, mac, StringComparison.OrdinalIgnoreCase))
@@ -216,7 +217,7 @@ namespace MacChanger.Core
                 result.Success = true;
                 result.Message = "MAC 변경 완료: " + MacAddressUtil.Format(current) + SourceNote(live) + WarningSuffix(tcpipWarning);
                 if (adapter.Kind == AdapterKind.Wireless && SafeRandomMacState(guid) == true)
-                    result.Message += " — 주의: 이 Wi-Fi 인터페이스에 '임의 하드웨어 주소'가 켜져 있어 네트워크 연결 시 MAC이 다시 바뀔 수 있습니다. 설정에서 끄세요.";
+                    result.Message += " — 주의: Wi-Fi '임의 하드웨어 주소'가 켜져 있어 연결 시 MAC이 다시 바뀔 수 있습니다. 설정에서 끄세요.";
                 return result;
             }
             result.Message = "드라이버가 새 MAC을 적용하지 않았습니다. 현재 MAC: " + MacAddressUtil.Format(current) + SourceNote(live);
@@ -236,9 +237,9 @@ namespace MacChanger.Core
 
             bool restarted, deferred, live;
             string tcpipWarning, current;
-            MacChangeResult fail = RunCycle(adapter, log, "레지스트리 NetworkAddress 값 삭제", "레지스트리 값 삭제",
+            MacChangeResult fail = RunCycle(adapter, log, "MAC 설정 삭제", "MAC 설정 삭제",
                 delegate { existed = MacRegistry.DeleteNetworkAddress(guid); },
-                "네트워크 연결(ncpa.cpl)에서 어댑터를 수동으로 '사용'으로 바꾸세요.",
+                EnableHint,
                 resetDns, out restarted, out deferred, out tcpipWarning, out current, out live);
             if (fail != null) return fail;
             result.AdapterRestarted = restarted;
@@ -247,16 +248,16 @@ namespace MacChanger.Core
             {
                 result.Success = true;
                 result.RebootRequired = true;
-                result.Message = (existed ? "NetworkAddress 값을 삭제했지만 " : "NetworkAddress 값은 원래 없었고 ")
-                    + "장치 관리자가 어댑터를 즉시 재시작하지 못했습니다. 재부팅 후 공장 MAC으로 돌아갑니다." + WarningSuffix(tcpipWarning);
+                result.Message = (existed ? "MAC 설정을 지웠지만 " : "지울 MAC 설정은 없었고 ")
+                    + "어댑터를 바로 재시작하지 못했습니다. 재부팅 후 공장 MAC으로 돌아갑니다." + WarningSuffix(tcpipWarning);
                 return result;
             }
             string permanent = ReadPermanentMac(adapter);
             if (permanent == null)
             {
                 result.Success = true;
-                result.Message = (existed ? "NetworkAddress 삭제 및 " : "") + "어댑터 재시작 완료. 현재 MAC: " + MacAddressUtil.Format(current)
-                    + SourceNote(live) + " (공장 MAC을 조회할 수 없어 비교는 생략)" + WarningSuffix(tcpipWarning);
+                result.Message = "복구 완료 (공장 MAC 조회 불가 — 비교 생략). 현재 MAC: " + MacAddressUtil.Format(current)
+                    + SourceNote(live) + WarningSuffix(tcpipWarning);
                 return result;
             }
             if (string.Equals(current, permanent, StringComparison.OrdinalIgnoreCase))
@@ -265,7 +266,7 @@ namespace MacChanger.Core
                 result.Message = "공장 MAC으로 복구 완료: " + MacAddressUtil.Format(current) + SourceNote(live) + WarningSuffix(tcpipWarning);
                 return result;
             }
-            result.Message = "NetworkAddress를 삭제했지만 현재 MAC(" + MacAddressUtil.Format(current)
+            result.Message = "복구 후에도 현재 MAC(" + MacAddressUtil.Format(current)
                 + ")이 공장 MAC(" + MacAddressUtil.Format(permanent) + ")과 다릅니다." + SourceNote(live);
             result.Guidance = (adapter.Kind == AdapterKind.Wireless && SafeRandomMacState(guid) == true)
                 ? "이 Wi-Fi 인터페이스에 Windows '임의 하드웨어 주소'가 켜져 있습니다. 설정 > 네트워크 및 인터넷 > Wi-Fi에서 끄면 공장 MAC이 사용됩니다."
@@ -288,9 +289,9 @@ namespace MacChanger.Core
 
             bool restarted, deferred, live;
             string tcpipWarning, current;
-            MacChangeResult fail = RunCycle(adapter, log, "레지스트리 NetworkAddress 유지 (MAC 변경 없음)", "레지스트리 단계",
+            MacChangeResult fail = RunCycle(adapter, log, "MAC 설정 유지 (변경 없음)", "MAC 설정 확인",
                 delegate { },
-                "네트워크 연결(ncpa.cpl)에서 어댑터를 수동으로 '사용'으로 바꾸세요.",
+                EnableHint,
                 resetDns, out restarted, out deferred, out tcpipWarning, out current, out live);
             if (fail != null) return fail;
             result.Success = true;
@@ -298,19 +299,19 @@ namespace MacChanger.Core
             if (deferred)
             {
                 result.RebootRequired = true;
-                result.Message = "장치 관리자가 어댑터를 즉시 재시작하지 못했습니다. 재부팅 후 IP가 새로 할당됩니다." + WarningSuffix(tcpipWarning);
+                result.Message = "어댑터를 바로 재시작하지 못했습니다. 재부팅 후 IP가 새로 할당됩니다." + WarningSuffix(tcpipWarning);
                 return result;
             }
             string shown = MacAddressUtil.Format(current) + SourceNote(live);
             if (before == null)
-                result.Message = "IP 갱신 완료: 어댑터를 재시작했습니다. 현재 MAC: " + shown + WarningSuffix(tcpipWarning);
+                result.Message = "IP 갱신 완료 — 현재 MAC: " + shown + WarningSuffix(tcpipWarning);
             else if (string.Equals(before, current, StringComparison.OrdinalIgnoreCase))
-                result.Message = "IP 갱신 완료: 어댑터를 재시작했습니다. 현재 MAC(유지): " + shown + WarningSuffix(tcpipWarning);
+                result.Message = "IP 갱신 완료 — 현재 MAC(유지): " + shown + WarningSuffix(tcpipWarning);
             else
             {
                 // 보류 중이던 NetworkAddress 값이 이번 재시작에 적용되었거나 Wi-Fi 임의 하드웨어 주소가 바뀐 경우
-                result.Message = "IP 갱신 완료: 어댑터를 재시작했지만 현재 MAC " + shown + " 이(가) 재시작 전(" + MacAddressUtil.Format(before) + ")과 다릅니다. "
-                    + "보류 중이던 NetworkAddress 값이 이번 재시작에 적용되었거나, Wi-Fi '임의 하드웨어 주소'가 켜져 있을 수 있습니다." + WarningSuffix(tcpipWarning);
+                result.Message = "IP 갱신 완료 — 현재 MAC " + shown + " 이(가) 재시작 전(" + MacAddressUtil.Format(before) + ")과 다릅니다. "
+                    + "(보류 중이던 MAC 설정이 적용되었거나 Wi-Fi '임의 하드웨어 주소'가 켜져 있음)" + WarningSuffix(tcpipWarning);
             }
             return result;
         }
@@ -337,14 +338,14 @@ namespace MacChanger.Core
                 int? enableDhcp = MacRegistry.GetEnableDhcp(guid, out keyExists);
                 if (!keyExists || enableDhcp == null || enableDhcp.Value != 1)
                 {
-                    log(stepLabel + " Tcpip 값 정리 건너뜀 (" + (!keyExists ? "Tcpip 인터페이스 키 없음" : enableDhcp == null ? "EnableDHCP 값 없음" : "EnableDHCP = " + enableDhcp.Value + ", 고정 IP 설정 유지") + ")");
+                    log(stepLabel + " Tcpip 값 정리 건너뜀 (" + (!keyExists ? "IP 설정 키 없음" : enableDhcp == null ? "DHCP 사용 여부 값 없음" : "고정 IP — 설정 유지") + ")");
                     return null;
                 }
-                log(stepLabel + " EnableDHCP = 1 → Tcpip 값 자동 정리");
+                log(stepLabel + " DHCP 사용 중 → Tcpip 값 자동 정리");
             }
             catch (Exception ex)
             {
-                return "EnableDHCP 확인 실패: " + ex.Message;
+                return "DHCP 사용 여부 확인 실패: " + ex.Message;
             }
 
             // 인터페이스 값 삭제와 전역 값 삭제는 서로 독립이므로 한쪽이 실패해도 다른 쪽은 시도한다.
@@ -353,13 +354,13 @@ namespace MacChanger.Core
             {
                 bool keptNameServer = MacRegistry.CleanTcpipInterfaceValues(guid, resetDns);
                 log(stepLabel + (keptNameServer
-                    ? " 인터페이스 값 정리: EnableDHCP 와 NameServer(직접 지정한 DNS)만 남김"
-                    : resetDns ? " 인터페이스 값 정리: DNS 초기화 옵션 — EnableDHCP 만 남김"
-                               : " 인터페이스 값 정리: EnableDHCP 만 남김 (NameServer 비어 있음/없음)"));
+                    ? " Tcpip 값 정리: EnableDHCP 와 NameServer(직접 지정한 DNS)만 남김"
+                    : resetDns ? " Tcpip 값 정리: EnableDHCP 만 남김 (DNS 초기화)"
+                               : " Tcpip 값 정리: EnableDHCP 만 남김"));
             }
             catch (Exception ex)
             {
-                interfaceWarning = "인터페이스 Tcpip 값 정리 실패: " + ex.Message;
+                interfaceWarning = "어댑터 IP 설정 정리 실패: " + ex.Message;
             }
             string globalWarning = null;
             try
@@ -368,7 +369,7 @@ namespace MacChanger.Core
             }
             catch (Exception ex)
             {
-                globalWarning = "전역 DhcpDomain/DhcpNameServer 삭제 실패: " + ex.Message;
+                globalWarning = "전역 DHCP DNS 값 삭제 실패: " + ex.Message;
             }
             if (interfaceWarning != null && globalWarning != null) return interfaceWarning + "; " + globalWarning;
             return interfaceWarning ?? globalWarning;

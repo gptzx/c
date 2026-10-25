@@ -179,7 +179,7 @@ namespace MacChanger
                 NetworkAdapterInfo adapter = SelectedAdapter;
                 bool wireless = adapter != null && adapter.Kind == AdapterKind.Wireless;
                 txtNewMac.Text = MacAddressUtil.Format(MacAddressUtil.GenerateRandom(wireless));
-                SetStatus("준비", "랜덤 MAC 생성됨 (" + (wireless ? "무선: 두 번째 자리 2/6/A/E" : "유선/기타: 두 번째 자리 짝수") + "): " + txtNewMac.Text);
+                SetStatus("준비", "랜덤 MAC 생성 (" + (wireless ? "무선" : "유선") + "용): " + txtNewMac.Text);
             }
             catch (Exception ex)
             {
@@ -198,13 +198,13 @@ namespace MacChanger
             string mac = MacAddressUtil.Normalize(txtNewMac.Text);
             if (mac == null)
             {
-                SetStatus("실패", "새 MAC 형식이 올바르지 않습니다. 12자리 16진수를 입력하세요 (예: 02-1A-2B-3C-4D-5E).");
+                SetStatus("실패", "새 MAC은 16진수 12자리여야 합니다. (예: 02-1A-2B-3C-4D-5E)");
                 txtNewMac.Focus();
                 return;
             }
             if (!MacAddressUtil.IsUnicast(mac))
             {
-                SetStatus("실패", "두 번째 자리가 홀수(멀티캐스트 주소)입니다. 두 번째 자리를 짝수로 바꾸세요.");
+                SetStatus("실패", "두 번째 자리는 짝수여야 합니다. (홀수는 멀티캐스트 주소)");
                 txtNewMac.Focus();
                 return;
             }
@@ -321,7 +321,7 @@ namespace MacChanger
         {
             if (chkAutoStopIp.Checked && ParseStopIp() == null)
             {
-                SetStatus("실패", "자동 정지할 IP/대역 형식이 올바르지 않습니다 (예: 123, 123.123, 123.123.123, 123.123.123.123). 고친 뒤 다시 시작하세요.");
+                SetStatus("실패", "자동 정지 IP/대역 형식 오류 — 예: 123, 123.123, 123.123.123, 123.123.123.123");
                 txtAutoStopIp.Focus();
                 return;
             }
@@ -330,7 +330,7 @@ namespace MacChanger
             autoRunning = true;
             UpdateControlStates();   // 실행 중에는 정지·로그 지우기·백그라운드 실행 외의 조작을 잠근다
             btnAutoToggle.Text = "정지 (IP 대기)";
-            if (!busy) SetStatus("준비", "자동 변경 시작: IP 할당 후 " + nudAutoDelay.Value + "초 뒤, 또는 IP 할당 대기가 " + nudWaitTimeout.Value + "초를 넘으면 새 MAC을 적용합니다.");
+            if (!busy) SetStatus("준비", "자동 변경 시작 — IP 할당 " + nudAutoDelay.Value + "초 뒤, 또는 할당 대기 " + nudWaitTimeout.Value + "초 초과 시 새 MAC 적용");
             if (AutoStopIfTargetAssigned(lastLoggedIp)) return;   // 지정 IP가 이미 할당되어 있으면 바꾸지 않고 바로 정지
             ScheduleAuto();   // 이미 IP가 할당되어 있으면 지금부터 센다
             RunAutoIfDue();   // 바로 남은 시간을 보여주고, 0초면 즉시 시작
@@ -680,9 +680,9 @@ namespace MacChanger
                 ShowCurrentMac(adapter, current);
 
                 if (current == null)
-                    SetStatus("실패", "현재 MAC을 읽지 못했습니다 (어댑터가 비활성화되었거나 드라이버가 조회를 거부).");
+                    SetStatus("실패", "현재 MAC을 읽지 못했습니다. (어댑터 비활성 또는 드라이버 거부)");
                 else if (permanent == null)
-                    SetStatus("준비", "공장 MAC을 읽지 못했습니다 (드라이버가 OID 조회를 지원하지 않음). 현재 MAC은 읽었습니다.");
+                    SetStatus("준비", "공장 MAC은 읽지 못했습니다(드라이버 미지원). 현재 MAC만 표시합니다.");
                 else
                     SetStatus("준비", "어댑터 정보를 읽었습니다.");
 
@@ -739,19 +739,15 @@ namespace MacChanger
             // 어댑터가 올라와 있으면 지금 사용 중인 MAC도 함께 갱신한다 (느리게 올라온 어댑터, Wi-Fi 임의 주소 변경 등).
             if (info != null && info.Mac != null && info.Mac != "000000000000") ShowCurrentMac(adapter, info.Mac);
 
-            // 로그 기준은 169.254.x.x 를 뺀 "실제 할당" 주소 목록 — 전환 중 자동 사설 주소가 붙었다 떨어져도 중복 기록되지 않는다.
+            // 표시·로그 기준은 169.254.x.x 를 뺀 "실제 할당" 주소 목록 — 전환 중 자동 사설 주소가 붙었다 떨어져도 보이거나 중복 기록되지 않는다.
             string assigned, assignedMasks;
             IpMonitor.FilterAssigned(ip, info != null ? info.Masks : null, out assigned, out assignedMasks);
-            string text;
-            if (ip == null) text = "(어댑터 비활성 상태)";
-            else if (ip.Length == 0) text = up ? "(IP 없음 — 할당 대기 중)" : "(연결 안 됨 — 링크 없음)";
-            else if (!up) text = ip + "  (링크 없음)";
-            else if (assigned.Length == 0) text = ip + "  (DHCP 응답 없음 — 자동 사설 주소)";
-            else text = ip;
-            SetIfChanged(txtCurrentIp, text);
-            SetIfChanged(txtMask, ip == null || ip.Length == 0 ? string.Empty : info.Masks);
-            SetIfChanged(txtGateway, ip == null ? string.Empty : info.Gateways.Length > 0 ? info.Gateways : "(없음)");
-            SetIfChanged(txtDns, ip == null ? string.Empty : info.Dns.Length > 0 ? info.Dns : "(없음)");
+            // 표시는 ipconfig 와 같은 기준: 링크가 없으면 주소를 보이지 않고, 실제 IP가 있으면 169.254 자동 사설 주소는 숨긴다.
+            bool shown = ip != null && up && ip.Length > 0;
+            SetIfChanged(txtCurrentIp, IpDisplayText(ip, up, assigned));
+            SetIfChanged(txtMask, !shown ? string.Empty : assigned.Length > 0 ? assignedMasks : info.Masks);
+            SetIfChanged(txtGateway, ip == null || !up ? string.Empty : info.Gateways.Length > 0 ? info.Gateways : "(없음)");
+            SetIfChanged(txtDns, ip == null || !up ? string.Empty : info.Dns.Length > 0 ? info.Dns : "(없음)");
 
             if (ip == null || ip.Length == 0 || !up)
             {
@@ -780,6 +776,19 @@ namespace MacChanger
             if (chkShowLog.Checked) AppendToBox(assigned, line);   // 숨겨진 동안에는 상자에 기록하지 않음
             ipLogError = AppendToFile(line);
             ScheduleAuto();   // 새로 할당된 IP → 자동 변경 예약
+        }
+
+        /// <summary>
+        /// 현재 IP 칸의 문장 (ipconfig 기준). ip: 어댑터의 IPv4 목록(어댑터가 IP 스택에 없으면 null), up: 링크 상태, assigned: 169.254 를 뺀 실제 할당 목록.
+        /// 링크가 없으면 남아 있는 주소(대개 169.254 자동 사설 주소)를 보이지 않고, 실제 IP가 있으면 함께 붙어 있는 169.254 는 숨긴다.
+        /// </summary>
+        private static string IpDisplayText(string ip, bool up, string assigned)
+        {
+            if (ip == null) return "(어댑터 비활성 상태)";
+            if (!up) return "(연결 안 됨 — 링크 없음)";
+            if (ip.Length == 0) return "(IP 없음 — 할당 대기 중)";
+            if (assigned.Length == 0) return ip + "  (DHCP 응답 없음 — 자동 사설 주소)";
+            return assigned;
         }
 
         // ------------------------------------------------------------------
@@ -921,7 +930,7 @@ namespace MacChanger
         }
 
         /// <param name="state">준비 / 진행 / 완료 / 실패</param>
-        /// <param name="message">상태 라벨에 덧붙일 한국어 메시지 (전체 내용은 툴팁으로도 볼 수 있다)</param>
+        /// <param name="message">상태 라벨에 덧붙일 한국어 메시지 (라벨에 다 들어가지 않아 잘려 보일 때만 전체 문장을 툴팁으로 보여 준다)</param>
         private void SetStatus(string state, string message)
         {
             string text = "상태: " + state;
@@ -935,7 +944,9 @@ namespace MacChanger
                 case "진행": lblStatus.ForeColor = Color.DarkOrange; break;
                 default: lblStatus.ForeColor = SystemColors.ControlText; break;
             }
-            toolTip.SetToolTip(lblStatus, text);
+            // 라벨에 다 들어가면 툴팁 없음, 잘려 보이면(…) 전체 문장을 툴팁으로
+            bool clipped = TextRenderer.MeasureText(text, lblStatus.Font).Width > lblStatus.ClientSize.Width - 4;
+            toolTip.SetToolTip(lblStatus, clipped ? text : null);
         }
     }
 }

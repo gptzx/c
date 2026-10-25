@@ -85,7 +85,7 @@ namespace MacChanger.Core
 
         /// <summary>
         /// 주소 목록에서 169.254.x.x(DHCP 응답이 없을 때 Windows가 붙이는 자동 사설 주소)를 뺀 "실제 할당된" 주소 목록과, 같은 순서의 서브넷 마스크 목록.
-        /// 로그 중복 판정과 기록은 이 값으로만 한다 — DHCP 전환 중 169.254 주소가 잠깐 붙었다 떨어져도 같은 줄이 다시 기록되지 않는다.
+        /// 화면 표시·로그 중복 판정·기록은 이 값으로 한다 — DHCP 전환 중 169.254 주소가 잠깐 붙었다 떨어져도 보이거나 다시 기록되지 않는다.
         /// </summary>
         public static void FilterAssigned(string addresses, string masks, out string assignedAddresses, out string assignedMasks)
         {
