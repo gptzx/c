@@ -58,6 +58,7 @@
   <ItemGroup>
     <Compile Include="Core\AdapterController.cs" />
     <Compile Include="Core\AdapterEnumerator.cs" />
+    <Compile Include="Core\IpChangeNotifier.cs" />
     <Compile Include="Core\IpMonitor.cs" />
     <Compile Include="Core\MacAddressUtil.cs" />
     <Compile Include="Core\MacChangeService.cs" />
@@ -74,9 +75,6 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="TrafficGraph.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Include="IntervalUpDown.cs">
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />

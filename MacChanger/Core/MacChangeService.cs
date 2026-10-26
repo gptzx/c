@@ -23,7 +23,8 @@ namespace MacChanger.Core
     {
         /// <summary>어댑터 재시작 후 NDIS 장치가 다시 열릴 때까지 기다리는 최대 시간</summary>
         public const int MacWaitTimeoutMs = 20000;
-        public const int MacWaitPollMs = 1000;
+        /// <summary>재시작 직후 드라이버가 올라올 때까지 NDIS 조회를 다시 시도하는 간격 — 짧을수록 MAC 변경 완료가 빨리 확인된다</summary>
+        public const int MacWaitPollMs = 250;
         /// <summary>(폴백 경로) 비활성화 직후 활성화하기 전 잠시 대기</summary>
         public const int AfterDisableDelayMs = 700;
 
@@ -92,7 +93,7 @@ namespace MacChanger.Core
                     return mac;
                 }
                 if (DateTime.UtcNow >= deadline) break;
-                log("어댑터 초기화 대기 중... (" + attempt + ")");
+                if (attempt % (1000 / MacWaitPollMs) == 1) log("어댑터 초기화 대기 중... (" + ((attempt - 1) * MacWaitPollMs / 1000 + 1) + "초)");
                 Thread.Sleep(MacWaitPollMs);
             }
             // 시간 초과: GetAdaptersAddresses/WMI 값으로 폴백 (NDIS 는 ReadCurrentMac 이 먼저 한 번 더 본다)
@@ -129,7 +130,8 @@ namespace MacChanger.Core
             }
 
             // 재시작 전에 정리한다: 장치가 다시 올라오면 DHCP 클라이언트가 이 키를 새로 읽으므로, 임대 값이 없으면 새 IP를 받는다.
-            tcpipWarning = CleanTcpipIfDhcp(adapter.InterfaceGuid, "[2/3]", resetDns, log);
+            bool cleaned;
+            tcpipWarning = CleanTcpipIfDhcp(adapter.InterfaceGuid, "[2/3]", resetDns, log, out cleaned);
             if (tcpipWarning != null) log("[2/3] 경고: " + tcpipWarning);
 
             log("[3/3] 어댑터 재시작");
@@ -146,6 +148,7 @@ namespace MacChanger.Core
             }
             fail.AdapterRestarted = restarted;
             if (deferred) return null;   // 어댑터가 실제로 재시작되지 않았으므로 검증 생략 — 호출자가 재부팅 안내
+            if (cleaned) SweepLeaseCachesAfterRestart(adapter.InterfaceGuid, log);   // Wi-Fi 가 인터페이스를 내리며 쓴 현재 SSID 캐시까지 지운다
 
             current = WaitForCurrentMac(adapter, log, out live);
             if (current == null)
@@ -341,12 +344,30 @@ namespace MacChanger.Core
         // ------------------------------------------------------------------
 
         /// <summary>
+        /// 재시작 직후 DHCP 임대 캐시 하위 키를 한 번 더 지운다. Wi-Fi 는 네트워크를 떠날 때(인터페이스가 내려갈 때) 현재 SSID 의 임대를 캐시에 쓰므로
+        /// 재시작 전 정리만으로는 남을 수 있고, 남아 있으면 같은 SSID 에 다시 붙을 때 옛 IP 가 그대로 돌아온다. 실패는 진행 로그에만 남긴다.
+        /// </summary>
+        private static void SweepLeaseCachesAfterRestart(string guid, Action<string> log)
+        {
+            try
+            {
+                int n = MacRegistry.DeleteLeaseCacheSubKeys(guid);
+                if (n > 0) log("재시작 후 SSID 별 임대 캐시 " + n + "개 추가 삭제");
+            }
+            catch (Exception ex)
+            {
+                log("재시작 후 임대 캐시 정리 실패: " + ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Tcpip 값 자동 정리 (재시작 직전에 수행). 인터페이스 키의 EnableDHCP가 1이면 그 키의 값(EnableDHCP 는 항상, NameServer 는 값이 있고
         /// resetDns 가 false 면 남김)과 전역 Tcpip\Parameters의 DhcpDomain/DhcpNameServer를 삭제한다. EnableDHCP가 0(고정 IP)이거나 값/키가 없으면 건너뛴다.
         /// 실패해도 예외를 던지지 않고 경고 문자열을 돌려준다 (없으면 null).
         /// </summary>
-        private static string CleanTcpipIfDhcp(string guid, string stepLabel, bool resetDns, Action<string> log)
+        private static string CleanTcpipIfDhcp(string guid, string stepLabel, bool resetDns, Action<string> log, out bool cleaned)
         {
+            cleaned = false;
             try
             {
                 bool keyExists;
@@ -357,6 +378,7 @@ namespace MacChanger.Core
                     return null;
                 }
                 log(stepLabel + " DHCP 사용 중 → Tcpip 값 자동 정리");
+                cleaned = true;
             }
             catch (Exception ex)
             {
@@ -367,11 +389,13 @@ namespace MacChanger.Core
             string interfaceWarning = null;
             try
             {
-                bool keptNameServer = MacRegistry.CleanTcpipInterfaceValues(guid, resetDns);
+                int leaseCaches;
+                bool keptNameServer = MacRegistry.CleanTcpipInterfaceValues(guid, resetDns, out leaseCaches);
                 log(stepLabel + (keptNameServer
                     ? " Tcpip 값 정리: EnableDHCP 와 NameServer(직접 지정한 DNS)만 남김"
                     : resetDns ? " Tcpip 값 정리: EnableDHCP 만 남김 (DNS 초기화)"
-                               : " Tcpip 값 정리: EnableDHCP 만 남김"));
+                               : " Tcpip 값 정리: EnableDHCP 만 남김")
+                    + (leaseCaches > 0 ? " + SSID 별 임대 캐시 " + leaseCaches + "개 삭제" : ""));
             }
             catch (Exception ex)
             {

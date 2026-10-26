@@ -178,13 +178,15 @@ namespace MacChanger.Core
         /// <summary>
         /// Tcpip\Parameters\Interfaces\{GUID} 키의 값을 정리한다. EnableDHCP 는 항상 남긴다.
         /// NameServer 에 값 데이터가 있고 resetDns 가 false 면 NameServer 도 함께 남기고,
-        /// 값이 비어 있거나 항목이 없거나 resetDns 가 true 면 NameServer 도 지운다. 하위 키는 건드리지 않는다.
-        /// NameServer 를 남겼으면 true, 키가 없으면 false. 삭제되지 않은 값이 있으면 예외.
+        /// 값이 비어 있거나 항목이 없거나 resetDns 가 true 면 NameServer 도 지운다.
+        /// 하위 키 가운데 DHCP 임대 캐시(Wi-Fi 가 SSID 별로 두는 DhcpIPAddress/DhcpServer/Lease 를 가진 키)는 통째로 지우고(leaseCachesDeleted 에 개수),
+        /// 그 밖의 하위 키는 건드리지 않는다. NameServer 를 남겼으면 true, 키가 없으면 false. 삭제되지 않은 값/하위 키가 있으면 예외.
         /// </summary>
-        public static bool CleanTcpipInterfaceValues(string interfaceGuid, bool resetDns)
+        public static bool CleanTcpipInterfaceValues(string interfaceGuid, bool resetDns, out int leaseCachesDeleted)
         {
             List<string> failed = new List<string>();
             bool keepNameServer;
+            leaseCachesDeleted = 0;
             using (RegistryKey hklm = OpenHklm64())
             using (RegistryKey key = hklm.OpenSubKey(TcpipInterfacesKeyPath + "\\" + interfaceGuid, true))
             {
@@ -197,11 +199,59 @@ namespace MacChanger.Core
                     key.DeleteValue(valueName, false);
                     if (key.GetValue(valueName) != null) failed.Add(valueName.Length == 0 ? "(기본값)" : valueName);
                 }
+                foreach (string subKeyName in key.GetSubKeyNames())
+                {
+                    if (!IsLeaseCacheKey(key, subKeyName)) continue;
+                    key.DeleteSubKeyTree(subKeyName, false);
+                    using (RegistryKey check = key.OpenSubKey(subKeyName))
+                    {
+                        if (check != null) failed.Add(subKeyName + "\\");
+                        else leaseCachesDeleted++;
+                    }
+                }
                 key.Flush();
             }
             if (failed.Count > 0)
                 throw new InvalidOperationException("삭제되지 않은 값: " + string.Join(", ", failed.ToArray()));
             return keepNameServer;
+        }
+
+        /// <summary>
+        /// 인터페이스 키의 DHCP 임대 캐시 하위 키만 지운다 (값은 건드리지 않는다). 재시작 직후 한 번 더 부르기 위한 것 —
+        /// Wi-Fi 는 네트워크를 떠날 때(재시작으로 인터페이스가 내려갈 때) 현재 SSID 의 캐시를 쓰므로, 재시작 전 정리만으로는 그 항목이 남을 수 있다.
+        /// 지운 개수를 돌려주고, 키가 없으면 0.
+        /// </summary>
+        public static int DeleteLeaseCacheSubKeys(string interfaceGuid)
+        {
+            int deleted = 0;
+            using (RegistryKey hklm = OpenHklm64())
+            using (RegistryKey key = hklm.OpenSubKey(TcpipInterfacesKeyPath + "\\" + interfaceGuid, true))
+            {
+                if (key == null) return 0;
+                foreach (string subKeyName in key.GetSubKeyNames())
+                {
+                    if (!IsLeaseCacheKey(key, subKeyName)) continue;
+                    key.DeleteSubKeyTree(subKeyName, false);
+                    using (RegistryKey check = key.OpenSubKey(subKeyName))
+                        if (check == null) deleted++;
+                }
+            }
+            return deleted;
+        }
+
+        /// <summary>하위 키가 DHCP 임대 캐시인지 — 임대 값(DhcpIPAddress, DhcpServer, Lease) 가운데 하나라도 있으면 캐시로 본다.</summary>
+        private static bool IsLeaseCacheKey(RegistryKey parent, string subKeyName)
+        {
+            using (RegistryKey sub = parent.OpenSubKey(subKeyName))
+            {
+                if (sub == null) return false;
+                foreach (string name in sub.GetValueNames())
+                    if (string.Equals(name, "DhcpIPAddress", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(name, "DhcpServer", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(name, "Lease", StringComparison.OrdinalIgnoreCase))
+                        return true;
+                return false;
+            }
         }
 
         /// <summary>레지스트리 값에 실제 데이터가 있는지 (null, 빈 문자열, 공백뿐인 문자열, 빈 배열은 데이터 없음).</summary>

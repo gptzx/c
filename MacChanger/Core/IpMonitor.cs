@@ -58,7 +58,7 @@ namespace MacChanger.Core
             List<string> masks = new List<string>();
             List<UnicastIPAddressInformation> unicast = new List<UnicastIPAddressInformation>();
             foreach (UnicastIPAddressInformation u in props.UnicastAddresses)
-                if (u.Address.AddressFamily == AddressFamily.InterNetwork) unicast.Add(u);
+                if (u.Address.AddressFamily == AddressFamily.InterNetwork && IsUsable(u)) unicast.Add(u);
             unicast.Sort(delegate(UnicastIPAddressInformation a, UnicastIPAddressInformation b)
             {
                 return string.CompareOrdinal(a.Address.ToString(), b.Address.ToString());
@@ -81,6 +81,20 @@ namespace MacChanger.Core
                 if (d.AddressFamily == AddressFamily.InterNetwork) dns.Add(d.ToString());
             info.Dns = string.Join(", ", dns.ToArray());
             return info;
+        }
+
+        /// <summary>
+        /// 중복 주소 감지(DAD)에서 중복으로 판정되었거나(Duplicate) 무효(Invalid)인 주소는 쓸 수 없으므로 뺀다. 임시(Tentative) 상태는 DHCP 가 막 붙인 정상 주소이므로 포함한다.
+        /// 상태를 읽을 수 없는 환경이면 포함한다.
+        /// </summary>
+        private static bool IsUsable(UnicastIPAddressInformation u)
+        {
+            try
+            {
+                DuplicateAddressDetectionState state = u.DuplicateAddressDetectionState;
+                return state != DuplicateAddressDetectionState.Duplicate && state != DuplicateAddressDetectionState.Invalid;
+            }
+            catch (Exception) { return true; }
         }
 
         /// <summary>

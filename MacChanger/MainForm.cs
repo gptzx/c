@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
+using System.Threading;
 using System.Windows.Forms;
 using MacChanger.Core;
 using MacChanger.Native;
@@ -37,8 +38,10 @@ namespace MacChanger
         private string lastLoggedIp;
         /// <summary>lastLoggedIp 와 함께 읽은 서브넷 마스크·기본 게이트웨이 (로그 상자를 켜거나 파일 저장을 켤 때 같은 줄을 다시 만들기 위해)</summary>
         private string lastLoggedMask, lastLoggedGateway;
-        /// <summary>그래프 위치: 로그 상자와 반반일 때 / 로그 상자를 숨겨 아래쪽 전체 폭을 쓸 때 (DPI/글꼴 배율이 적용된 뒤의 실제 픽셀)</summary>
-        private Rectangle graphHalfBounds, graphFullBounds;
+        /// <summary>IP 구성 변화 알림 (Windows 가 알려 줄 때만 다시 읽는다; 못 쓰는 OS 에서는 ipTimer 가 1초 폴링으로 대신)</summary>
+        private IpChangeNotifier ipNotifier;
+        /// <summary>알림이 몰려와도 UI 스레드에는 한 번만 넘기기 위한 플래그 (0: 대기 중 없음, 1: 넘겨 둠)</summary>
+        private int refreshQueued;
         /// <summary>선택한 어댑터의 송수신 카운터 (1초마다 읽어 그래프에 넣는다)</summary>
         private readonly TrafficMonitor traffic = new TrafficMonitor();
         /// <summary>직전 RefreshIp 에서 발생한 로그 저장 오류 (없으면 null)</summary>
@@ -58,13 +61,13 @@ namespace MacChanger
         /// <summary>지정 IP/대역 할당으로 자동 변경을 정지했을 때의 안내문 — 작업 완료 상태에 그대로 붙인다 (어느 IP가 맞았는지 남기기 위해)</summary>
         private string autoStopMessage;
 
+        /// <summary>알림을 쓸 때의 안전망 폴링 주기 / 알림 직후 한 번 더 읽는 간격(게이트웨이·DNS 는 주소보다 조금 늦게 기록된다) / 알림을 못 쓰는 OS 에서의 폴링 주기 (ms)</summary>
+        private const int IpSafetyPollMs = 3000, IpSettleMs = 1000, IpFallbackPollMs = 1000;
+
         public MainForm()
         {
             InitializeComponent();
-            ipTimer.Interval = (int)nudIpInterval.Value;                              // IP 확인 주기의 기본값은 입력 칸 한 곳에서만 정한다
-            graphHalfBounds = trafficGraph.Bounds;                                    // AutoScaleMode.Font 배율이 적용된 뒤의 값
-            graphFullBounds = Rectangle.Union(txtIpLog.Bounds, trafficGraph.Bounds);   // 로그 상자를 숨기면 그 자리까지 그래프가 차지
-            ApplyLogBoxVisibility();                                                  // 기본값: 로그 상자 숨김
+            ApplyLogBoxEnabled();   // 기본값: 로그 상자 꺼짐(흐리게 표시, 기록 안 함)
             try
             {
                 // 실행 파일에 내장된 아이콘(그룹 아이콘 ID 32512)을 EXE 리소스에서 직접 읽어 창/작업표시줄 아이콘으로 쓴다.
@@ -88,14 +91,13 @@ namespace MacChanger
             toolTip.SetToolTip(nudAutoDelay, "IP를 받은 뒤 MAC을 바꾸기까지 기다리는 초 (0 = 즉시, 최대 7일)");
             toolTip.SetToolTip(btnAutoToggle, "자동 변경 시작 / 정지\n변경 실패·재부팅 필요·지정 IP 할당 시 스스로 멈춥니다.");
             toolTip.SetToolTip(nudWaitTimeout, "자동 변경 중 IP를 못 받은 채 새 MAC을 적용하기까지 기다리는 초 (10~60)");
-            toolTip.SetToolTip(nudIpInterval, "IP를 다시 읽는 간격 (ms) — 위/아래 버튼은 100 단위로 100~2000, 직접 입력은 1~2000");
-            toolTip.SetToolTip(chkAutoStopIp, "오른쪽 칸의 IP(또는 그 대역의 IP)를 받으면 자동 변경을 멈춥니다.");
+            toolTip.SetToolTip(chkAutoStopIp, "체크하면 오른쪽 칸의 IP(또는 그 대역의 IP)를 받는 순간 자동 변경을 멈춥니다.");
             toolTip.SetToolTip(txtAutoStopIp, "멈출 IP 또는 대역\n123 → 123.*.*.*   123.123 → 123.123.*.*   123.123.123 → 123.123.123.*");
             toolTip.SetToolTip(chkLogTime, "로그에 시각을 함께 기록합니다.");
             toolTip.SetToolTip(chkLogMask, "로그에 서브넷 마스크를 함께 기록합니다.");
             toolTip.SetToolTip(chkLogGateway, "로그에 기본 게이트웨이를 함께 기록합니다.");
             toolTip.SetToolTip(chkLogMac, "로그에 그 시점의 MAC을 함께 기록합니다.");
-            toolTip.SetToolTip(chkShowLog, "할당 IP 로그 상자를 보이거나 숨깁니다. (숨기면 그래프가 전체 폭)\n숨긴 동안은 상자에 기록하지 않습니다.");
+            toolTip.SetToolTip(chkLogBox, "할당 IP 로그 상자를 켜거나 끕니다.\n끄면 흐리게 보이고 기록하지 않습니다. (로그 비우기는 언제나 가능)");
             toolTip.SetToolTip(chkIpLog, "새 IP를 받을 때마다 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 기록합니다.");
             toolTip.SetToolTip(btnBackground, "창을 숨기고 트레이 아이콘으로 계속 실행합니다.\n트레이 아이콘을 두 번 클릭하면 창이 다시 열립니다.");
             toolTip.SetToolTip(trafficGraph, "송수신 속도 그래프 (빨강: 수신, 초록: 송신)");
@@ -117,7 +119,7 @@ namespace MacChanger
         private void MainForm_Shown(object sender, EventArgs e)
         {
             // 창이 먼저 그려진 뒤에 (WMI 조회가 몇 초 걸릴 수 있으므로) 목록을 읽는다.
-            BeginInvoke(new MethodInvoker(delegate { LoadAdapters(null); ipTimer.Start(); secondTimer.Start(); }));
+            BeginInvoke(new MethodInvoker(delegate { LoadAdapters(null); StartIpMonitoring(); secondTimer.Start(); }));
         }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -128,6 +130,69 @@ namespace MacChanger
                 MessageBox.Show(this, "작업이 진행 중입니다. 완료될 때까지 기다려 주세요.", Program.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 e.Cancel = true;
             }
+        }
+
+        /// <summary>창이 실제로 닫힌 뒤(종료가 취소될 수 있는 FormClosing 이 아니라) 알림을 해제한다 — UI 스레드, 콜백 밖.</summary>
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            if (ipNotifier != null)
+            {
+                ipNotifier.Dispose();
+                ipNotifier = null;
+            }
+            base.OnFormClosed(e);
+        }
+
+        // ------------------------------------------------------------------
+        // IP 변화 감지: Windows 알림(즉시) + 안전망 폴링
+        // ------------------------------------------------------------------
+        /// <summary>
+        /// 알림이 등록되면 변화가 있을 때만 즉시 다시 읽고(1초 뒤 한 번 더 — 늦게 기록되는 게이트웨이·DNS 반영), ipTimer 는 놓친 변화를 메우는 안전망(3초)으로 돈다.
+        /// 알림을 못 쓰는 OS 면 1초 폴링.
+        /// </summary>
+        private void StartIpMonitoring()
+        {
+            ipNotifier = new IpChangeNotifier();
+            if (ipNotifier.Available)
+            {
+                ipNotifier.Changed += ipNotifier_Changed;
+                ipTimer.Interval = IpSafetyPollMs;
+            }
+            else
+            {
+                string why = ipNotifier.Error;
+                ipNotifier.Dispose();
+                ipNotifier = null;
+                ipTimer.Interval = IpFallbackPollMs;
+                if (!busy) SetStatus("준비", "IP 변경 알림을 쓸 수 없어 1초마다 확인합니다. (" + why + ")");
+            }
+            ipTimer.Start();
+        }
+
+        /// <summary>시스템 스레드에서 온 알림 — UI 스레드에 한 번만 넘긴다 (몰려오는 알림은 한 번의 갱신으로 합친다).</summary>
+        private void ipNotifier_Changed(object sender, EventArgs e)
+        {
+            if (Interlocked.Exchange(ref refreshQueued, 1) != 0) return;
+            try
+            {
+                if (IsHandleCreated && !IsDisposed) BeginInvoke(new MethodInvoker(RefreshIpFromNotification));
+                else Interlocked.Exchange(ref refreshQueued, 0);
+            }
+            catch (Exception)   // 창이 닫히는 중
+            {
+                Interlocked.Exchange(ref refreshQueued, 0);
+            }
+        }
+
+        private void RefreshIpFromNotification()
+        {
+            Interlocked.Exchange(ref refreshQueued, 0);
+            if (IsDisposed) return;
+            RefreshIp();
+            if (ipLogError != null) SetStatus("실패", ipLogError);
+            ipTimer.Stop();                 // 1초 뒤 한 번 더 읽고(settle), 그 다음부터 안전망 주기로 돌아간다
+            ipTimer.Interval = IpSettleMs;
+            ipTimer.Start();
         }
 
         // ------------------------------------------------------------------
@@ -294,9 +359,9 @@ namespace MacChanger
             else SetStatus("준비", "할당 IP 로그를 실행 파일 옆 " + IpMonitor.LogFileName + " 에 저장합니다.");
         }
 
-        private void chkShowLog_CheckedChanged(object sender, EventArgs e)
+        private void chkLogBox_CheckedChanged(object sender, EventArgs e)
         {
-            ApplyLogBoxVisibility();
+            ApplyLogBoxEnabled();
         }
 
         private void chkAuto_CheckedChanged(object sender, EventArgs e)
@@ -328,9 +393,10 @@ namespace MacChanger
             waiting = false;   // 할당 대기 시간은 시작 시점부터 센다
             autoStopMessage = null;
             autoRunning = true;
-            UpdateControlStates();   // 실행 중에는 정지·로그 지우기·백그라운드 실행 외의 조작을 잠근다
+            UpdateControlStates();   // 실행 중에는 정지·로그 비우기·백그라운드 실행 외의 조작을 잠근다
             btnAutoToggle.Text = "정지 (IP 대기)";
             if (!busy) SetStatus("준비", "자동 변경 시작 — IP 할당 " + nudAutoDelay.Value + "초 뒤, 또는 할당 대기 " + nudWaitTimeout.Value + "초 초과 시 새 MAC 적용");
+            RefreshIp();   // 지금 상태를 바로 읽어 둔다 — IP 없이 링크만 올라와 있으면 할당 대기 시계가 이 순간부터 센다 (알림만 기다리면 최대 3초 늦는다)
             if (AutoStopIfTargetAssigned(lastLoggedIp)) return;   // 지정 IP가 이미 할당되어 있으면 바꾸지 않고 바로 정지
             ScheduleAuto();   // 이미 IP가 할당되어 있으면 지금부터 센다
             RunAutoIfDue();   // 바로 남은 시간을 보여주고, 0초면 즉시 시작
@@ -482,7 +548,7 @@ namespace MacChanger
             return null;
         }
 
-        /// <summary>자동 변경 중 "지정 IP 할당 시 자동 정지"의 IP/대역에 속하는 IP가 할당 목록에 있으면 자동 변경을 정지한다. 정지했으면 true.</summary>
+        /// <summary>자동 변경 중 "자동 정지: 지정 IP/대역 할당 시 정지"의 IP/대역에 속하는 IP가 할당 목록에 있으면 자동 변경을 정지한다. 정지했으면 true.</summary>
         private bool AutoStopIfTargetAssigned(string assignedIps)
         {
             if (busy || !autoRunning || !chkAutoStopIp.Checked || string.IsNullOrEmpty(assignedIps)) return false;
@@ -546,28 +612,27 @@ namespace MacChanger
             }
         }
 
-        /// <summary>로그 상자 표시 여부에 맞춰 상자와 지우기 버튼, 그래프 폭을 맞춘다 (상자를 숨기면 그래프가 아래쪽 전체 폭을 쓴다).</summary>
-        private void ApplyLogBoxVisibility()
+        /// <summary>로그 상자 사용 여부에 맞춘다: 상자는 늘 보이되 꺼져 있으면 흐리게(비활성) 표시하고 기록하지 않는다. 로그 비우기는 언제나 된다.</summary>
+        private void ApplyLogBoxEnabled()
         {
-            bool show = chkShowLog.Checked;
+            bool on = chkLogBox.Checked;
             NetworkAdapterInfo adapter = SelectedAdapter;
-            if (show && adapter != null && lastLoggedIp != null && lastLoggedIp != lastBoxIp)   // 켜는 순간 현재 IP (마지막 줄과 같으면 생략)
+            if (on && adapter != null && lastLoggedIp != null && lastLoggedIp != lastBoxIp)   // 켜는 순간 현재 IP (마지막 줄과 같으면 생략)
                 AppendToBox(lastLoggedIp, BuildLastLogLine(adapter));
-            txtIpLog.Visible = show;
-            btnClearLog.Enabled = show;
-            trafficGraph.Bounds = show ? graphHalfBounds : graphFullBounds;
+            txtIpLog.Enabled = on;
         }
 
-        /// <summary>IP 확인 주기(기본 1초)마다: IP 구성 표시와 할당 IP 로그 (새 IP가 보이면 자동 변경 예약).</summary>
+        /// <summary>안전망 폴링(알림 직후에는 settle 재조회): 알림을 놓쳤을 때를 대비해 IP 구성을 다시 읽는다 (알림을 못 쓰는 OS 에서는 이것이 유일한 갱신 경로).</summary>
         private void ipTimer_Tick(object sender, EventArgs e)
         {
             RefreshIp();
             if (ipLogError != null) SetStatus("실패", ipLogError);
-        }
-
-        private void nudIpInterval_ValueChanged(object sender, EventArgs e)
-        {
-            ipTimer.Interval = (int)nudIpInterval.Value;   // 바로 적용 (동작 중이면 새 주기로 다시 시작)
+            if (ipNotifier != null && ipTimer.Interval != IpSafetyPollMs)
+            {
+                ipTimer.Stop();
+                ipTimer.Interval = IpSafetyPollMs;
+                ipTimer.Start();
+            }
         }
 
         /// <summary>
@@ -589,6 +654,8 @@ namespace MacChanger
                 trafficGraph.AddSample(traffic.ReceivedSpeed, traffic.SentSpeed, traffic.ReceivedTotal, traffic.SentTotal);
             }
             RunAutoIfDue();
+            // 할당 대기 시계는 IP 를 다시 읽지 않고도 1초마다 센다 (대기 상태는 마지막 RefreshIp 가 정한다)
+            if (waiting && autoRunning && !busy && TrackWaiting(true, Environment.TickCount)) StartWaitTimeoutChange();
         }
 
         // ------------------------------------------------------------------
@@ -773,9 +840,10 @@ namespace MacChanger
             lastLoggedMask = assignedMasks;
             lastLoggedGateway = info.Gateways;
             string line = BuildLastLogLine(adapter);   // 상자와 파일에 같은 줄
-            if (chkShowLog.Checked) AppendToBox(assigned, line);   // 숨겨진 동안에는 상자에 기록하지 않음
+            if (chkLogBox.Checked) AppendToBox(assigned, line);   // 꺼져 있는 동안에는 상자에 기록하지 않음
             ipLogError = AppendToFile(line);
             ScheduleAuto();   // 새로 할당된 IP → 자동 변경 예약
+            if (autoPending && (int)nudAutoDelay.Value == 0) RunAutoIfDue();   // 0초면 다음 타이머 틱을 기다리지 않고 바로 바꾼다
         }
 
         /// <summary>
@@ -900,7 +968,7 @@ namespace MacChanger
 
         /// <summary>
         /// 작업 중(busy)과 자동 변경 실행 중(autoRunning)에 맞춰 컨트롤 사용 가능 여부를 한곳에서 맞춘다.
-        /// 자동 변경 실행 중에는 정지(btnAutoToggle), 로그 지우기(로그 상자 표시 여부를 따름), 백그라운드 실행 외의 버튼·체크박스·어댑터 선택·입력 칸을 모두 잠근다.
+        /// 자동 변경 실행 중에는 정지(btnAutoToggle), 로그 비우기, 백그라운드 실행 외의 버튼·체크박스·어댑터 선택·입력 칸을 모두 잠근다.
         /// </summary>
         private void UpdateControlStates()
         {
@@ -918,11 +986,10 @@ namespace MacChanger
             chkLogMask.Enabled = !autoRunning;
             chkLogGateway.Enabled = !autoRunning;
             chkLogMac.Enabled = !autoRunning;
-            chkShowLog.Enabled = !autoRunning;
+            chkLogBox.Enabled = !autoRunning;
             btnAutoToggle.Enabled = chkAuto.Checked;                     // 실행 중에도 정지할 수 있어야 하므로 잠그지 않는다
             nudAutoDelay.Enabled = !autoRunning && chkAuto.Checked;        // 지연 초와 할당 대기 초는 자동 변경을 체크해야 열린다
             nudWaitTimeout.Enabled = !autoRunning && chkAuto.Checked;
-            nudIpInterval.Enabled = !autoRunning;
             chkAutoStopIp.Enabled = !autoRunning;
             txtAutoStopIp.Enabled = !autoRunning && chkAutoStopIp.Checked;   // 체크해야 입력 칸이 열린다
             chkResetDns.Enabled = !autoRunning;

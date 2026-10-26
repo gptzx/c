@@ -75,6 +75,37 @@ namespace MacChanger.Native
         [DllImport("iphlpapi.dll")]
         public static extern int ConvertInterfaceGuidToLuid(ref Guid interfaceGuid, out ulong interfaceLuid);
 
+        // ------------------------------------------------------------------
+        // iphlpapi — IP 구성 변화 알림 (Windows Vista 이상). 콜백은 시스템 스레드에서 호출되며 Row 는 NULL 일 수 있다 (초기 알림).
+        // CancelMibChangeNotify2 는 콜백 안에서 부르면 안 된다 (교착).
+        // ------------------------------------------------------------------
+        public const ushort AF_INET = 2;
+
+        /// <summary>PIPINTERFACE_CHANGE_CALLBACK(PVOID CallerContext, PMIB_IPINTERFACE_ROW Row, MIB_NOTIFICATION_TYPE NotificationType) — 사용자 모드에서는 WINAPI(stdcall)</summary>
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        public delegate void IpInterfaceChangeCallback(IntPtr callerContext, IntPtr row, int notificationType);
+        /// <summary>PUNICAST_IPADDRESS_CHANGE_CALLBACK(PVOID CallerContext, PMIB_UNICASTIPADDRESS_ROW Row, MIB_NOTIFICATION_TYPE NotificationType)</summary>
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        public delegate void UnicastIpAddressChangeCallback(IntPtr callerContext, IntPtr row, int notificationType);
+        /// <summary>PIPFORWARD_CHANGE_CALLBACK(PVOID CallerContext, PMIB_IPFORWARD_ROW2 Row, MIB_NOTIFICATION_TYPE NotificationType)</summary>
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        public delegate void IpForwardChangeCallback(IntPtr callerContext, IntPtr row, int notificationType);
+
+        [DllImport("iphlpapi.dll")]
+        public static extern int NotifyIpInterfaceChange(ushort family, IpInterfaceChangeCallback callback, IntPtr callerContext,
+            [MarshalAs(UnmanagedType.U1)] bool initialNotification, out IntPtr notificationHandle);
+
+        [DllImport("iphlpapi.dll")]
+        public static extern int NotifyUnicastIpAddressChange(ushort family, UnicastIpAddressChangeCallback callback, IntPtr callerContext,
+            [MarshalAs(UnmanagedType.U1)] bool initialNotification, out IntPtr notificationHandle);
+
+        [DllImport("iphlpapi.dll")]
+        public static extern int NotifyRouteChange2(ushort family, IpForwardChangeCallback callback, IntPtr callerContext,
+            [MarshalAs(UnmanagedType.U1)] bool initialNotification, out IntPtr notificationHandle);
+
+        [DllImport("iphlpapi.dll")]
+        public static extern int CancelMibChangeNotify2(IntPtr notificationHandle);
+
         /// <summary>InterfaceLuid 로 지정한 인터페이스의 MIB_IF_ROW2 를 읽는다. 성공하면 NO_ERROR(0).</summary>
         [DllImport("iphlpapi.dll")]
         public static extern int GetIfEntry2(ref MIB_IF_ROW2 row);
