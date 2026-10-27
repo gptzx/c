@@ -12,6 +12,9 @@ namespace MacChanger.Core
     {
         /// <summary>감시 중인 어댑터 GUID (없으면 null)</summary>
         public string InterfaceGuid { get; private set; }
+        /// <summary>InterfaceGuid 를 파싱한 값 (Attach 때 한 번만; 없거나 형식이 틀리면 hasGuid=false 로 Sample 은 바로 false)</summary>
+        private Guid guid;
+        private bool hasGuid;
 
         /// <summary>GUID 에서 구한 NET_LUID (아직 못 구했거나 조회가 실패하면 0 — 다음 샘플 때 다시 구한다)</summary>
         private ulong interfaceLuid;
@@ -35,6 +38,7 @@ namespace MacChanger.Core
         public void Attach(string interfaceGuid)
         {
             InterfaceGuid = interfaceGuid;
+            hasGuid = interfaceGuid != null && Guid.TryParse(interfaceGuid, out guid);   // 1초마다 다시 파싱하지 않는다
             interfaceLuid = 0;
             hasLast = false;
             hasBase = false;
@@ -52,8 +56,7 @@ namespace MacChanger.Core
         public bool Sample()
         {
             ReceivedSpeed = SentSpeed = 0;
-            Guid guid;
-            if (InterfaceGuid == null || !Guid.TryParse(InterfaceGuid, out guid)) return false;
+            if (!hasGuid) return false;
             if (interfaceLuid == 0 && NativeMethods.ConvertInterfaceGuidToLuid(ref guid, out interfaceLuid) != 0)
             {
                 interfaceLuid = 0;

@@ -14,27 +14,23 @@ namespace MacChanger.Core
         public event EventHandler Changed;
 
         private IntPtr interfaceHandle, addressHandle, routeHandle;
-        // 델리게이트를 필드에 붙들어 두어야 GC 가 콜백을 거두지 않는다 (네이티브 쪽이 포인터를 계속 쓴다)
-        private readonly NativeMethods.IpInterfaceChangeCallback interfaceCallback;
-        private readonly NativeMethods.UnicastIpAddressChangeCallback addressCallback;
-        private readonly NativeMethods.IpForwardChangeCallback routeCallback;
+        // 델리게이트를 필드에 붙들어 두어야 GC 가 콜백을 거두지 않는다 (네이티브 쪽이 포인터를 계속 쓴다). 세 등록이 같은 콜백을 쓴다.
+        private readonly NativeMethods.MibChangeCallback callback;
         private bool disposed;
 
-        /// <summary>세 알림 가운데 하나라도 등록되었는지. false 면 이 OS 에서는 쓸 수 없다(폴링으로 대신).</summary>
+        /// <summary>인터페이스 알림과 주소 알림 가운데 하나라도 등록되었는지 (경로 알림만으로는 IP 할당을 알 수 없으므로 세지 않는다). false 면 이 OS 에서는 쓸 수 없다(폴링으로 대신).</summary>
         public bool Available { get; private set; }
         /// <summary>등록 실패 사유 (모두 성공했으면 null)</summary>
         public string Error { get; private set; }
 
         public IpChangeNotifier()
         {
-            interfaceCallback = OnInterfaceChange;
-            addressCallback = OnAddressChange;
-            routeCallback = OnRouteChange;
+            callback = OnChange;
             try
             {
-                int r1 = NativeMethods.NotifyIpInterfaceChange(NativeMethods.AF_INET, interfaceCallback, IntPtr.Zero, false, out interfaceHandle);
-                int r2 = NativeMethods.NotifyUnicastIpAddressChange(NativeMethods.AF_INET, addressCallback, IntPtr.Zero, false, out addressHandle);
-                int r3 = NativeMethods.NotifyRouteChange2(NativeMethods.AF_INET, routeCallback, IntPtr.Zero, false, out routeHandle);
+                int r1 = NativeMethods.NotifyIpInterfaceChange(NativeMethods.AF_INET, callback, IntPtr.Zero, false, out interfaceHandle);
+                int r2 = NativeMethods.NotifyUnicastIpAddressChange(NativeMethods.AF_INET, callback, IntPtr.Zero, false, out addressHandle);
+                int r3 = NativeMethods.NotifyRouteChange2(NativeMethods.AF_INET, callback, IntPtr.Zero, false, out routeHandle);
                 if (r1 != 0) interfaceHandle = IntPtr.Zero;
                 if (r2 != 0) addressHandle = IntPtr.Zero;
                 if (r3 != 0) routeHandle = IntPtr.Zero;
@@ -49,11 +45,8 @@ namespace MacChanger.Core
             }
         }
 
-        private void OnInterfaceChange(IntPtr callerContext, IntPtr row, int notificationType) { Raise(); }
-        private void OnAddressChange(IntPtr callerContext, IntPtr row, int notificationType) { Raise(); }
-        private void OnRouteChange(IntPtr callerContext, IntPtr row, int notificationType) { Raise(); }
-
-        private void Raise()
+        /// <summary>세 알림 공통 콜백 (시스템 스레드)</summary>
+        private void OnChange(IntPtr callerContext, IntPtr row, int notificationType)
         {
             if (disposed) return;
             EventHandler handler = Changed;

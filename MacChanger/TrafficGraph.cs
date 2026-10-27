@@ -13,8 +13,8 @@ namespace MacChanger
     /// </summary>
     public sealed class TrafficGraph : Control
     {
-        /// <summary>보관하는 샘플 수 — DPI/글꼴 배율이 크게 적용된 전체 폭 그래프의 보이는 샘플 수(536 × 배율 / PixelsPerSample)보다도 넉넉히 두어, 버퍼가 다 찬 뒤에도 그래프 왼쪽이 비지 않고 로그 상자를 숨겨 넓어져도 이전 이력이 보인다</summary>
-        private const int Capacity = 4096;
+        /// <summary>보관하는 샘플 수 — DPI/글꼴 배율이 크게 적용된 그래프(262 × 배율 px)의 보이는 샘플 수(262 × 배율 / PixelsPerSample)보다 넉넉히 두어, 버퍼가 다 찬 뒤에도 그래프 왼쪽이 비지 않는다</summary>
+        private const int Capacity = 1024;
         /// <summary>샘플 하나의 가로 폭(픽셀). TMAC 과 같은 밀도가 되도록 1초를 2픽셀로 그린다.</summary>
         private const int PixelsPerSample = 2;
         private readonly long[] received = new long[Capacity];
@@ -31,7 +31,7 @@ namespace MacChanger
         private static readonly Color ReceivedText = Color.FromArgb(192, 0, 0);
         private static readonly Color SentText = Color.Green;
         private const TextFormatFlags TextFlags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
-        /// <summary>값 칸: 폭이 모자라면(반폭 그래프에 TB 단위 값 등) 끝을 "…" 으로 줄인다</summary>
+        /// <summary>값 칸: 폭이 모자라면(TB 단위 값 등) 끝을 "…" 으로 줄인다</summary>
         private const TextFormatFlags ValueFlags = TextFlags | TextFormatFlags.EndEllipsis;
 
         public TrafficGraph()

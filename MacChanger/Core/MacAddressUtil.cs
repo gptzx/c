@@ -74,15 +74,10 @@ namespace MacChanger.Core
             return Normalize(mac) == "000000000000";
         }
 
-        public static bool IsAllFF(string mac)
-        {
-            return Normalize(mac) == "FFFFFFFFFFFF";
-        }
-
         /// <summary>
         /// 랜덤 MAC 생성 (12자리 모두 0~F 범위에서 무작위, 첫 자리도 고정하지 않음).
         /// wireless == true  : 왼쪽에서 두 번째 자리만 2/6/A/E 중 하나 → X2/X6/XA/XE-XX-XX-XX-XX-XX (유니캐스트·로컬관리 보장)
-        /// wireless == false : 왼쪽에서 두 번째 자리만 짝수(0/2/4/6/8/A/C/E) → 유니캐스트 보장, 00-00-00-00-00-00과 FF-FF-FF-FF-FF-FF는 제외
+        /// wireless == false : 왼쪽에서 두 번째 자리만 짝수(0/2/4/6/8/A/C/E) → 유니캐스트 보장, 00-00-00-00-00-00은 제외 (FF-FF-FF-FF-FF-FF 는 두 번째 자리가 홀수라 애초에 나오지 않는다)
         /// </summary>
         public static string GenerateRandom(bool wireless)
         {
@@ -98,7 +93,7 @@ namespace MacChanger.Core
                     for (int i = 0; i < 12; i++) c[i] = hex[rnd[i] & 0x0F];
                     c[1] = secondChoices[rnd[1] & (secondChoices.Length - 1)];   // 4 또는 8개 중 균등 선택
                     string mac = new string(c);
-                    if (mac == "000000000000" || mac == "FFFFFFFFFFFF") continue;
+                    if (mac == "000000000000") continue;
                     return mac;
                 }
             }

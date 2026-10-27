@@ -33,37 +33,28 @@ namespace MacChanger.Core
         }
 
         /// <summary>
-        /// Control\Class\{4D36E972-...} 아래 00XX 하위 키를 모두 돌며 NetCfgInstanceId가 interfaceGuid와 같은 키 이름("0001" 등)을 찾는다.
+        /// 열려 있는 Control\Class\{4D36E972-...} 키 아래 00XX 하위 키를 모두 돌며 NetCfgInstanceId가 interfaceGuid와 같은 키 이름("0001" 등)을 찾는다.
         /// 없으면 null.
         /// </summary>
-        private static string FindClassSubKeyName(string interfaceGuid)
+        private static string FindClassSubKeyName(RegistryKey classKey, string interfaceGuid)
         {
-            if (string.IsNullOrEmpty(interfaceGuid)) throw new ArgumentNullException("interfaceGuid");
-
-            using (RegistryKey hklm = OpenHklm64())
-            using (RegistryKey classKey = hklm.OpenSubKey(NetClassKeyPath, false))
+            foreach (string name in classKey.GetSubKeyNames())
             {
-                if (classKey == null)
-                    throw new InvalidOperationException("네트워크 클래스 키를 열 수 없습니다: HKLM\\" + NetClassKeyPath);
-
-                foreach (string name in classKey.GetSubKeyNames())
+                string id = null;
+                try
                 {
-                    string id = null;
-                    try
+                    using (RegistryKey sub = classKey.OpenSubKey(name, false))
                     {
-                        using (RegistryKey sub = classKey.OpenSubKey(name, false))
-                        {
-                            if (sub != null) id = sub.GetValue(NetCfgInstanceIdValueName) as string;
-                        }
+                        if (sub != null) id = sub.GetValue(NetCfgInstanceIdValueName) as string;
                     }
-                    catch (SecurityException) { continue; }        // 예: "Properties" 하위 키는 관리자도 열 수 없다
-                    catch (UnauthorizedAccessException) { continue; }
-
-                    if (id == null) continue;
-                    string normalized = NetworkAdapterInfo.NormalizeGuid(id);
-                    if (normalized != null && string.Equals(normalized, interfaceGuid, StringComparison.OrdinalIgnoreCase))
-                        return name;
                 }
+                catch (SecurityException) { continue; }        // 예: "Properties" 하위 키는 관리자도 열 수 없다
+                catch (UnauthorizedAccessException) { continue; }
+
+                if (id == null) continue;
+                string normalized = NetworkAdapterInfo.NormalizeGuid(id);
+                if (normalized != null && string.Equals(normalized, interfaceGuid, StringComparison.OrdinalIgnoreCase))
+                    return name;
             }
             return null;
         }
@@ -82,13 +73,17 @@ namespace MacChanger.Core
 
         private static RegistryKey OpenAdapterClassKey(string interfaceGuid, bool writable)
         {
-            string subKeyName = FindClassSubKeyName(interfaceGuid);
-            if (subKeyName == null)
-                throw new InvalidOperationException("NetCfgInstanceId가 " + interfaceGuid + "인 클래스 하위 키(00XX)를 찾지 못했습니다.");
+            if (string.IsNullOrEmpty(interfaceGuid)) throw new ArgumentNullException("interfaceGuid");
 
             using (RegistryKey hklm = OpenHklm64())
+            using (RegistryKey classKey = hklm.OpenSubKey(NetClassKeyPath, false))
             {
-                RegistryKey key = hklm.OpenSubKey(NetClassKeyPath + "\\" + subKeyName, writable);
+                if (classKey == null)
+                    throw new InvalidOperationException("네트워크 클래스 키를 열 수 없습니다: HKLM\\" + NetClassKeyPath);
+                string subKeyName = FindClassSubKeyName(classKey, interfaceGuid);
+                if (subKeyName == null)
+                    throw new InvalidOperationException("NetCfgInstanceId가 " + interfaceGuid + "인 클래스 하위 키(00XX)를 찾지 못했습니다.");
+                RegistryKey key = classKey.OpenSubKey(subKeyName, writable);   // 부모 키를 닫아도 열어 둔 하위 키는 그대로 유효하다
                 if (key == null)
                     throw new InvalidOperationException("클래스 하위 키를 열 수 없습니다: " + subKeyName);
                 return key;
@@ -172,7 +167,7 @@ namespace MacChanger.Core
                 key.Flush();
             }
             if (failed.Count > 0)
-                throw new InvalidOperationException("삭제되지 않은 값: " + string.Join(", ", failed.ToArray()));
+                throw new InvalidOperationException("삭제되지 않은 값: " + string.Join(", ", failed));
         }
 
         /// <summary>
@@ -199,21 +194,29 @@ namespace MacChanger.Core
                     key.DeleteValue(valueName, false);
                     if (key.GetValue(valueName) != null) failed.Add(valueName.Length == 0 ? "(기본값)" : valueName);
                 }
-                foreach (string subKeyName in key.GetSubKeyNames())
-                {
-                    if (!IsLeaseCacheKey(key, subKeyName)) continue;
-                    key.DeleteSubKeyTree(subKeyName, false);
-                    using (RegistryKey check = key.OpenSubKey(subKeyName))
-                    {
-                        if (check != null) failed.Add(subKeyName + "\\");
-                        else leaseCachesDeleted++;
-                    }
-                }
+                leaseCachesDeleted = DeleteLeaseCaches(key, failed);
                 key.Flush();
             }
             if (failed.Count > 0)
-                throw new InvalidOperationException("삭제되지 않은 값: " + string.Join(", ", failed.ToArray()));
+                throw new InvalidOperationException("삭제되지 않은 값: " + string.Join(", ", failed));
             return keepNameServer;
+        }
+
+        /// <summary>key 의 DHCP 임대 캐시 하위 키를 모두 지우고 지운 개수를 돌려준다. failed 가 null 이 아니면 지워지지 않은 하위 키 이름("이름\\")을 거기에 넣는다.</summary>
+        private static int DeleteLeaseCaches(RegistryKey key, List<string> failed)
+        {
+            int deleted = 0;
+            foreach (string subKeyName in key.GetSubKeyNames())
+            {
+                if (!IsLeaseCacheKey(key, subKeyName)) continue;
+                key.DeleteSubKeyTree(subKeyName, false);
+                using (RegistryKey check = key.OpenSubKey(subKeyName))
+                {
+                    if (check == null) deleted++;
+                    else if (failed != null) failed.Add(subKeyName + "\\");
+                }
+            }
+            return deleted;
         }
 
         /// <summary>
@@ -223,20 +226,11 @@ namespace MacChanger.Core
         /// </summary>
         public static int DeleteLeaseCacheSubKeys(string interfaceGuid)
         {
-            int deleted = 0;
             using (RegistryKey hklm = OpenHklm64())
             using (RegistryKey key = hklm.OpenSubKey(TcpipInterfacesKeyPath + "\\" + interfaceGuid, true))
             {
-                if (key == null) return 0;
-                foreach (string subKeyName in key.GetSubKeyNames())
-                {
-                    if (!IsLeaseCacheKey(key, subKeyName)) continue;
-                    key.DeleteSubKeyTree(subKeyName, false);
-                    using (RegistryKey check = key.OpenSubKey(subKeyName))
-                        if (check == null) deleted++;
-                }
+                return key == null ? 0 : DeleteLeaseCaches(key, null);
             }
-            return deleted;
         }
 
         /// <summary>하위 키가 DHCP 임대 캐시인지 — 임대 값(DhcpIPAddress, DhcpServer, Lease) 가운데 하나라도 있으면 캐시로 본다.</summary>

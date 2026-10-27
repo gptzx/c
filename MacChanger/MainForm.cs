@@ -85,7 +85,7 @@ namespace MacChanger
             toolTip.SetToolTip(chkResetDns, "변경 적용·원상복구·IP 갱신 때 직접 지정한 DNS도 함께 지웁니다. (DHCP 어댑터만)");
             toolTip.SetToolTip(btnApply, "새 MAC을 바로 적용합니다. (어댑터 재시작, 확인 창 없음)");
             toolTip.SetToolTip(btnRenewIp, "MAC은 그대로 두고 IP만 새로 받습니다. (어댑터 재시작, 확인 창 없음)");
-            toolTip.SetToolTip(btnRestore, "원래(공장) MAC으로 되돌립니다. (어댑터 재시작, 확인 창 없음)");
+            toolTip.SetToolTip(btnRestore, "원래(공장) MAC으로 되돌립니다. (확인 창을 거쳐 어댑터 재시작)");
             toolTip.SetToolTip(btnClearLog, "로그 상자를 비웁니다. (로그 파일은 그대로)");
             toolTip.SetToolTip(chkAuto, "자동 변경 사용 — '시작'을 누르면 IP를 받을 때마다 지정한 초 뒤에 랜덤 MAC을 적용합니다.");
             toolTip.SetToolTip(nudAutoDelay, "IP를 받은 뒤 MAC을 바꾸기까지 기다리는 초 (0 = 즉시, 최대 7일)");
@@ -111,11 +111,6 @@ namespace MacChanger
         // ------------------------------------------------------------------
         // 폼 이벤트
         // ------------------------------------------------------------------
-        private void MainForm_Load(object sender, EventArgs e)
-        {
-            SetStatus("진행", "어댑터 목록을 읽는 중...");
-        }
-
         private void MainForm_Shown(object sender, EventArgs e)
         {
             // 창이 먼저 그려진 뒤에 (WMI 조회가 몇 초 걸릴 수 있으므로) 목록을 읽는다.
@@ -273,9 +268,9 @@ namespace MacChanger
                 txtNewMac.Focus();
                 return;
             }
-            if (MacAddressUtil.IsAllZero(mac) || MacAddressUtil.IsAllFF(mac))
+            if (MacAddressUtil.IsAllZero(mac))   // FF-FF-…는 두 번째 자리가 홀수라 위에서 이미 걸러진다
             {
-                SetStatus("실패", "00-00-00-00-00-00과 FF-FF-FF-FF-FF-FF는 사용할 수 없습니다.");
+                SetStatus("실패", "00-00-00-00-00-00은 사용할 수 없습니다.");
                 txtNewMac.Focus();
                 return;
             }
@@ -311,7 +306,14 @@ namespace MacChanger
                 SetStatus("준비", "현재 MAC이 이미 원래(공장) MAC과 같습니다. 복구할 내용이 없습니다.");
                 return;
             }
-            // 확인 대화 상자 없이 바로 복구한다 (자동 변경 실행 중에는 이 버튼이 잠겨 있다).
+            // 세 작업 가운데 원상복구만 확인 대화 상자를 거친다 (변경 적용·IP 갱신은 바로 실행; 자동 변경 실행 중에는 이 버튼이 잠겨 있다).
+            string question = "현재 MAC " + txtCurrentMac.Text + " 을(를) 원래(공장) MAC " + txtPermanentMac.Text
+                + " 으로 되돌립니다.\r\n어댑터가 재시작됩니다. 계속할까요?";
+            if (MessageBox.Show(this, question, Program.AppTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+            {
+                SetStatus("준비", "원상복구를 취소했습니다.");
+                return;
+            }
             OperationArgs args = new OperationArgs();
             args.Kind = OperationKind.Restore;
             args.Adapter = adapter;

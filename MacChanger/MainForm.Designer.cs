@@ -568,7 +568,6 @@
             // 
             // ipTimer
             // 
-            this.ipTimer.Interval = 1000;
             this.ipTimer.Tick += new System.EventHandler(this.ipTimer_Tick);
             // 
             // secondTimer
@@ -641,7 +640,6 @@
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "MAC 주소 변경 유틸리티";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
-            this.Load += new System.EventHandler(this.MainForm_Load);
             this.Shown += new System.EventHandler(this.MainForm_Shown);
             ((System.ComponentModel.ISupportInitialize)(this.nudAutoDelay)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudWaitTimeout)).EndInit();

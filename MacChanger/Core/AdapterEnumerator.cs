@@ -214,7 +214,7 @@ namespace MacChanger.Core
 
         // ------------------------------------------------------------------
         // 3) GetAdaptersAddresses — NetworkInterface.GetAllNetworkInterfaces() 가 Vista 이상에서 이 API 를 호출한다.
-        //    (비활성화된 어댑터는 나오지 않는다. 열거 폴백과 현재 MAC 재조회에 사용)
+        //    (비활성화된 어댑터는 나오지 않는다. 열거 폴백과 Win32_NetworkAdapter 경로의 무선 판별 보강에 사용)
         // ------------------------------------------------------------------
         private static List<NetworkAdapterInfo> EnumerateGetAdaptersAddresses()
         {
@@ -247,7 +247,7 @@ namespace MacChanger.Core
         }
 
         // ------------------------------------------------------------------
-        // 단일 어댑터 MAC 재조회 헬퍼 (변경/복구 후 UI 갱신용)
+        // 단일 어댑터 현재 MAC 조회 폴백 (MacChangeService.ReadCurrentMac 이 NDIS 조회에 실패했을 때)
         // ------------------------------------------------------------------
         public static string GetCurrentMacViaGetAdaptersAddresses(string interfaceGuid)
         {
