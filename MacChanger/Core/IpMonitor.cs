@@ -58,7 +58,7 @@ namespace MacChanger.Core
             List<string> masks = new List<string>();
             List<UnicastIPAddressInformation> unicast = new List<UnicastIPAddressInformation>();
             foreach (UnicastIPAddressInformation u in props.UnicastAddresses)
-                if (u.Address.AddressFamily == AddressFamily.InterNetwork && IsUsable(u)) unicast.Add(u);
+                if (u.Address.AddressFamily == AddressFamily.InterNetwork && !u.Address.Equals(IPAddress.Any) && IsUsable(u)) unicast.Add(u);   // 0.0.0.0 은 반환 뒤의 자리표시자
             unicast.Sort(delegate(UnicastIPAddressInformation a, UnicastIPAddressInformation b)
             {
                 return string.CompareOrdinal(a.Address.ToString(), b.Address.ToString());

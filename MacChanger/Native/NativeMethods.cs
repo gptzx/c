@@ -103,6 +103,28 @@ namespace MacChanger.Native
         [DllImport("iphlpapi.dll")]
         public static extern int CancelMibChangeNotify2(IntPtr notificationHandle);
 
+        // ------------------------------------------------------------------
+        // iphlpapi — DHCP 임대 반환: ipconfig /release 가 쓰는 IpReleaseAddress (Windows 2000 이상, 관리자 권한)
+        // ------------------------------------------------------------------
+        public const int MAX_ADAPTER_NAME = 128;
+
+        /// <summary>IP_ADAPTER_INDEX_MAP (260바이트): 인터페이스 인덱스와 "\DEVICE\TCPIP_{GUID}" 이름. GetInterfaceInfo 가 채우고 IpReleaseAddress 에 그대로 넘긴다.</summary>
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct IP_ADAPTER_INDEX_MAP
+        {
+            public uint Index;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = MAX_ADAPTER_NAME)]
+            public string Name;
+        }
+
+        /// <summary>IPv4 를 쓰는 어댑터 목록(IP_INTERFACE_INFO: LONG NumAdapters 뒤에 IP_ADAPTER_INDEX_MAP 배열). 버퍼가 작으면 ERROR_INSUFFICIENT_BUFFER 와 필요한 크기, 어댑터가 없으면 ERROR_NO_DATA.</summary>
+        [DllImport("iphlpapi.dll")]
+        public static extern int GetInterfaceInfo(IntPtr pIfTable, ref uint dwOutBufLen);
+
+        /// <summary>DHCP 클라이언트가 서버에 DHCPRELEASE 를 보내고 주소를 내린다 (ipconfig /release). 성공하면 NO_ERROR(0).</summary>
+        [DllImport("iphlpapi.dll")]
+        public static extern int IpReleaseAddress(ref IP_ADAPTER_INDEX_MAP adapterInfo);
+
         /// <summary>InterfaceLuid 로 지정한 인터페이스의 MIB_IF_ROW2 를 읽는다. 성공하면 NO_ERROR(0).</summary>
         [DllImport("iphlpapi.dll")]
         public static extern int GetIfEntry2(ref MIB_IF_ROW2 row);
@@ -130,6 +152,7 @@ namespace MacChanger.Native
         public const uint DI_NEEDREBOOT = 0x00000100;
 
         public const int ERROR_INSUFFICIENT_BUFFER = 122;
+        public const int ERROR_NO_DATA = 232;
         public const int ERROR_NO_MORE_ITEMS = 259;
         /// <summary>64비트 Windows에서 32비트 프로세스가 SetupDiCallClassInstaller를 호출하면 반환되는 오류</summary>
         public const int ERROR_IN_WOW64 = unchecked((int)0xE0000235);

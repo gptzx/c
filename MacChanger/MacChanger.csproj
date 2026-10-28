@@ -58,6 +58,7 @@
   <ItemGroup>
     <Compile Include="Core\AdapterController.cs" />
     <Compile Include="Core\AdapterEnumerator.cs" />
+    <Compile Include="Core\DhcpRelease.cs" />
     <Compile Include="Core\IpChangeNotifier.cs" />
     <Compile Include="Core\IpMonitor.cs" />
     <Compile Include="Core\MacAddressUtil.cs" />

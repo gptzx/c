@@ -17,7 +17,7 @@ namespace MacChanger.Core
     }
 
     /// <summary>
-    /// 변경 적용 / 원상복구 / IP 갱신 절차를 순서대로 수행한다. 각 단계는 try/catch로 감싸고 한국어 진행 메시지를 log 콜백(상태 라벨)으로 보낸다.
+    /// 변경 적용 / 원상복구 / IP 갱신 / IP 반환 절차를 순서대로 수행한다. 각 단계는 try/catch로 감싸고 한국어 진행 메시지를 log 콜백(상태 라벨)으로 보낸다.
     /// </summary>
     public static class MacChangeService
     {
@@ -108,6 +108,8 @@ namespace MacChanger.Core
             public bool Restarted;
             public bool Deferred;
             public string TcpipWarning;
+            /// <summary>작업 전 IP 반환 옵션이 켜져 있었는데 반환에 실패했으면 그 이유 (성공·건너뜀이면 null)</summary>
+            public string ReleaseWarning;
             /// <summary>재시작 뒤 읽은 현재 MAC 과 그것을 NDIS 직접 조회로 읽었는지</summary>
             public string Current;
             public bool Live;
@@ -119,7 +121,7 @@ namespace MacChanger.Core
                 result.Success = true;
                 result.RebootRequired = Deferred;
                 result.AdapterRestarted = Restarted;
-                result.Message = message + WarningSuffix(TcpipWarning);
+                result.Message = message + WarningSuffix(TcpipWarning) + WarningSuffix(ReleaseWarning);
                 return result;
             }
 
@@ -135,19 +137,24 @@ namespace MacChanger.Core
         }
 
         /// <summary>
-        /// 변경 적용·원상복구·IP 갱신의 공통 절차: [1/3] 레지스트리 단계(registryStep) → [2/3] Tcpip 값 자동 정리 → [3/3] 어댑터 재시작 → 현재 MAC 재조회.
+        /// 변경 적용·원상복구·IP 갱신의 공통 절차: (IP 반환 →) 레지스트리 단계(registryStep) → Tcpip 값 자동 정리 → 어댑터 재시작 → 현재 MAC 재조회 — 단계 번호는 StepLabel 이 [n/3] 또는 [n/4] 로 붙인다.
         /// 재시작은 장치 관리자(어댑터 속성 창)가 고급 속성 변경을 반영할 때와 같은 DICS_PROPCHANGE 한 번이다 — "사용 안 함" 상태를 거치지 않고
         /// 장치를 멈췄다가 바로 다시 시작하므로 빠르고, 드라이버는 다시 올라오면서 레지스트리의 NetworkAddress 를 읽는다.
         /// SetupAPI 경로를 쓸 수 없는 환경에서만 예전 방식(비활성화 → 활성화, WMI 폴백 포함)으로 대신한다.
+        /// releaseIp 가 켜져 있으면 맨 앞에 DHCP 서버에 IP 반환 단계가 들어간다 (ipconfig /release 와 같음; 실패해도 경고만 남기고 계속한다).
         /// registryDoneNote 는 레지스트리 단계가 끝난 뒤 재시작에 실패했을 때 붙일 안내("새 MAC은 기록되었습니다." 등, 없으면 null).
         /// 실패 결과(Fail)에는 어댑터가 실제로 재시작되었는지(AdapterRestarted)가 이미 채워져 있다.
         /// </summary>
-        private static Cycle RunCycle(NetworkAdapterInfo adapter, Action<string> log, string registryStepLabel, Action registryStep, string registryDoneNote, bool resetDns)
+        private static Cycle RunCycle(NetworkAdapterInfo adapter, Action<string> log, string registryStepLabel, Action registryStep, string registryDoneNote, bool resetDns, bool releaseIp)
         {
             Cycle cycle = new Cycle();
             MacChangeResult fail = new MacChangeResult();
+            int totalSteps = releaseIp ? 4 : 3;
+            int step = 0;
 
-            log("[1/3] " + registryStepLabel);
+            if (releaseIp) cycle.ReleaseWarning = ReleaseIpStep(adapter, StepLabel(++step, totalSteps), log);
+
+            log(StepLabel(++step, totalSteps) + " " + registryStepLabel);
             try
             {
                 registryStep();
@@ -161,10 +168,11 @@ namespace MacChanger.Core
 
             // 재시작 전에 정리한다: 장치가 다시 올라오면 DHCP 클라이언트가 이 키를 새로 읽으므로, 임대 값이 없으면 새 IP를 받는다.
             bool cleaned;
-            cycle.TcpipWarning = CleanTcpipIfDhcp(adapter.InterfaceGuid, resetDns, log, out cleaned);
-            if (cycle.TcpipWarning != null) log("[2/3] 경고: " + cycle.TcpipWarning);
+            string cleanLabel = StepLabel(++step, totalSteps);
+            cycle.TcpipWarning = CleanTcpipIfDhcp(adapter.InterfaceGuid, cleanLabel, resetDns, log, out cleaned);
+            if (cycle.TcpipWarning != null) log(cleanLabel + " 경고: " + cycle.TcpipWarning);
 
-            log("[3/3] 어댑터 재시작");
+            log(StepLabel(++step, totalSteps) + " 어댑터 재시작");
             try
             {
                 AdapterController.Restart(adapter, log, out cycle.Deferred);
@@ -187,6 +195,11 @@ namespace MacChanger.Core
                 cycle.Fail = fail;
             }
             return cycle;
+        }
+
+        private static string StepLabel(int step, int total)
+        {
+            return "[" + step + "/" + total + "]";
         }
 
         /// <summary>
@@ -240,7 +253,7 @@ namespace MacChanger.Core
         // ------------------------------------------------------------------
         // 변경 적용
         // ------------------------------------------------------------------
-        public static MacChangeResult Apply(NetworkAdapterInfo adapter, string newMac, bool resetDns, Action<string> log)
+        public static MacChangeResult Apply(NetworkAdapterInfo adapter, string newMac, bool resetDns, bool releaseIp, Action<string> log)
         {
             if (adapter == null) throw new ArgumentNullException("adapter");
             string mac = MacAddressUtil.Normalize(newMac);
@@ -252,7 +265,7 @@ namespace MacChanger.Core
             }
             string guid = adapter.InterfaceGuid;
 
-            Cycle cycle = RunCycle(adapter, log, "새 MAC 기록", delegate { MacRegistry.SetNetworkAddress(guid, mac); }, "새 MAC은 기록되었습니다.", resetDns);
+            Cycle cycle = RunCycle(adapter, log, "새 MAC 기록", delegate { MacRegistry.SetNetworkAddress(guid, mac); }, "새 MAC은 기록되었습니다.", resetDns, releaseIp);
             if (cycle.Fail != null) return cycle.Fail;
             if (cycle.Deferred)
                 return cycle.Success("새 MAC " + MacAddressUtil.Format(mac) + " 을(를) 기록했지만 어댑터를 바로 재시작하지 못했습니다. 재부팅 후 적용됩니다.");
@@ -270,13 +283,13 @@ namespace MacChanger.Core
         // ------------------------------------------------------------------
         // 원상복구
         // ------------------------------------------------------------------
-        public static MacChangeResult Restore(NetworkAdapterInfo adapter, bool resetDns, Action<string> log)
+        public static MacChangeResult Restore(NetworkAdapterInfo adapter, bool resetDns, bool releaseIp, Action<string> log)
         {
             if (adapter == null) throw new ArgumentNullException("adapter");
             string guid = adapter.InterfaceGuid;
             bool existed = false;
 
-            Cycle cycle = RunCycle(adapter, log, "MAC 설정 삭제", delegate { existed = MacRegistry.DeleteNetworkAddress(guid); }, "MAC 설정은 지웠습니다.", resetDns);
+            Cycle cycle = RunCycle(adapter, log, "MAC 설정 삭제", delegate { existed = MacRegistry.DeleteNetworkAddress(guid); }, "MAC 설정은 지웠습니다.", resetDns, releaseIp);
             if (cycle.Fail != null) return cycle.Fail;
             if (cycle.Deferred)
                 return cycle.Success((existed ? "MAC 설정을 지웠지만 " : "지울 MAC 설정은 없었고 ") + "어댑터를 바로 재시작하지 못했습니다. 재부팅 후 공장 MAC으로 돌아갑니다.");
@@ -298,12 +311,12 @@ namespace MacChanger.Core
         /// IP 갱신: NetworkAddress 는 그대로 두어 MAC 은 바꾸지 않고, Tcpip 값 자동 정리(EnableDHCP = 1 인 경우) → 어댑터 재시작(DICS_PROPCHANGE)으로 IP 만 새로 받는다.
         /// (원상복구가 이미 공장 MAC 인 어댑터에서 하던 일과 같다.) 재시작 전후 MAC 을 비교해 실제로 유지되었는지 알려준다.
         /// </summary>
-        public static MacChangeResult RenewIp(NetworkAdapterInfo adapter, bool resetDns, Action<string> log)
+        public static MacChangeResult RenewIp(NetworkAdapterInfo adapter, bool resetDns, bool releaseIp, Action<string> log)
         {
             if (adapter == null) throw new ArgumentNullException("adapter");
             string before = ReadCurrentMac(adapter);   // 어댑터가 꺼져 있으면 null — 그때는 "유지" 여부를 말하지 않는다
 
-            Cycle cycle = RunCycle(adapter, log, "MAC 설정 유지 (변경 없음)", delegate { }, null, resetDns);
+            Cycle cycle = RunCycle(adapter, log, "MAC 설정 유지 (변경 없음)", delegate { }, null, resetDns, releaseIp);
             if (cycle.Fail != null) return cycle.Fail;
             if (cycle.Deferred) return cycle.Success("어댑터를 바로 재시작하지 못했습니다. 재부팅 후 IP가 새로 할당됩니다.");
             string shown = MacAddressUtil.Format(cycle.Current) + SourceNote(cycle.Live);
@@ -312,6 +325,95 @@ namespace MacChanger.Core
             // 보류 중이던 NetworkAddress 값이 이번 재시작에 적용되었거나 Wi-Fi 임의 하드웨어 주소가 바뀐 경우
             return cycle.Success("IP 갱신 완료 — 현재 MAC " + shown + " 이(가) 재시작 전(" + MacAddressUtil.Format(before) + ")과 다릅니다. "
                 + "(보류 중이던 MAC 설정이 적용되었거나 Wi-Fi '임의 하드웨어 주소'가 켜져 있음)");
+        }
+
+        // ------------------------------------------------------------------
+        // IP 반환 (ipconfig /release)
+        // ------------------------------------------------------------------
+        /// <summary>
+        /// 지금 할당된 IP 를 DHCP 서버에 반환한다 (어댑터는 그대로). 반환 뒤에는 IP 갱신이나 어댑터 재시작 때까지 IP 가 없다.
+        /// 고정 IP 이거나 할당된 IP 가 없으면 실패가 아니라 안내만 한다.
+        /// </summary>
+        public static MacChangeResult ReleaseIp(NetworkAdapterInfo adapter, Action<string> log)
+        {
+            if (adapter == null) throw new ArgumentNullException("adapter");
+            MacChangeResult result = new MacChangeResult();
+            log("DHCP 서버에 IP 반환");
+            string detail;
+            switch (TryReleaseIp(adapter, out detail))
+            {
+                case ReleaseOutcome.Released:
+                    result.Success = true;
+                    result.Message = "IP 반환 완료: " + detail + " 을(를) DHCP 서버에 반환했습니다. 새 IP는 IP 갱신이나 어댑터 재시작 때 받습니다.";
+                    break;
+                case ReleaseOutcome.Skipped:
+                    result.Success = true;
+                    result.Message = "반환할 IP가 없습니다 (" + detail + ").";
+                    break;
+                default:
+                    result.Message = "IP 반환 실패: " + detail;
+                    break;
+            }
+            return result;
+        }
+
+        private enum ReleaseOutcome { Released, Skipped, Failed }
+
+        /// <summary>
+        /// DHCP 어댑터면 지금 할당된 IP 를 서버에 반환한다. Released 면 detail 은 반환한 IP, Skipped 면 건너뛴 이유(고정 IP·할당된 IP 없음), Failed 면 오류.
+        /// </summary>
+        private static ReleaseOutcome TryReleaseIp(NetworkAdapterInfo adapter, out string detail)
+        {
+            try
+            {
+                bool keyExists;
+                int? enableDhcp = MacRegistry.GetEnableDhcp(adapter.InterfaceGuid, out keyExists);
+                if (keyExists && enableDhcp != null && enableDhcp.Value != 1)
+                {
+                    detail = "고정 IP — 반환할 임대 없음";
+                    return ReleaseOutcome.Skipped;
+                }
+                IpMonitor.IpInfo info = IpMonitor.ReadIpInfo(adapter.InterfaceGuid);
+                string assigned, masks;
+                IpMonitor.FilterAssigned(info != null ? info.Addresses : null, null, out assigned, out masks);
+                if (assigned.Length == 0)
+                {
+                    detail = info == null ? "어댑터가 IP 스택에 없음" : "할당된 IP 없음";
+                    return ReleaseOutcome.Skipped;
+                }
+                string error;
+                if (DhcpRelease.Release(adapter.InterfaceGuid, out error))
+                {
+                    detail = assigned;
+                    return ReleaseOutcome.Released;
+                }
+                detail = error;
+                return ReleaseOutcome.Failed;
+            }
+            catch (Exception ex)
+            {
+                detail = ex.Message;
+                return ReleaseOutcome.Failed;
+            }
+        }
+
+        /// <summary>작업 절차의 IP 반환 단계: 진행 로그를 남기고, 실패했을 때만 경고 문자열을 돌려준다 (계속 진행).</summary>
+        private static string ReleaseIpStep(NetworkAdapterInfo adapter, string stepLabel, Action<string> log)
+        {
+            log(stepLabel + " DHCP 서버에 IP 반환");   // IpReleaseAddress 는 반환이 끝날 때까지 막히므로 먼저 알린다
+            string detail;
+            switch (TryReleaseIp(adapter, out detail))
+            {
+                case ReleaseOutcome.Released:
+                    log(stepLabel + " DHCP 서버에 IP 반환: " + detail);
+                    return null;
+                case ReleaseOutcome.Skipped:
+                    log(stepLabel + " IP 반환 건너뜀 (" + detail + ")");
+                    return null;
+                default:
+                    log(stepLabel + " 경고: IP 반환 실패 — " + detail);
+                    return "IP 반환 실패: " + detail;
+            }
         }
 
         // ------------------------------------------------------------------
@@ -340,9 +442,8 @@ namespace MacChanger.Core
         /// resetDns 가 false 면 남김)과 전역 Tcpip\Parameters의 DhcpDomain/DhcpNameServer를 삭제한다. EnableDHCP가 0(고정 IP)이거나 값/키가 없으면 건너뛴다.
         /// 실패해도 예외를 던지지 않고 경고 문자열을 돌려준다 (없으면 null).
         /// </summary>
-        private static string CleanTcpipIfDhcp(string guid, bool resetDns, Action<string> log, out bool cleaned)
+        private static string CleanTcpipIfDhcp(string guid, string stepLabel, bool resetDns, Action<string> log, out bool cleaned)
         {
-            const string stepLabel = "[2/3]";
             cleaned = false;
             try
             {
