@@ -481,9 +481,9 @@
             this.chkReleaseIp.AutoSize = true;
             this.chkReleaseIp.Location = new System.Drawing.Point(118, 369);
             this.chkReleaseIp.Name = "chkReleaseIp";
-            this.chkReleaseIp.Size = new System.Drawing.Size(228, 19);
+            this.chkReleaseIp.Size = new System.Drawing.Size(150, 19);
             this.chkReleaseIp.TabIndex = 36;
-            this.chkReleaseIp.Text = "모든 작업 전에 DHCP 서버에 IP 반환";
+            this.chkReleaseIp.Text = "DHCP 서버에 IP 반환";
             this.chkReleaseIp.UseVisualStyleBackColor = true;
             // 
             // btnReleaseIp

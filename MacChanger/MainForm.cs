@@ -26,7 +26,7 @@ namespace MacChanger
             public string NewMac;
             /// <summary>Tcpip 값 정리 때 NameServer 에 값이 있어도 지울지 (DNS 초기화 옵션, UI 스레드에서 작업 시작 시 읽어 둔다)</summary>
             public bool ResetDns;
-            /// <summary>작업 전에 DHCP 서버에 IP 를 반환할지 ("모든 작업 전에 IP 반환" 옵션, 작업 시작 시 읽어 둔다)</summary>
+            /// <summary>작업 전에 DHCP 서버에 IP 를 반환할지 ("DHCP 서버에 IP 반환" 옵션, 작업 시작 시 읽어 둔다)</summary>
             public bool ReleaseIp;
             /// <summary>작업을 시작한 이유 (예: "IP 할당 대기 30초 초과"). 시작·완료 상태 앞에 붙인다. 직접 누른 작업은 null.</summary>
             public string Reason;
@@ -92,8 +92,8 @@ namespace MacChanger
             toolTip.SetToolTip(btnRenewIp, "MAC은 그대로 두고 IP만 새로 받습니다. (어댑터 재시작, 확인 창 없음)");
             toolTip.SetToolTip(btnRestore, "원래(공장) MAC으로 되돌립니다. (확인 창을 거쳐 어댑터 재시작)");
             toolTip.SetToolTip(btnClearLog, "로그 상자를 비웁니다. (로그 파일은 그대로)");
-            toolTip.SetToolTip(chkReleaseIp, "모든 작업(변경 적용·IP 갱신·원상복구·자동 변경) 전에 IP를 DHCP 서버에 반환합니다.\n(ipconfig /release 와 같음)");
-            toolTip.SetToolTip(btnReleaseIp, "지금 IP를 DHCP 서버에 반환합니다. (ipconfig /release 와 같음)\n새 IP는 IP 갱신이나 어댑터 재시작 때 받습니다.");
+            toolTip.SetToolTip(chkReleaseIp, "변경 적용·IP 갱신·원상복구·자동 변경 전에 IP를 DHCP 서버에 먼저 반환합니다.");
+            toolTip.SetToolTip(btnReleaseIp, "지금 IP를 DHCP 서버에 반환합니다.\n새 IP는 IP 갱신이나 어댑터 재시작 때 받습니다.");
             toolTip.SetToolTip(chkAuto, "자동 변경 사용 — '시작'을 누르면 IP를 받을 때마다 지정한 초 뒤에 랜덤 MAC을 적용합니다.");
             toolTip.SetToolTip(nudAutoDelay, "IP를 받은 뒤 MAC을 바꾸기까지 기다리는 초 (0 = 즉시, 최대 7일)");
             toolTip.SetToolTip(btnAutoToggle, "자동 변경 시작 / 정지\n변경 실패·재부팅 필요·지정 IP 할당 시 스스로 멈춥니다.");
