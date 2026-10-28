@@ -21,8 +21,8 @@ namespace MacChanger
 
         private sealed class OperationArgs
         {
-            public OperationKind Kind;
-            public NetworkAdapterInfo Adapter;
+            public readonly OperationKind Kind;
+            public readonly NetworkAdapterInfo Adapter;
             public string NewMac;
             /// <summary>Tcpip 값 정리 때 NameServer 에 값이 있어도 지울지 (DNS 초기화 옵션, UI 스레드에서 작업 시작 시 읽어 둔다)</summary>
             public bool ResetDns;
@@ -30,6 +30,12 @@ namespace MacChanger
             public bool ReleaseIp;
             /// <summary>작업을 시작한 이유 (예: "IP 할당 대기 30초 초과"). 시작·완료 상태 앞에 붙인다. 직접 누른 작업은 null.</summary>
             public string Reason;
+
+            public OperationArgs(OperationKind kind, NetworkAdapterInfo adapter)
+            {
+                Kind = kind;
+                Adapter = adapter;
+            }
         }
 
         private bool busy;
@@ -61,8 +67,6 @@ namespace MacChanger
         private int waitingSinceTick;
         /// <summary>진행 중인 작업의 이유(OperationArgs.Reason) — 완료 상태에도 붙인다</summary>
         private string operationReason;
-        /// <summary>진행 중인 작업의 종류 (완료 처리에서 어댑터를 재시작한 작업인지 가리기 위해)</summary>
-        private OperationKind operationKind;
         /// <summary>지정 IP/대역 할당으로 자동 변경을 정지했을 때의 안내문 — 작업 완료 상태에 그대로 붙인다 (어느 IP가 맞았는지 남기기 위해)</summary>
         private string autoStopMessage;
 
@@ -254,14 +258,18 @@ namespace MacChanger
             }
         }
 
-        private void btnApply_Click(object sender, EventArgs e)
+        /// <summary>선택한 어댑터. 없으면 실패 상태를 표시하고 null 을 돌려준다 (버튼 작업 공통 확인).</summary>
+        private NetworkAdapterInfo RequireSelectedAdapter()
         {
             NetworkAdapterInfo adapter = SelectedAdapter;
-            if (adapter == null)
-            {
-                SetStatus("실패", "어댑터를 선택하세요.");
-                return;
-            }
+            if (adapter == null) SetStatus("실패", "어댑터를 선택하세요.");
+            return adapter;
+        }
+
+        private void btnApply_Click(object sender, EventArgs e)
+        {
+            NetworkAdapterInfo adapter = RequireSelectedAdapter();
+            if (adapter == null) return;
             string mac = MacAddressUtil.Normalize(txtNewMac.Text);
             if (mac == null)
             {
@@ -289,21 +297,15 @@ namespace MacChanger
             }
 
             // 확인 대화 상자 없이 바로 적용한다.
-            OperationArgs args = new OperationArgs();
-            args.Kind = OperationKind.Apply;
-            args.Adapter = adapter;
+            OperationArgs args = new OperationArgs(OperationKind.Apply, adapter);
             args.NewMac = mac;
             StartOperation(args);
         }
 
         private void btnRestore_Click(object sender, EventArgs e)
         {
-            NetworkAdapterInfo adapter = SelectedAdapter;
-            if (adapter == null)
-            {
-                SetStatus("실패", "어댑터를 선택하세요.");
-                return;
-            }
+            NetworkAdapterInfo adapter = RequireSelectedAdapter();
+            if (adapter == null) return;
             // 이미 공장 MAC이고 레지스트리에 NetworkAddress 값도 없으면 복구할 것이 없다 (변경 적용의 "같은 MAC" 안내와 같은 방식).
             string currentNormalized = MacAddressUtil.Normalize(txtCurrentMac.Text);
             string permanentNormalized = MacAddressUtil.Normalize(txtPermanentMac.Text);
@@ -321,10 +323,7 @@ namespace MacChanger
                 SetStatus("준비", "원상복구를 취소했습니다.");
                 return;
             }
-            OperationArgs args = new OperationArgs();
-            args.Kind = OperationKind.Restore;
-            args.Adapter = adapter;
-            StartOperation(args);
+            StartOperation(new OperationArgs(OperationKind.Restore, adapter));
         }
 
         /// <summary>레지스트리에 NetworkAddress 값이 남아 있는지. 읽지 못하면(키 없음·권한) 남아 있다고 보고 복구를 진행하게 한다.</summary>
@@ -342,30 +341,14 @@ namespace MacChanger
 
         private void btnRenewIp_Click(object sender, EventArgs e)
         {
-            NetworkAdapterInfo adapter = SelectedAdapter;
-            if (adapter == null)
-            {
-                SetStatus("실패", "어댑터를 선택하세요.");
-                return;
-            }
-            OperationArgs args = new OperationArgs();
-            args.Kind = OperationKind.RenewIp;
-            args.Adapter = adapter;
-            StartOperation(args);
+            NetworkAdapterInfo adapter = RequireSelectedAdapter();
+            if (adapter != null) StartOperation(new OperationArgs(OperationKind.RenewIp, adapter));
         }
 
         private void btnReleaseIp_Click(object sender, EventArgs e)
         {
-            NetworkAdapterInfo adapter = SelectedAdapter;
-            if (adapter == null)
-            {
-                SetStatus("실패", "어댑터를 선택하세요.");
-                return;
-            }
-            OperationArgs args = new OperationArgs();
-            args.Kind = OperationKind.ReleaseIp;
-            args.Adapter = adapter;
-            StartOperation(args);
+            NetworkAdapterInfo adapter = RequireSelectedAdapter();
+            if (adapter != null) StartOperation(new OperationArgs(OperationKind.ReleaseIp, adapter));
         }
 
         private void chkIpLog_CheckedChanged(object sender, EventArgs e)
@@ -495,9 +478,7 @@ namespace MacChanger
                 return;
             }
             txtNewMac.Text = MacAddressUtil.Format(mac);
-            OperationArgs args = new OperationArgs();
-            args.Kind = OperationKind.Apply;
-            args.Adapter = adapter;
+            OperationArgs args = new OperationArgs(OperationKind.Apply, adapter);
             args.NewMac = mac;
             args.Reason = reason;
             StartOperation(args);
@@ -896,7 +877,6 @@ namespace MacChanger
             args.ResetDns = chkResetDns.Checked;
             args.ReleaseIp = chkReleaseIp.Checked;
             operationReason = args.Reason;
-            operationKind = args.Kind;
             SetBusy(true);
             SetStatus("진행", ReasonPrefix() + OperationLabel(args.Kind) + " 시작...");
             worker.RunWorkerAsync(args);
@@ -957,7 +937,7 @@ namespace MacChanger
             // 어댑터가 실제로 중지되었다면 이후 받는 IP는 같은 값이라도 새 할당이므로 새 MAC과 함께 기록한다.
             if (result != null && result.AdapterRestarted) lastLoggedIp = null;
             // 작업(MAC 변경·원상복구·IP 갱신)이 끝나면 그래프는 그대로 두고 누적 송수신량만 0부터 다시 센다 (TMAC 과 같은 동작).
-            if (result != null && result.Success && operationKind != OperationKind.ReleaseIp)   // IP 반환은 어댑터를 재시작하지 않는다
+            if (result != null && result.Success && (result.AdapterRestarted || result.RebootRequired))   // IP 반환은 어댑터를 거치지 않으므로(둘 다 false) 제외된다
             {
                 traffic.ResetTotals();
                 trafficGraph.ResetTotals();   // 다음 샘플을 기다리지 않고 바로 0으로 표시

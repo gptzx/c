@@ -23,13 +23,15 @@ namespace MacChanger
         private int count;
         private long receivedTotal, sentTotal, receivedSpeed, sentSpeed;
 
-        private static readonly Color TableBack = Color.FromArgb(248, 248, 248);
-        private static readonly Color TableLine = Color.FromArgb(240, 240, 240);
-        private static readonly Color TableBorder = Color.FromArgb(100, 100, 100);
-        private static readonly Color ReceivedLine = Color.Red;
-        private static readonly Color SentLine = Color.FromArgb(10, 128, 10);
+        // 그릴 때마다 만들지 않도록 붓·펜은 한 번만 만들어 둔다 (컨트롤과 수명이 같으므로 Dispose 하지 않는다 — Brushes/Pens 클래스와 같은 방식)
+        private static readonly Brush TableBack = new SolidBrush(Color.FromArgb(248, 248, 248));
+        private static readonly Pen TableLine = new Pen(Color.FromArgb(240, 240, 240));
+        private static readonly Pen TableBorder = new Pen(Color.FromArgb(100, 100, 100));
+        private static readonly Pen ReceivedLine = new Pen(Color.Red);
+        private static readonly Pen SentLine = new Pen(Color.FromArgb(10, 128, 10));
         private static readonly Color ReceivedText = Color.FromArgb(192, 0, 0);
         private static readonly Color SentText = Color.Green;
+        private static readonly string[] Labels = { "수신", "--속도", "송신", "--속도" };
         private const TextFormatFlags TextFlags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
         /// <summary>값 칸: 폭이 모자라면(TB 단위 값 등) 끝을 "…" 으로 줄인다</summary>
         private const TextFormatFlags ValueFlags = TextFlags | TextFormatFlags.EndEllipsis;
@@ -93,12 +95,9 @@ namespace MacChanger
             g.DrawLine(Pens.Black, 0, 0, 0, tableTop - 1);
             g.DrawLine(Pens.Black, w - 1, 0, w - 1, tableTop - 1);
 
-            using (SolidBrush back = new SolidBrush(TableBack))
-                g.FillRectangle(back, 1, tableTop + 1, innerWidth, h - tableTop - 2);
-            using (Pen border = new Pen(TableBorder))
-                g.DrawRectangle(border, 0, tableTop, w - 1, h - 1 - tableTop);
+            g.FillRectangle(TableBack, 1, tableTop + 1, innerWidth, h - tableTop - 2);
+            g.DrawRectangle(TableBorder, 0, tableTop, w - 1, h - 1 - tableTop);
 
-            string[] labels = { "수신", "--속도", "송신", "--속도" };
             string[] values =
             {
                 TrafficMonitor.FormatTotal(receivedTotal), TrafficMonitor.FormatSpeed(receivedSpeed),
@@ -106,23 +105,20 @@ namespace MacChanger
             };
             int labelX = 5;
             int indent = rowHeight * 2 / 3;   // "--속도" 들여쓰기
-            int separatorX = labelX + indent + TextRenderer.MeasureText(g, labels[1], Font, Size.Empty, TextFlags).Width + rowHeight / 2;   // 라벨 칸 | 값 칸 세로 구분선
+            int separatorX = labelX + indent + TextRenderer.MeasureText(g, Labels[1], Font, Size.Empty, TextFlags).Width + rowHeight / 2;   // 라벨 칸 | 값 칸 세로 구분선
             int valueX = separatorX + rowHeight / 2;
             int valueWidth = Math.Max(1, w - 1 - labelX - valueX);
-            using (Pen line = new Pen(TableLine))
+            int y = tableTop + 1;
+            for (int row = 0; row < 4; row++)
             {
-                int y = tableTop + 1;
-                for (int row = 0; row < 4; row++)
-                {
-                    g.DrawLine(line, 1, y, w - 2, y);
-                    Color color = row < 2 ? ReceivedText : SentText;
-                    TextRenderer.DrawText(g, labels[row], Font, new Point(labelX + (row % 2 == 1 ? indent : 0), y + 1), color, TextFlags);
-                    TextRenderer.DrawText(g, values[row], Font, new Rectangle(valueX, y + 1, valueWidth, rowHeight), color, ValueFlags);
-                    y += rowPitch;
-                }
-                g.DrawLine(line, 1, y, w - 2, y);
-                g.DrawLine(line, separatorX, tableTop + 1, separatorX, y);
+                g.DrawLine(TableLine, 1, y, w - 2, y);
+                Color color = row < 2 ? ReceivedText : SentText;
+                TextRenderer.DrawText(g, Labels[row], Font, new Point(labelX + (row % 2 == 1 ? indent : 0), y + 1), color, TextFlags);
+                TextRenderer.DrawText(g, values[row], Font, new Rectangle(valueX, y + 1, valueWidth, rowHeight), color, ValueFlags);
+                y += rowPitch;
             }
+            g.DrawLine(TableLine, 1, y, w - 2, y);
+            g.DrawLine(TableLine, separatorX, tableTop + 1, separatorX, y);
         }
 
         /// <summary>
@@ -154,8 +150,8 @@ namespace MacChanger
             }
             rx[n] = new Point(innerWidth, rx[n - 1].Y);   // 최신 샘플 값을 오른쪽 끝까지 이어 그린다
             tx[n] = new Point(innerWidth, tx[n - 1].Y);
-            using (Pen pen = new Pen(ReceivedLine)) g.DrawLines(pen, rx);
-            using (Pen pen = new Pen(SentLine)) g.DrawLines(pen, tx);   // 보통 더 작은 송신 선이 가려지지 않도록 나중에 그린다
+            g.DrawLines(ReceivedLine, rx);
+            g.DrawLines(SentLine, tx);   // 보통 더 작은 송신 선이 가려지지 않도록 나중에 그린다
         }
     }
 }

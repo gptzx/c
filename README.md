@@ -47,7 +47,7 @@ MacChanger/
   app.manifest                         ← requireAdministrator, supportedOS(Win7~11), dpiAware
   app.ico                              ← 실행 파일/창 아이콘 (16·32·256)
   Program.cs                           ← 진입점, 관리자 권한 확인, 전역 예외 처리
-  MainForm.cs / MainForm.Designer.cs   ← UI (드롭다운, 원래/현재 MAC, 현재 IP·서브넷 마스크·기본 게이트웨이·DNS, 새 MAC, 랜덤 MAC 주소, DNS 초기화, 변경 적용, IP 갱신, 원상복구, 로그 비우기, 백그라운드 실행(트레이), 자동 변경(지연 초, 할당 대기 초 10~60, 시작/정지), 지정 IP/대역 할당 시 자동 정지, IP 반환(옵션·지금 반환 버튼), 로그 옵션 6개, IP 변화 알림 수신, 상태 라벨, 할당 IP 로그 상자, 송수신 그래프)
+  MainForm.cs / MainForm.Designer.cs   ← UI (드롭다운, 원래/현재 MAC, 현재 IP·서브넷 마스크·기본 게이트웨이·DNS, 새 MAC, 랜덤 MAC 주소, DNS 초기화, 변경 적용, IP 갱신, 원상복구, 로그 비우기, 백그라운드 실행(트레이), 자동 변경(지연 초, 할당 대기 초 10~60, 시작/정지), 지정 IP/대역 할당 시 자동 정지, IP 반환(옵션·지금 IP 반환 버튼), 로그 옵션 6개, IP 변화 알림 수신, 상태 라벨, 할당 IP 로그 상자, 송수신 그래프)
   TrafficGraph.cs                      ← TMAC 식 송수신 그래프 컨트롤 (수신 빨강 / 송신 초록 꺾은선 + 누적량·속도 네 줄)
   Properties/AssemblyInfo.cs
   Core/

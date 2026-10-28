@@ -132,7 +132,7 @@
             // lblCurrent
             // 
             this.lblCurrent.AutoSize = true;
-            this.lblCurrent.Location = new System.Drawing.Point(12, 76);
+            this.lblCurrent.Location = new System.Drawing.Point(12, 78);
             this.lblCurrent.Name = "lblCurrent";
             this.lblCurrent.Size = new System.Drawing.Size(64, 15);
             this.lblCurrent.TabIndex = 5;
@@ -142,7 +142,7 @@
             // 
             this.txtCurrentMac.BackColor = System.Drawing.SystemColors.Window;
             this.txtCurrentMac.Font = new System.Drawing.Font("Consolas", 10F);
-            this.txtCurrentMac.Location = new System.Drawing.Point(118, 72);
+            this.txtCurrentMac.Location = new System.Drawing.Point(118, 74);
             this.txtCurrentMac.Name = "txtCurrentMac";
             this.txtCurrentMac.ReadOnly = true;
             this.txtCurrentMac.Size = new System.Drawing.Size(190, 23);
@@ -152,7 +152,7 @@
             // lblIp
             // 
             this.lblIp.AutoSize = true;
-            this.lblIp.Location = new System.Drawing.Point(12, 104);
+            this.lblIp.Location = new System.Drawing.Point(12, 108);
             this.lblIp.Name = "lblIp";
             this.lblIp.Size = new System.Drawing.Size(50, 15);
             this.lblIp.TabIndex = 7;
@@ -162,7 +162,7 @@
             // 
             this.txtCurrentIp.BackColor = System.Drawing.SystemColors.Window;
             this.txtCurrentIp.Font = new System.Drawing.Font("Consolas", 10F);
-            this.txtCurrentIp.Location = new System.Drawing.Point(118, 100);
+            this.txtCurrentIp.Location = new System.Drawing.Point(118, 104);
             this.txtCurrentIp.Name = "txtCurrentIp";
             this.txtCurrentIp.ReadOnly = true;
             this.txtCurrentIp.Size = new System.Drawing.Size(430, 23);
@@ -172,7 +172,7 @@
             // lblMask
             // 
             this.lblMask.AutoSize = true;
-            this.lblMask.Location = new System.Drawing.Point(12, 132);
+            this.lblMask.Location = new System.Drawing.Point(12, 138);
             this.lblMask.Name = "lblMask";
             this.lblMask.Size = new System.Drawing.Size(84, 15);
             this.lblMask.TabIndex = 9;
@@ -182,7 +182,7 @@
             // 
             this.txtMask.BackColor = System.Drawing.SystemColors.Window;
             this.txtMask.Font = new System.Drawing.Font("Consolas", 10F);
-            this.txtMask.Location = new System.Drawing.Point(118, 128);
+            this.txtMask.Location = new System.Drawing.Point(118, 134);
             this.txtMask.Name = "txtMask";
             this.txtMask.ReadOnly = true;
             this.txtMask.Size = new System.Drawing.Size(430, 23);
@@ -192,7 +192,7 @@
             // lblGateway
             // 
             this.lblGateway.AutoSize = true;
-            this.lblGateway.Location = new System.Drawing.Point(12, 160);
+            this.lblGateway.Location = new System.Drawing.Point(12, 168);
             this.lblGateway.Name = "lblGateway";
             this.lblGateway.Size = new System.Drawing.Size(96, 15);
             this.lblGateway.TabIndex = 11;
@@ -202,7 +202,7 @@
             // 
             this.txtGateway.BackColor = System.Drawing.SystemColors.Window;
             this.txtGateway.Font = new System.Drawing.Font("Consolas", 10F);
-            this.txtGateway.Location = new System.Drawing.Point(118, 156);
+            this.txtGateway.Location = new System.Drawing.Point(118, 164);
             this.txtGateway.Name = "txtGateway";
             this.txtGateway.ReadOnly = true;
             this.txtGateway.Size = new System.Drawing.Size(430, 23);
@@ -212,7 +212,7 @@
             // lblDns
             // 
             this.lblDns.AutoSize = true;
-            this.lblDns.Location = new System.Drawing.Point(12, 188);
+            this.lblDns.Location = new System.Drawing.Point(12, 198);
             this.lblDns.Name = "lblDns";
             this.lblDns.Size = new System.Drawing.Size(62, 15);
             this.lblDns.TabIndex = 13;
@@ -222,7 +222,7 @@
             // 
             this.txtDns.BackColor = System.Drawing.SystemColors.Window;
             this.txtDns.Font = new System.Drawing.Font("Consolas", 10F);
-            this.txtDns.Location = new System.Drawing.Point(118, 184);
+            this.txtDns.Location = new System.Drawing.Point(118, 194);
             this.txtDns.Name = "txtDns";
             this.txtDns.ReadOnly = true;
             this.txtDns.Size = new System.Drawing.Size(430, 23);
@@ -232,7 +232,7 @@
             // lblNew
             // 
             this.lblNew.AutoSize = true;
-            this.lblNew.Location = new System.Drawing.Point(12, 216);
+            this.lblNew.Location = new System.Drawing.Point(12, 228);
             this.lblNew.Name = "lblNew";
             this.lblNew.Size = new System.Drawing.Size(55, 15);
             this.lblNew.TabIndex = 15;
@@ -241,7 +241,7 @@
             // txtNewMac
             // 
             this.txtNewMac.Font = new System.Drawing.Font("Consolas", 10F);
-            this.txtNewMac.Location = new System.Drawing.Point(118, 212);
+            this.txtNewMac.Location = new System.Drawing.Point(118, 224);
             this.txtNewMac.MaxLength = 17;
             this.txtNewMac.Name = "txtNewMac";
             this.txtNewMac.Size = new System.Drawing.Size(190, 23);
@@ -249,7 +249,7 @@
             // 
             // btnRandom
             // 
-            this.btnRandom.Location = new System.Drawing.Point(314, 211);
+            this.btnRandom.Location = new System.Drawing.Point(314, 223);
             this.btnRandom.Name = "btnRandom";
             this.btnRandom.Size = new System.Drawing.Size(110, 25);
             this.btnRandom.TabIndex = 17;
@@ -260,7 +260,7 @@
             // btnApply
             // 
             this.btnApply.Font = new System.Drawing.Font("맑은 고딕", 9F, System.Drawing.FontStyle.Bold);
-            this.btnApply.Location = new System.Drawing.Point(118, 244);
+            this.btnApply.Location = new System.Drawing.Point(118, 256);
             this.btnApply.Name = "btnApply";
             this.btnApply.Size = new System.Drawing.Size(110, 30);
             this.btnApply.TabIndex = 19;
@@ -270,7 +270,7 @@
             // 
             // btnRestore
             // 
-            this.btnRestore.Location = new System.Drawing.Point(342, 244);
+            this.btnRestore.Location = new System.Drawing.Point(342, 256);
             this.btnRestore.Name = "btnRestore";
             this.btnRestore.Size = new System.Drawing.Size(110, 30);
             this.btnRestore.TabIndex = 21;
@@ -280,7 +280,7 @@
             // 
             // btnRenewIp
             // 
-            this.btnRenewIp.Location = new System.Drawing.Point(236, 244);
+            this.btnRenewIp.Location = new System.Drawing.Point(236, 256);
             this.btnRenewIp.Name = "btnRenewIp";
             this.btnRenewIp.Size = new System.Drawing.Size(100, 30);
             this.btnRenewIp.TabIndex = 20;
@@ -291,7 +291,7 @@
             // chkIpLog
             // 
             this.chkIpLog.AutoSize = true;
-            this.chkIpLog.Location = new System.Drawing.Point(258, 427);
+            this.chkIpLog.Location = new System.Drawing.Point(258, 448);
             this.chkIpLog.Name = "chkIpLog";
             this.chkIpLog.Size = new System.Drawing.Size(129, 19);
             this.chkIpLog.TabIndex = 44;
@@ -301,7 +301,7 @@
             // 
             // btnBackground
             // 
-            this.btnBackground.Location = new System.Drawing.Point(440, 423);
+            this.btnBackground.Location = new System.Drawing.Point(440, 444);
             this.btnBackground.Name = "btnBackground";
             this.btnBackground.Size = new System.Drawing.Size(108, 25);
             this.btnBackground.TabIndex = 45;
@@ -340,7 +340,7 @@
             // lblAuto
             // 
             this.lblAuto.AutoSize = true;
-            this.lblAuto.Location = new System.Drawing.Point(12, 284);
+            this.lblAuto.Location = new System.Drawing.Point(12, 297);
             this.lblAuto.Name = "lblAuto";
             this.lblAuto.Size = new System.Drawing.Size(62, 15);
             this.lblAuto.TabIndex = 23;
@@ -349,7 +349,7 @@
             // chkAuto
             // 
             this.chkAuto.AutoSize = true;
-            this.chkAuto.Location = new System.Drawing.Point(118, 282);
+            this.chkAuto.Location = new System.Drawing.Point(118, 295);
             this.chkAuto.Name = "chkAuto";
             this.chkAuto.Size = new System.Drawing.Size(84, 19);
             this.chkAuto.TabIndex = 24;
@@ -360,7 +360,7 @@
             // nudAutoDelay
             // 
             this.nudAutoDelay.Enabled = false;
-            this.nudAutoDelay.Location = new System.Drawing.Point(210, 280);
+            this.nudAutoDelay.Location = new System.Drawing.Point(210, 293);
             this.nudAutoDelay.Maximum = new decimal(new int[] { 604800, 0, 0, 0 });
             this.nudAutoDelay.Name = "nudAutoDelay";
             this.nudAutoDelay.Size = new System.Drawing.Size(72, 23);
@@ -371,7 +371,7 @@
             // lblAutoSuffix
             // 
             this.lblAutoSuffix.AutoSize = true;
-            this.lblAutoSuffix.Location = new System.Drawing.Point(288, 284);
+            this.lblAutoSuffix.Location = new System.Drawing.Point(288, 297);
             this.lblAutoSuffix.Name = "lblAutoSuffix";
             this.lblAutoSuffix.Size = new System.Drawing.Size(110, 15);
             this.lblAutoSuffix.TabIndex = 26;
@@ -380,7 +380,7 @@
             // btnAutoToggle
             // 
             this.btnAutoToggle.Enabled = false;
-            this.btnAutoToggle.Location = new System.Drawing.Point(404, 279);
+            this.btnAutoToggle.Location = new System.Drawing.Point(404, 292);
             this.btnAutoToggle.Name = "btnAutoToggle";
             this.btnAutoToggle.Size = new System.Drawing.Size(144, 25);
             this.btnAutoToggle.TabIndex = 27;
@@ -391,7 +391,7 @@
             // lblAutoStop
             // 
             this.lblAutoStop.AutoSize = true;
-            this.lblAutoStop.Location = new System.Drawing.Point(12, 342);
+            this.lblAutoStop.Location = new System.Drawing.Point(12, 359);
             this.lblAutoStop.Name = "lblAutoStop";
             this.lblAutoStop.Size = new System.Drawing.Size(62, 15);
             this.lblAutoStop.TabIndex = 32;
@@ -400,7 +400,7 @@
             // chkResetDns
             // 
             this.chkResetDns.AutoSize = true;
-            this.chkResetDns.Location = new System.Drawing.Point(436, 214);
+            this.chkResetDns.Location = new System.Drawing.Point(436, 226);
             this.chkResetDns.Name = "chkResetDns";
             this.chkResetDns.Size = new System.Drawing.Size(82, 19);
             this.chkResetDns.TabIndex = 18;
@@ -410,7 +410,7 @@
             // lblWait
             // 
             this.lblWait.AutoSize = true;
-            this.lblWait.Location = new System.Drawing.Point(12, 313);
+            this.lblWait.Location = new System.Drawing.Point(12, 328);
             this.lblWait.Name = "lblWait";
             this.lblWait.Size = new System.Drawing.Size(62, 15);
             this.lblWait.TabIndex = 28;
@@ -419,7 +419,7 @@
             // lblWaitPrefix
             // 
             this.lblWaitPrefix.AutoSize = true;
-            this.lblWaitPrefix.Location = new System.Drawing.Point(118, 313);
+            this.lblWaitPrefix.Location = new System.Drawing.Point(118, 328);
             this.lblWaitPrefix.Name = "lblWaitPrefix";
             this.lblWaitPrefix.Size = new System.Drawing.Size(86, 15);
             this.lblWaitPrefix.TabIndex = 29;
@@ -428,7 +428,7 @@
             // nudWaitTimeout
             // 
             this.nudWaitTimeout.Enabled = false;
-            this.nudWaitTimeout.Location = new System.Drawing.Point(210, 309);
+            this.nudWaitTimeout.Location = new System.Drawing.Point(210, 324);
             this.nudWaitTimeout.Maximum = new decimal(new int[] { 60, 0, 0, 0 });
             this.nudWaitTimeout.Minimum = new decimal(new int[] { 10, 0, 0, 0 });
             this.nudWaitTimeout.Name = "nudWaitTimeout";
@@ -440,7 +440,7 @@
             // lblWaitSuffix
             // 
             this.lblWaitSuffix.AutoSize = true;
-            this.lblWaitSuffix.Location = new System.Drawing.Point(276, 313);
+            this.lblWaitSuffix.Location = new System.Drawing.Point(276, 328);
             this.lblWaitSuffix.Name = "lblWaitSuffix";
             this.lblWaitSuffix.Size = new System.Drawing.Size(150, 15);
             this.lblWaitSuffix.TabIndex = 31;
@@ -449,7 +449,7 @@
             // chkAutoStopIp
             // 
             this.chkAutoStopIp.AutoSize = true;
-            this.chkAutoStopIp.Location = new System.Drawing.Point(118, 340);
+            this.chkAutoStopIp.Location = new System.Drawing.Point(118, 357);
             this.chkAutoStopIp.Name = "chkAutoStopIp";
             this.chkAutoStopIp.Size = new System.Drawing.Size(166, 19);
             this.chkAutoStopIp.TabIndex = 33;
@@ -461,7 +461,7 @@
             // 
             this.txtAutoStopIp.Enabled = false;
             this.txtAutoStopIp.Font = new System.Drawing.Font("Consolas", 10F);
-            this.txtAutoStopIp.Location = new System.Drawing.Point(292, 338);
+            this.txtAutoStopIp.Location = new System.Drawing.Point(292, 355);
             this.txtAutoStopIp.MaxLength = 15;
             this.txtAutoStopIp.Name = "txtAutoStopIp";
             this.txtAutoStopIp.Size = new System.Drawing.Size(130, 23);
@@ -470,7 +470,7 @@
             // lblRelease
             // 
             this.lblRelease.AutoSize = true;
-            this.lblRelease.Location = new System.Drawing.Point(12, 371);
+            this.lblRelease.Location = new System.Drawing.Point(12, 389);
             this.lblRelease.Name = "lblRelease";
             this.lblRelease.Size = new System.Drawing.Size(50, 15);
             this.lblRelease.TabIndex = 35;
@@ -479,7 +479,7 @@
             // chkReleaseIp
             // 
             this.chkReleaseIp.AutoSize = true;
-            this.chkReleaseIp.Location = new System.Drawing.Point(118, 369);
+            this.chkReleaseIp.Location = new System.Drawing.Point(118, 387);
             this.chkReleaseIp.Name = "chkReleaseIp";
             this.chkReleaseIp.Size = new System.Drawing.Size(150, 19);
             this.chkReleaseIp.TabIndex = 36;
@@ -488,7 +488,7 @@
             // 
             // btnReleaseIp
             // 
-            this.btnReleaseIp.Location = new System.Drawing.Point(404, 366);
+            this.btnReleaseIp.Location = new System.Drawing.Point(404, 384);
             this.btnReleaseIp.Name = "btnReleaseIp";
             this.btnReleaseIp.Size = new System.Drawing.Size(144, 25);
             this.btnReleaseIp.TabIndex = 37;
@@ -499,7 +499,7 @@
             // lblLogOptions
             // 
             this.lblLogOptions.AutoSize = true;
-            this.lblLogOptions.Location = new System.Drawing.Point(12, 400);
+            this.lblLogOptions.Location = new System.Drawing.Point(12, 419);
             this.lblLogOptions.Name = "lblLogOptions";
             this.lblLogOptions.Size = new System.Drawing.Size(38, 15);
             this.lblLogOptions.TabIndex = 38;
@@ -508,7 +508,7 @@
             // chkLogTime
             // 
             this.chkLogTime.AutoSize = true;
-            this.chkLogTime.Location = new System.Drawing.Point(118, 398);
+            this.chkLogTime.Location = new System.Drawing.Point(118, 417);
             this.chkLogTime.Name = "chkLogTime";
             this.chkLogTime.Size = new System.Drawing.Size(50, 19);
             this.chkLogTime.TabIndex = 39;
@@ -518,7 +518,7 @@
             // chkLogMask
             // 
             this.chkLogMask.AutoSize = true;
-            this.chkLogMask.Location = new System.Drawing.Point(180, 398);
+            this.chkLogMask.Location = new System.Drawing.Point(180, 417);
             this.chkLogMask.Name = "chkLogMask";
             this.chkLogMask.Size = new System.Drawing.Size(105, 19);
             this.chkLogMask.TabIndex = 40;
@@ -528,7 +528,7 @@
             // chkLogGateway
             // 
             this.chkLogGateway.AutoSize = true;
-            this.chkLogGateway.Location = new System.Drawing.Point(297, 398);
+            this.chkLogGateway.Location = new System.Drawing.Point(297, 417);
             this.chkLogGateway.Name = "chkLogGateway";
             this.chkLogGateway.Size = new System.Drawing.Size(117, 19);
             this.chkLogGateway.TabIndex = 41;
@@ -538,7 +538,7 @@
             // chkLogMac
             // 
             this.chkLogMac.AutoSize = true;
-            this.chkLogMac.Location = new System.Drawing.Point(426, 398);
+            this.chkLogMac.Location = new System.Drawing.Point(426, 417);
             this.chkLogMac.Name = "chkLogMac";
             this.chkLogMac.Size = new System.Drawing.Size(55, 19);
             this.chkLogMac.TabIndex = 42;
@@ -548,7 +548,7 @@
             // chkLogBox
             // 
             this.chkLogBox.AutoSize = true;
-            this.chkLogBox.Location = new System.Drawing.Point(118, 427);
+            this.chkLogBox.Location = new System.Drawing.Point(118, 448);
             this.chkLogBox.Name = "chkLogBox";
             this.chkLogBox.Size = new System.Drawing.Size(107, 19);
             this.chkLogBox.TabIndex = 43;
@@ -558,7 +558,7 @@
             // 
             // btnClearLog
             // 
-            this.btnClearLog.Location = new System.Drawing.Point(458, 246);
+            this.btnClearLog.Location = new System.Drawing.Point(458, 258);
             this.btnClearLog.Name = "btnClearLog";
             this.btnClearLog.Size = new System.Drawing.Size(90, 25);
             this.btnClearLog.TabIndex = 22;
@@ -570,7 +570,7 @@
             // 
             this.lblStatus.AutoEllipsis = true;
             this.lblStatus.Font = new System.Drawing.Font("맑은 고딕", 9F, System.Drawing.FontStyle.Bold);
-            this.lblStatus.Location = new System.Drawing.Point(12, 456);
+            this.lblStatus.Location = new System.Drawing.Point(12, 477);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(536, 20);
             this.lblStatus.TabIndex = 46;
@@ -580,21 +580,21 @@
             // 
             this.txtIpLog.BackColor = System.Drawing.SystemColors.Window;
             this.txtIpLog.Font = new System.Drawing.Font("Consolas", 9F);
-            this.txtIpLog.Location = new System.Drawing.Point(12, 482);
+            this.txtIpLog.Location = new System.Drawing.Point(12, 504);
             this.txtIpLog.Multiline = true;
             this.txtIpLog.Name = "txtIpLog";
             this.txtIpLog.ReadOnly = true;
             this.txtIpLog.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-            this.txtIpLog.Size = new System.Drawing.Size(262, 140);
+            this.txtIpLog.Size = new System.Drawing.Size(262, 148);
             this.txtIpLog.TabIndex = 47;
             this.txtIpLog.TabStop = false;
             this.txtIpLog.WordWrap = false;
             // 
             // trafficGraph
             // 
-            this.trafficGraph.Location = new System.Drawing.Point(286, 482);
+            this.trafficGraph.Location = new System.Drawing.Point(286, 504);
             this.trafficGraph.Name = "trafficGraph";
-            this.trafficGraph.Size = new System.Drawing.Size(262, 140);
+            this.trafficGraph.Size = new System.Drawing.Size(262, 148);
             this.trafficGraph.TabIndex = 48;
             this.trafficGraph.TabStop = false;
             // 
@@ -618,7 +618,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(560, 634);
+            this.ClientSize = new System.Drawing.Size(560, 664);
             this.Controls.Add(this.trafficGraph);
             this.Controls.Add(this.txtIpLog);
             this.Controls.Add(this.lblStatus);

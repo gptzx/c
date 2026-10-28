@@ -68,18 +68,18 @@ namespace MacChanger.Core
                 addresses.Add(u.Address.ToString());
                 masks.Add(u.IPv4Mask != null ? u.IPv4Mask.ToString() : "?");
             }
-            info.Addresses = string.Join(", ", addresses.ToArray());
-            info.Masks = string.Join(", ", masks.ToArray());
+            info.Addresses = string.Join(", ", addresses);
+            info.Masks = string.Join(", ", masks);
 
             List<string> gateways = new List<string>();
             foreach (GatewayIPAddressInformation g in props.GatewayAddresses)
                 if (g.Address.AddressFamily == AddressFamily.InterNetwork) gateways.Add(g.Address.ToString());
-            info.Gateways = string.Join(", ", gateways.ToArray());
+            info.Gateways = string.Join(", ", gateways);
 
             List<string> dns = new List<string>();
             foreach (IPAddress d in props.DnsAddresses)
                 if (d.AddressFamily == AddressFamily.InterNetwork) dns.Add(d.ToString());
-            info.Dns = string.Join(", ", dns.ToArray());
+            info.Dns = string.Join(", ", dns);
             return info;
         }
 
@@ -125,8 +125,8 @@ namespace MacChanger.Core
                 keepIps.Add(ip);
                 keepMasks.Add(i < ms.Length ? ms[i].Trim() : "?");
             }
-            assignedAddresses = string.Join(", ", keepIps.ToArray());
-            assignedMasks = string.Join(", ", keepMasks.ToArray());
+            assignedAddresses = string.Join(", ", keepIps);
+            assignedMasks = string.Join(", ", keepMasks);
         }
 
         /// <summary>로그 한 줄: [시각(탭)]IP[(탭)서브넷 마스크][(탭)기본 게이트웨이][(탭)MAC] — IP 외의 항목은 옵션. 게이트웨이가 없으면 "(없음)".</summary>

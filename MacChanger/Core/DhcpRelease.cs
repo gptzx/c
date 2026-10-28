@@ -19,7 +19,7 @@ namespace MacChanger.Core
             if (!TryFindAdapter(interfaceGuid, out map, out error)) return false;
             int rc = NativeMethods.IpReleaseAddress(ref map);
             if (rc == 0) return true;
-            error = "IpReleaseAddress: " + new Win32Exception(rc).Message + " (" + rc + ")";
+            error = ApiError("IpReleaseAddress", rc);
             return false;
         }
 
@@ -37,7 +37,7 @@ namespace MacChanger.Core
             }
             if (rc != 0 && rc != NativeMethods.ERROR_INSUFFICIENT_BUFFER)
             {
-                error = "GetInterfaceInfo: " + new Win32Exception(rc).Message + " (" + rc + ")";
+                error = ApiError("GetInterfaceInfo", rc);
                 return false;
             }
             IntPtr buffer = Marshal.AllocHGlobal((int)size);
@@ -46,14 +46,14 @@ namespace MacChanger.Core
                 rc = NativeMethods.GetInterfaceInfo(buffer, ref size);
                 if (rc != 0)
                 {
-                    error = "GetInterfaceInfo: " + new Win32Exception(rc).Message + " (" + rc + ")";
+                    error = ApiError("GetInterfaceInfo", rc);
                     return false;
                 }
                 int count = Marshal.ReadInt32(buffer);   // LONG NumAdapters, 바로 뒤에 항목 배열 (260바이트씩, 패딩 없음)
                 int entrySize = Marshal.SizeOf(typeof(NativeMethods.IP_ADAPTER_INDEX_MAP));
                 for (int i = 0; i < count; i++)
                 {
-                    IntPtr entryPtr = new IntPtr(buffer.ToInt64() + 4 + (long)i * entrySize);
+                    IntPtr entryPtr = IntPtr.Add(buffer, 4 + i * entrySize);
                     NativeMethods.IP_ADAPTER_INDEX_MAP entry = (NativeMethods.IP_ADAPTER_INDEX_MAP)Marshal.PtrToStructure(entryPtr, typeof(NativeMethods.IP_ADAPTER_INDEX_MAP));
                     if (NameMatchesGuid(entry.Name, interfaceGuid))
                     {
@@ -68,6 +68,11 @@ namespace MacChanger.Core
             {
                 Marshal.FreeHGlobal(buffer);
             }
+        }
+
+        private static string ApiError(string api, int rc)
+        {
+            return api + ": " + new Win32Exception(rc).Message + " (" + rc + ")";
         }
 
         /// <summary>"\DEVICE\TCPIP_{GUID}" 이름이 어댑터 GUID 에 해당하는지 (중괄호 유무·대소문자 무시).</summary>
