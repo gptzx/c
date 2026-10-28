@@ -585,7 +585,7 @@
             this.txtIpLog.Name = "txtIpLog";
             this.txtIpLog.ReadOnly = true;
             this.txtIpLog.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-            this.txtIpLog.Size = new System.Drawing.Size(262, 148);
+            this.txtIpLog.Size = new System.Drawing.Size(262, 167);
             this.txtIpLog.TabIndex = 47;
             this.txtIpLog.TabStop = false;
             this.txtIpLog.WordWrap = false;
@@ -594,7 +594,7 @@
             // 
             this.trafficGraph.Location = new System.Drawing.Point(286, 504);
             this.trafficGraph.Name = "trafficGraph";
-            this.trafficGraph.Size = new System.Drawing.Size(262, 148);
+            this.trafficGraph.Size = new System.Drawing.Size(262, 167);
             this.trafficGraph.TabIndex = 48;
             this.trafficGraph.TabStop = false;
             // 
@@ -618,7 +618,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(560, 664);
+            this.ClientSize = new System.Drawing.Size(560, 683);
             this.Controls.Add(this.trafficGraph);
             this.Controls.Add(this.txtIpLog);
             this.Controls.Add(this.lblStatus);
