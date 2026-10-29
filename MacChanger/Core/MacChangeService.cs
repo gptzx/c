@@ -14,6 +14,8 @@ namespace MacChanger.Core
         public bool AdapterRestarted { get; set; }
         /// <summary>실패 시 사용자에게 추가로 보여줄 안내문(무선 제약, 임의 하드웨어 주소 등)</summary>
         public string Guidance { get; set; }
+        /// <summary>어댑터가 다시 올라온 뒤 작업자 스레드가 읽은 현재 MAC(12자리 hex). 재시작이 보류됐거나 어댑터를 건드리지 않은 작업이면 null — UI 가 다시 읽지 않도록 넘긴다</summary>
+        public string CurrentMac { get; set; }
     }
 
     /// <summary>
@@ -121,6 +123,7 @@ namespace MacChanger.Core
                 result.Success = true;
                 result.RebootRequired = Deferred;
                 result.AdapterRestarted = Restarted;
+                result.CurrentMac = Current;
                 result.Message = message + WarningSuffix(TcpipWarning) + WarningSuffix(ReleaseWarning);
                 return result;
             }
@@ -130,6 +133,7 @@ namespace MacChanger.Core
             {
                 MacChangeResult result = new MacChangeResult();
                 result.AdapterRestarted = Restarted;
+                result.CurrentMac = Current;
                 result.Message = message;
                 result.Guidance = guidance;
                 return result;

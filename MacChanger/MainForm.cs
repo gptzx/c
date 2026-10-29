@@ -71,7 +71,7 @@ namespace MacChanger
 
         /// <summary>알림을 쓸 때의 안전망 폴링 주기 / 알림 직후 한 번 더 읽는 간격(게이트웨이·DNS 는 주소보다 조금 늦게 기록된다) / 알림을 못 쓰는 OS 에서의 폴링 주기 (ms)</summary>
         /// <summary>ipTimer 주기: 알림을 쓸 때 놓친 변화를 메우는 안전망 3초, 알림 직후 한 번 더 읽는 settle 1초, 알림을 못 쓰는 OS 의 폴링 1초.
-        /// 그래프·카운트다운을 돌리는 secondTimer 와 분리해 둔다 — 그 타이머는 재시작하지 않아야 그래프가 정확히 1초마다 갱신된다.</summary>
+        /// 그래프를 돌리는 graphTimer, 카운트다운·할당 대기 숫자를 돌리는 secondTimer 와 분리해 둔다 — graphTimer 는 어디서도 재시작하지 않아야 그래프가 정확히 1초마다 갱신된다.</summary>
         private const int IpSafetyPollMs = 3000, IpSettleMs = 1000, IpFallbackPollMs = 1000;
         /// <summary>IP 조회가 작업자 스레드에서 진행 중인지 / 그동안 다시 요청됐는지</summary>
         private bool ipQueryRunning, ipQueryAgain;
@@ -130,7 +130,7 @@ namespace MacChanger
         private void MainForm_Shown(object sender, EventArgs e)
         {
             // 창이 먼저 그려진 뒤에 (WMI 조회가 몇 초 걸릴 수 있으므로) 목록을 읽는다.
-            BeginInvoke(new MethodInvoker(delegate { LoadAdapters(null); StartIpMonitoring(); secondTimer.Start(); }));
+            BeginInvoke(new MethodInvoker(delegate { LoadAdapters(null); StartIpMonitoring(); graphTimer.Start(); secondTimer.Start(); }));
         }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -160,7 +160,7 @@ namespace MacChanger
         // ------------------------------------------------------------------
         /// <summary>
         /// 알림이 등록되면 변화가 있을 때만 즉시 다시 읽고(1초 뒤 한 번 더 — 늦게 기록되는 게이트웨이·DNS 반영), ipTimer 는 놓친 변화를 메우는 안전망(3초)으로 돈다.
-        /// 알림을 못 쓰는 OS 면 1초 폴링. 조회 자체는 작업자 스레드에서 하므로 UI 스레드와 secondTimer 의 틱은 밀리지 않는다.
+        /// 알림을 못 쓰는 OS 면 1초 폴링. 조회 자체는 작업자 스레드에서 하므로 UI 스레드와 그래프·카운트다운 타이머의 틱은 밀리지 않는다.
         /// </summary>
         private void StartIpMonitoring()
         {
@@ -651,24 +651,29 @@ namespace MacChanger
         }
 
         /// <summary>
-        /// 1초마다: 선택한 어댑터의 송수신 카운터를 읽어 그래프에 한 샘플을 넣고(어댑터가 내려가 있으면 속도 0),
-        /// 자동 변경 카운트다운·할당 대기 시계의 숫자를 올려 예약 시각이 되면 변경을 시작한다.
-        /// 이 타이머는 ScheduleAuto 말고는 재시작하지 않는다 — 그래프가 정확히 1초 간격으로 갱신되어야 하기 때문.
+        /// 1초마다 선택한 어댑터의 송수신 카운터를 읽어 그래프에 한 샘플을 넣는다(어댑터가 내려가 있으면 속도 0).
+        /// 이 타이머는 시작한 뒤 어디서도 멈추거나 재시작하지 않는다 — 재시작하면 그 간격 하나가 늘어나 그래프가 멈칫한다.
+        /// </summary>
+        private void graphTimer_Tick(object sender, EventArgs e)
+        {
+            if (SelectedAdapter == null) return;
+            try
+            {
+                traffic.Sample();
+            }
+            catch (Exception)
+            {
+                // 조회 실패는 Sample 이 false 로 돌려주므로 여기는 P/Invoke 자체가 실패하는 경우(iphlpapi 에 GetIfEntry2 가 없는 OS 등)뿐 — 이번 초는 속도 0으로 둔다
+            }
+            trafficGraph.AddSample(traffic.ReceivedSpeed, traffic.SentSpeed, traffic.ReceivedTotal, traffic.SentTotal);
+        }
+
+        /// <summary>
+        /// 1초마다 자동 변경 카운트다운·할당 대기 시계의 숫자를 올려 예약 시각이 되면 변경을 시작한다.
+        /// ScheduleAuto 가 예약 시각에 맞춰 이 타이머만 재시작한다 (그래프는 graphTimer 가 따로 돌므로 영향 없음).
         /// </summary>
         private void secondTimer_Tick(object sender, EventArgs e)
         {
-            if (SelectedAdapter != null)
-            {
-                try
-                {
-                    traffic.Sample();
-                }
-                catch (Exception)
-                {
-                    // 조회 실패는 Sample 이 false 로 돌려주므로 여기는 P/Invoke 자체가 실패하는 경우(iphlpapi 에 GetIfEntry2 가 없는 OS 등)뿐 — 이번 초는 속도 0으로 둔다
-                }
-                trafficGraph.AddSample(traffic.ReceivedSpeed, traffic.SentSpeed, traffic.ReceivedTotal, traffic.SentTotal);
-            }
             RunAutoIfDue();
             // 할당 대기 시계는 IP 를 다시 읽지 않고도 1초마다 센다 (대기 상태는 마지막 IP 조회가 정한다); 숫자는 여기서만 올린다
             if (waiting && autoRunning && !busy && TrackWaiting(true, Environment.TickCount, true)) StartWaitTimeoutChange();
@@ -981,6 +986,7 @@ namespace MacChanger
                 StopAuto();
                 finalMessage += " 자동 변경을 정지했습니다.";
             }
+            else if (autoRunning) btnAutoToggle.Text = "정지 (IP 대기)";   // 작업 중 "정지" 를 되돌린다 — 다음 IP 조회 결과가 "IP 대기 N초"/카운트다운으로 덮는다
 
             // 어댑터가 실제로 중지되었다면 이후 받는 IP는 같은 값이라도 새 할당이므로 새 MAC과 함께 기록한다.
             if (result != null && result.AdapterRestarted) lastLoggedIp = null;
@@ -991,8 +997,14 @@ namespace MacChanger
                 trafficGraph.ResetTotals();   // 다음 샘플을 기다리지 않고 바로 0으로 표시
             }
 
-            // 변경/복구 후 현재 MAC을 다시 읽어 UI를 갱신하고(IP 는 작업자 스레드에서 읽혀 곧 반영된다) 작업 결과 상태를 표시한다.
-            RefreshSelectedAdapterInfo();
+            // 변경/복구 후의 현재 MAC 은 작업자 스레드가 이미 읽어 결과에 담아 왔다 — UI 스레드에서 NDIS/WMI 를 다시 읽지 않는다 (느린 폴백이 틱을 밀 수 있다).
+            // IP(와 어댑터가 올라와 있으면 MAC)는 작업자 스레드에서 다시 읽혀 곧 반영된다.
+            NetworkAdapterInfo adapter = SelectedAdapter;
+            if (adapter != null)
+            {
+                if (result != null) ShowCurrentMac(adapter, result.CurrentMac);
+                RefreshIp();
+            }
             SetStatus(finalState, finalMessage);
 
             if (finalState == "실패" || (result != null && result.RebootRequired)) RestoreFromTray();   // 숨긴 채로 대화 상자를 띄우지 않는다
