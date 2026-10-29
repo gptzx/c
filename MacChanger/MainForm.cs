@@ -47,14 +47,13 @@ namespace MacChanger
         private string lastLoggedIp;
         /// <summary>lastLoggedIp 와 함께 읽은 서브넷 마스크·기본 게이트웨이 (로그 상자를 켜거나 파일 저장을 켤 때 같은 줄을 다시 만들기 위해)</summary>
         private string lastLoggedMask, lastLoggedGateway;
-        /// <summary>IP 구성 변화 알림 (Windows 가 알려 줄 때만 다시 읽는다; 못 쓰는 OS 에서는 ipTimer 가 1초 폴링으로 대신)</summary>
+        /// <summary>IP 구성 변화 알림 (Windows 가 알려 줄 때만 다시 읽는다; 못 쓰는 OS 에서는 1초 타이머가 매 틱 폴링으로 대신)</summary>
         private IpChangeNotifier ipNotifier;
         /// <summary>알림이 몰려와도 UI 스레드에는 한 번만 넘기기 위한 플래그 (0: 대기 중 없음, 1: 넘겨 둠)</summary>
         private int refreshQueued;
         /// <summary>선택한 어댑터의 송수신 카운터 (1초마다 읽어 그래프에 넣는다)</summary>
         private readonly TrafficMonitor traffic = new TrafficMonitor();
         /// <summary>직전 RefreshIp 에서 발생한 로그 저장 오류 (없으면 null)</summary>
-        private string ipLogError;
         /// <summary>로그 상자에 마지막으로 넣은 "실제 할당 IP" — 상자를 다시 켤 때 같은 줄을 반복하지 않기 위한 기준</summary>
         private string lastBoxIp;
         /// <summary>자동 변경이 "시작" 상태인지 (체크박스는 기능 사용 여부, 버튼이 실제 시작/정지)</summary>
@@ -67,13 +66,18 @@ namespace MacChanger
         private int waitingSinceTick;
         /// <summary>진행 중인 작업의 이유(OperationArgs.Reason) — 완료 상태에도 붙인다</summary>
         private string operationReason;
-        /// <summary>지정 IP/대역 할당으로 자동 변경을 정지했을 때의 안내문 — 작업 완료 상태에 그대로 붙인다 (어느 IP가 맞았는지 남기기 위해)</summary>
-        private string autoStopMessage;
         /// <summary>트레이 아이콘의 오른쪽 클릭 메뉴 (처음 필요할 때 만든다)</summary>
         private TrayMenu trayMenu;
 
         /// <summary>알림을 쓸 때의 안전망 폴링 주기 / 알림 직후 한 번 더 읽는 간격(게이트웨이·DNS 는 주소보다 조금 늦게 기록된다) / 알림을 못 쓰는 OS 에서의 폴링 주기 (ms)</summary>
-        private const int IpSafetyPollMs = 3000, IpSettleMs = 1000, IpFallbackPollMs = 1000;
+        /// <summary>알림을 쓸 때 놓친 변화를 메우는 안전망 폴링 주기(1초 틱 수); 알림을 못 쓰면 매 틱</summary>
+        private const int IpSafetyPollTicks = 3;
+        /// <summary>다음 IP 폴링까지 남은 틱 수 (알림 직후에는 2: 1~2초 뒤 한 번 더 읽어 늦게 기록되는 게이트웨이·DNS 를 반영)</summary>
+        private int ipPollIn;
+        /// <summary>IP 조회가 작업자 스레드에서 진행 중인지 / 그동안 다시 요청됐는지</summary>
+        private bool ipQueryRunning, ipQueryAgain;
+        /// <summary>작업(어댑터 재시작)의 시작·완료마다 1씩 — 작업을 걸쳐 읽은 IP 결과는 버린다 (옛 IP 를 새 MAC 으로 기록하거나 변경을 또 걸지 않게)</summary>
+        private int ipEpoch;
 
         public MainForm()
         {
@@ -156,26 +160,21 @@ namespace MacChanger
         // IP 변화 감지: Windows 알림(즉시) + 안전망 폴링
         // ------------------------------------------------------------------
         /// <summary>
-        /// 알림이 등록되면 변화가 있을 때만 즉시 다시 읽고(1초 뒤 한 번 더 — 늦게 기록되는 게이트웨이·DNS 반영), ipTimer 는 놓친 변화를 메우는 안전망(3초)으로 돈다.
+        /// 알림이 등록되면 변화가 있을 때만 즉시 다시 읽고(1~2초 뒤 한 번 더 — 늦게 기록되는 게이트웨이·DNS 반영), 1초 타이머가 놓친 변화를 메우는 안전망(3초) 폴링을 겸한다.
         /// 알림을 못 쓰는 OS 면 1초 폴링.
         /// </summary>
         private void StartIpMonitoring()
         {
             ipNotifier = new IpChangeNotifier();
-            if (ipNotifier.Available)
-            {
-                ipNotifier.Changed += ipNotifier_Changed;
-                ipTimer.Interval = IpSafetyPollMs;
-            }
+            if (ipNotifier.Available) ipNotifier.Changed += ipNotifier_Changed;
             else
             {
                 string why = ipNotifier.Error;
                 ipNotifier.Dispose();
                 ipNotifier = null;
-                ipTimer.Interval = IpFallbackPollMs;
                 if (!busy) SetStatus("준비", "IP 변경 알림을 쓸 수 없어 1초마다 확인합니다. (" + why + ")");
             }
-            ipTimer.Start();
+            ipPollIn = IpSafetyPollTicks;
         }
 
         /// <summary>시스템 스레드에서 온 알림 — UI 스레드에 한 번만 넘긴다 (몰려오는 알림은 한 번의 갱신으로 합친다).</summary>
@@ -198,10 +197,7 @@ namespace MacChanger
             Interlocked.Exchange(ref refreshQueued, 0);
             if (IsDisposed) return;
             RefreshIp();
-            if (ipLogError != null) SetStatus("실패", ipLogError);
-            ipTimer.Stop();                 // 1초 뒤 한 번 더 읽고(settle), 그 다음부터 안전망 주기로 돌아간다
-            ipTimer.Interval = IpSettleMs;
-            ipTimer.Start();
+            ipPollIn = 2;   // 1~2초 뒤 한 번 더 읽고(settle), 그 다음부터 안전망 주기로 돌아간다
         }
 
         // ------------------------------------------------------------------
@@ -408,15 +404,11 @@ namespace MacChanger
                 return;
             }
             waiting = false;   // 할당 대기 시간은 시작 시점부터 센다
-            autoStopMessage = null;
             autoRunning = true;
             UpdateControlStates();   // 실행 중에는 정지·로그 비우기·백그라운드 실행 외의 조작을 잠근다
             btnAutoToggle.Text = "정지 (IP 대기)";
             if (!busy) SetStatus("준비", "자동 변경 시작 — IP 할당 " + nudAutoDelay.Value + "초 뒤, 또는 할당 대기 " + nudWaitTimeout.Value + "초 초과 시 새 MAC 적용");
-            RefreshIp();   // 지금 상태를 바로 읽어 둔다 — IP 없이 링크만 올라와 있으면 할당 대기 시계가 이 순간부터 센다 (알림만 기다리면 최대 3초 늦는다)
-            if (AutoStopIfTargetAssigned(lastLoggedIp)) return;   // 지정 IP가 이미 할당되어 있으면 바꾸지 않고 바로 정지
-            ScheduleAuto();   // 이미 IP가 할당되어 있으면 지금부터 센다
-            RunAutoIfDue();   // 바로 남은 시간을 보여주고, 0초면 즉시 시작
+            RefreshIp();   // 지금 상태를 읽어 ApplyIpInfo 가 결정한다: 이미 IP가 있으면 지금부터 세고(지정 IP면 바로 정지), 링크만 올라와 있으면 할당 대기 시계가 이 순간부터 센다
         }
 
         private void StopAuto()
@@ -510,6 +502,8 @@ namespace MacChanger
             {
                 waiting = true;
                 waitingSinceTick = nowTick;
+                secondTimer.Stop();   // 1초 틱을 대기 시작 시각에 맞춘다 — 틱과 IP 조회 결과가 같은 초를 가리켜 숫자가 고르게 올라간다 (ScheduleAuto 와 같은 방식)
+                secondTimer.Start();
             }
             if (!autoRunning) return false;
             int elapsedMs = unchecked(nowTick - waitingSinceTick);
@@ -571,8 +565,7 @@ namespace MacChanger
             string matched = prefix == null ? null : FirstIpInPrefix(assignedIps, prefix);
             if (matched == null) return false;
             StopAuto();
-            autoStopMessage = StopTargetLabel(prefix) + " IP " + matched + " 가 할당되어 자동 변경을 정지했습니다.";
-            SetStatus("완료", autoStopMessage);
+            SetStatus("완료", StopTargetLabel(prefix) + " IP " + matched + " 가 할당되어 자동 변경을 정지했습니다.");
             return true;
         }
 
@@ -637,22 +630,10 @@ namespace MacChanger
             txtIpLog.Enabled = on;
         }
 
-        /// <summary>안전망 폴링(알림 직후에는 settle 재조회): 알림을 놓쳤을 때를 대비해 IP 구성을 다시 읽는다 (알림을 못 쓰는 OS 에서는 이것이 유일한 갱신 경로).</summary>
-        private void ipTimer_Tick(object sender, EventArgs e)
-        {
-            RefreshIp();
-            if (ipLogError != null) SetStatus("실패", ipLogError);
-            if (ipNotifier != null && ipTimer.Interval != IpSafetyPollMs)
-            {
-                ipTimer.Stop();
-                ipTimer.Interval = IpSafetyPollMs;
-                ipTimer.Start();
-            }
-        }
-
         /// <summary>
         /// 1초마다: 선택한 어댑터의 송수신 카운터를 읽어 그래프에 한 샘플을 넣고(어댑터가 내려가 있으면 속도 0),
-        /// 자동 변경 카운트다운을 1초 단위로 갱신해 예약 시각이 되면 변경을 시작한다.
+        /// 자동 변경 카운트다운·할당 대기 시계를 갱신해 예약 시각이 되면 변경을 시작하고, 차례가 되면 안전망 IP 폴링을 시작한다
+        /// (알림을 놓쳤을 때를 대비; 알림을 못 쓰는 OS 에서는 이것이 유일한 갱신 경로). 조회는 작업자 스레드에서 돌므로 틱이 밀리지 않는다.
         /// </summary>
         private void secondTimer_Tick(object sender, EventArgs e)
         {
@@ -669,8 +650,13 @@ namespace MacChanger
                 trafficGraph.AddSample(traffic.ReceivedSpeed, traffic.SentSpeed, traffic.ReceivedTotal, traffic.SentTotal);
             }
             RunAutoIfDue();
-            // 할당 대기 시계는 IP 를 다시 읽지 않고도 1초마다 센다 (대기 상태는 마지막 RefreshIp 가 정한다)
+            // 할당 대기 시계는 IP 를 다시 읽지 않고도 1초마다 센다 (대기 상태는 마지막 IP 조회가 정한다)
             if (waiting && autoRunning && !busy && TrackWaiting(true, Environment.TickCount)) StartWaitTimeoutChange();
+            if (--ipPollIn <= 0)
+            {
+                ipPollIn = ipNotifier != null ? IpSafetyPollTicks : 1;
+                RefreshIp();
+            }
         }
 
         // ------------------------------------------------------------------
@@ -769,7 +755,6 @@ namespace MacChanger
                     SetStatus("준비", "어댑터 정보를 읽었습니다.");
 
                 RefreshIp();
-                if (ipLogError != null) SetStatus("실패", ipLogError);
             }
             finally
             {
@@ -795,22 +780,49 @@ namespace MacChanger
             finally { suppressSelectionChanged = false; }
         }
 
-        /// <summary>선택한 어댑터의 현재 IPv4를 표시하고, 로그 옵션이 켜져 있으면 새로 할당된 IP를 파일에 기록한다. 오류는 ipLogError 에 남긴다.</summary>
+        /// <summary>
+        /// 선택한 어댑터의 IP 구성을 작업자 스레드에서 읽어 ApplyIpInfo 로 넘긴다 — 어댑터 전환 중에는 조회가 수백 ms 걸릴 수 있어
+        /// UI 스레드에서 읽으면 1초 타이머(카운트다운·할당 대기 시계)가 밀린다. 조회 중에 다시 부르면 끝난 뒤 한 번 더 읽는다.
+        /// </summary>
         private void RefreshIp()
         {
-            ipLogError = null;
             NetworkAdapterInfo adapter = SelectedAdapter;
             if (adapter == null)
             {
                 txtCurrentIp.Text = txtMask.Text = txtGateway.Text = txtDns.Text = string.Empty;
                 return;
             }
-            IpMonitor.IpInfo info;
-            try
+            if (ipQueryRunning)
             {
-                info = IpMonitor.ReadIpInfo(adapter.InterfaceGuid);
+                ipQueryAgain = true;
+                return;
             }
-            catch (Exception)
+            ipQueryRunning = true;
+            string guid = adapter.InterfaceGuid;
+            int epoch = ipEpoch;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                IpMonitor.IpInfo info = null;
+                bool failed = false;
+                try { info = IpMonitor.ReadIpInfo(guid); }
+                catch (Exception) { failed = true; }
+                try { BeginInvoke(new Action<string, IpMonitor.IpInfo, bool, int>(ApplyIpInfo), guid, info, failed, epoch); }
+                catch (Exception) { }   // 창이 이미 닫혔다
+            });
+        }
+
+        /// <summary>읽어 온 IP 구성을 표시하고, 로그 옵션이 켜져 있으면 새로 할당된 IP를 파일에 기록한다 (UI 스레드).</summary>
+        private void ApplyIpInfo(string guid, IpMonitor.IpInfo info, bool failed, int epoch)
+        {
+            ipQueryRunning = false;
+            if (ipQueryAgain)
+            {
+                ipQueryAgain = false;
+                RefreshIp();
+            }
+            NetworkAdapterInfo adapter = SelectedAdapter;
+            if (adapter == null || adapter.InterfaceGuid != guid || epoch != ipEpoch) return;   // 그사이 다른 어댑터를 골랐거나 작업이 시작·완료됐다
+            if (failed)
             {
                 txtCurrentIp.Text = "(IP 조회 실패)";
                 txtMask.Text = txtGateway.Text = txtDns.Text = string.Empty;
@@ -848,17 +860,25 @@ namespace MacChanger
             TrackWaiting(false, 0);   // 실제 IP를 받았으면 대기 종료
             // 지정 IP 자동 정지: 자동 변경 중 대상 IP가 할당되면 바로 멈춘다 (로그 중복 판정과 상관없이 매번 확인, IP 줄은 아래에서 평소처럼 기록)
             AutoStopIfTargetAssigned(assigned);
-            // 작업 중(busy)에는 기록하지 않는다: 어댑터가 올라온 직후의 IP는 작업 완료 후 새 MAC과 함께 기록된다.
-            if (busy || assigned == lastLoggedIp) return;
-
-            lastLoggedIp = assigned;
-            lastLoggedMask = assignedMasks;
-            lastLoggedGateway = info.Gateways;
-            string line = BuildLastLogLine(adapter);   // 상자와 파일에 같은 줄
-            if (chkLogBox.Checked) AppendToBox(assigned, line);   // 꺼져 있는 동안에는 상자에 기록하지 않음
-            ipLogError = AppendToFile(line);
-            ScheduleAuto();   // 새로 할당된 IP → 자동 변경 예약
-            if (autoPending && (int)nudAutoDelay.Value == 0) RunAutoIfDue();   // 0초면 다음 타이머 틱을 기다리지 않고 바로 바꾼다
+            // 작업 중(busy)에는 기록·예약하지 않는다: 어댑터가 올라온 직후의 IP는 작업 완료 후 새 MAC과 함께 기록된다.
+            if (busy) return;
+            bool fresh = assigned != lastLoggedIp;
+            if (fresh)
+            {
+                lastLoggedIp = assigned;
+                lastLoggedMask = assignedMasks;
+                lastLoggedGateway = info.Gateways;
+                string line = BuildLastLogLine(adapter);   // 상자와 파일에 같은 줄
+                if (chkLogBox.Checked) AppendToBox(assigned, line);   // 꺼져 있는 동안에는 상자에 기록하지 않음
+                string error = AppendToFile(line);
+                if (error != null) SetStatus("실패", error);
+            }
+            // 새로 할당된 IP, 또는 자동 변경을 켠 뒤(예약이 아직 없을 때) 처음 확인한 IP → 지연 시간 뒤로 변경 예약 (자동 변경이 꺼져 있으면 ScheduleAuto 가 그냥 돌아온다)
+            if (fresh || !autoPending)
+            {
+                ScheduleAuto();
+                if (autoPending && (int)nudAutoDelay.Value == 0) RunAutoIfDue();   // 0초면 다음 타이머 틱을 기다리지 않고 바로 바꾼다
+            }
         }
 
         /// <summary>
@@ -888,6 +908,7 @@ namespace MacChanger
             args.ResetDns = chkResetDns.Checked;
             args.ReleaseIp = chkReleaseIp.Checked;
             operationReason = args.Reason;
+            ipEpoch++;
             SetBusy(true);
             SetStatus("진행", ReasonPrefix() + OperationLabel(args.Kind) + " 시작...");
             worker.RunWorkerAsync(args);
@@ -932,6 +953,7 @@ namespace MacChanger
 
         private void worker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
+            ipEpoch++;
             SetBusy(false);
 
             MacChangeResult result = e.Error == null ? e.Result as MacChangeResult : null;
@@ -954,11 +976,9 @@ namespace MacChanger
                 trafficGraph.ResetTotals();   // 다음 샘플을 기다리지 않고 바로 0으로 표시
             }
 
-            // 변경/복구 후 현재 MAC/IP를 다시 읽어 UI를 갱신한 뒤, 작업 결과 상태를 최종적으로 표시한다.
-            bool autoBefore = autoRunning;   // 실패/재부팅으로 위에서 이미 정지했다면 false
-            RefreshSelectedAdapterInfo();    // 새 IP가 지정 IP면 여기서 자동 변경이 정지된다
-            if (autoBefore && !autoRunning) finalMessage += " " + (autoStopMessage ?? "자동 변경을 정지했습니다.");
-            SetStatus(finalState, finalMessage + (ipLogError != null ? " / " + ipLogError : ""));
+            // 변경/복구 후 현재 MAC을 다시 읽어 UI를 갱신하고(IP 는 작업자 스레드에서 읽혀 곧 반영된다) 작업 결과 상태를 표시한다.
+            RefreshSelectedAdapterInfo();
+            SetStatus(finalState, finalMessage);
 
             if (finalState == "실패" || (result != null && result.RebootRequired)) RestoreFromTray();   // 숨긴 채로 대화 상자를 띄우지 않는다
             if (result != null && result.RebootRequired)
@@ -972,7 +992,6 @@ namespace MacChanger
                 if (result != null && !string.IsNullOrEmpty(result.Guidance)) text += "\r\n\r\n" + result.Guidance;
                 MessageBox.Show(this, text, Program.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
-            RunAutoIfDue();   // 지연 0초: IP가 이미 있으면 기다리지 않고 바로 다음 변경
         }
 
         // ------------------------------------------------------------------
