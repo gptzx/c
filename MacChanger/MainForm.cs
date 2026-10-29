@@ -197,7 +197,15 @@ namespace MacChanger
             Interlocked.Exchange(ref refreshQueued, 0);
             if (IsDisposed) return;
             RefreshIp();
-            ipPollIn = 2;   // 1~2초 뒤 한 번 더 읽고(settle), 그 다음부터 안전망 주기로 돌아간다
+            // settle: 주소보다 늦게 기록되는 게이트웨이·DNS 를 1초 뒤 한 번 더 읽는다 — 카운트다운·할당 대기 시계가 돌지 않을 때는 틱을 알림 시각에 맞춰 정확히 1초 뒤에,
+            // 돌고 있을 때는 그 시계의 위상을 흔들지 않도록 다음다음 틱(1~2초 뒤)에. 그 다음부터 안전망 주기로 돌아간다.
+            if (!autoPending && !waiting)
+            {
+                secondTimer.Stop();
+                secondTimer.Start();
+                ipPollIn = 1;
+            }
+            else ipPollIn = 2;
         }
 
         // ------------------------------------------------------------------
