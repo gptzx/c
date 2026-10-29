@@ -47,7 +47,7 @@ namespace MacChanger
         private string lastLoggedIp;
         /// <summary>lastLoggedIp 와 함께 읽은 서브넷 마스크·기본 게이트웨이 (로그 상자를 켜거나 파일 저장을 켤 때 같은 줄을 다시 만들기 위해)</summary>
         private string lastLoggedMask, lastLoggedGateway;
-        /// <summary>IP 구성 변화 알림 (Windows 가 알려 줄 때만 다시 읽는다; 못 쓰는 OS 에서는 1초 타이머가 매 틱 폴링으로 대신)</summary>
+        /// <summary>IP 구성 변화 알림 (Windows 가 알려 줄 때만 다시 읽는다; 못 쓰는 OS 에서는 ipTimer 가 1초 폴링으로 대신)</summary>
         private IpChangeNotifier ipNotifier;
         /// <summary>알림이 몰려와도 UI 스레드에는 한 번만 넘기기 위한 플래그 (0: 대기 중 없음, 1: 넘겨 둠)</summary>
         private int refreshQueued;
@@ -70,10 +70,9 @@ namespace MacChanger
         private TrayMenu trayMenu;
 
         /// <summary>알림을 쓸 때의 안전망 폴링 주기 / 알림 직후 한 번 더 읽는 간격(게이트웨이·DNS 는 주소보다 조금 늦게 기록된다) / 알림을 못 쓰는 OS 에서의 폴링 주기 (ms)</summary>
-        /// <summary>알림을 쓸 때 놓친 변화를 메우는 안전망 폴링 주기(1초 틱 수); 알림을 못 쓰면 매 틱</summary>
-        private const int IpSafetyPollTicks = 3;
-        /// <summary>다음 IP 폴링까지 남은 틱 수 (알림 직후에는 2: 1~2초 뒤 한 번 더 읽어 늦게 기록되는 게이트웨이·DNS 를 반영)</summary>
-        private int ipPollIn;
+        /// <summary>ipTimer 주기: 알림을 쓸 때 놓친 변화를 메우는 안전망 3초, 알림 직후 한 번 더 읽는 settle 1초, 알림을 못 쓰는 OS 의 폴링 1초.
+        /// 그래프·카운트다운을 돌리는 secondTimer 와 분리해 둔다 — 그 타이머는 재시작하지 않아야 그래프가 정확히 1초마다 갱신된다.</summary>
+        private const int IpSafetyPollMs = 3000, IpSettleMs = 1000, IpFallbackPollMs = 1000;
         /// <summary>IP 조회가 작업자 스레드에서 진행 중인지 / 그동안 다시 요청됐는지</summary>
         private bool ipQueryRunning, ipQueryAgain;
         /// <summary>작업(어댑터 재시작)의 시작·완료마다 1씩 — 작업을 걸쳐 읽은 IP 결과는 버린다 (옛 IP 를 새 MAC 으로 기록하거나 변경을 또 걸지 않게)</summary>
@@ -160,21 +159,26 @@ namespace MacChanger
         // IP 변화 감지: Windows 알림(즉시) + 안전망 폴링
         // ------------------------------------------------------------------
         /// <summary>
-        /// 알림이 등록되면 변화가 있을 때만 즉시 다시 읽고(1~2초 뒤 한 번 더 — 늦게 기록되는 게이트웨이·DNS 반영), 1초 타이머가 놓친 변화를 메우는 안전망(3초) 폴링을 겸한다.
-        /// 알림을 못 쓰는 OS 면 1초 폴링.
+        /// 알림이 등록되면 변화가 있을 때만 즉시 다시 읽고(1초 뒤 한 번 더 — 늦게 기록되는 게이트웨이·DNS 반영), ipTimer 는 놓친 변화를 메우는 안전망(3초)으로 돈다.
+        /// 알림을 못 쓰는 OS 면 1초 폴링. 조회 자체는 작업자 스레드에서 하므로 UI 스레드와 secondTimer 의 틱은 밀리지 않는다.
         /// </summary>
         private void StartIpMonitoring()
         {
             ipNotifier = new IpChangeNotifier();
-            if (ipNotifier.Available) ipNotifier.Changed += ipNotifier_Changed;
+            if (ipNotifier.Available)
+            {
+                ipNotifier.Changed += ipNotifier_Changed;
+                ipTimer.Interval = IpSafetyPollMs;
+            }
             else
             {
                 string why = ipNotifier.Error;
                 ipNotifier.Dispose();
                 ipNotifier = null;
+                ipTimer.Interval = IpFallbackPollMs;
                 if (!busy) SetStatus("준비", "IP 변경 알림을 쓸 수 없어 1초마다 확인합니다. (" + why + ")");
             }
-            ipPollIn = IpSafetyPollTicks;
+            ipTimer.Start();
         }
 
         /// <summary>시스템 스레드에서 온 알림 — UI 스레드에 한 번만 넘긴다 (몰려오는 알림은 한 번의 갱신으로 합친다).</summary>
@@ -197,15 +201,9 @@ namespace MacChanger
             Interlocked.Exchange(ref refreshQueued, 0);
             if (IsDisposed) return;
             RefreshIp();
-            // settle: 주소보다 늦게 기록되는 게이트웨이·DNS 를 1초 뒤 한 번 더 읽는다 — 카운트다운·할당 대기 시계가 돌지 않을 때는 틱을 알림 시각에 맞춰 정확히 1초 뒤에,
-            // 돌고 있을 때는 그 시계의 위상을 흔들지 않도록 다음다음 틱(1~2초 뒤)에. 그 다음부터 안전망 주기로 돌아간다.
-            if (!autoPending && !waiting)
-            {
-                secondTimer.Stop();
-                secondTimer.Start();
-                ipPollIn = 1;
-            }
-            else ipPollIn = 2;
+            ipTimer.Stop();                 // 1초 뒤 한 번 더 읽고(settle — 늦게 기록되는 게이트웨이·DNS), 그 다음부터 안전망 주기로 돌아간다
+            ipTimer.Interval = IpSettleMs;
+            ipTimer.Start();
         }
 
         // ------------------------------------------------------------------
@@ -445,10 +443,11 @@ namespace MacChanger
             else btnAutoToggle.Text = "정지";
         }
 
+        /// <summary>예약된 변경을 취소한다. 카운트다운을 보여주던 중이었다면 버튼을 "IP 대기"로 되돌린다 (할당 대기 숫자가 보이는 중이면 건드리지 않는다).</summary>
         private void CancelAuto()
         {
+            if (autoPending && autoRunning) btnAutoToggle.Text = "정지 (IP 대기)";
             autoPending = false;
-            if (autoRunning) btnAutoToggle.Text = "정지 (IP 대기)";
         }
 
         /// <summary>예약 시각이 지났으면 어댑터 종류에 맞는 랜덤 MAC을 만들어 바로 적용한다. 아직이면 남은 시간을 정지 버튼에 보여준다.</summary>
@@ -496,13 +495,15 @@ namespace MacChanger
         }
 
         /// <summary>
-        /// 할당 대기 상태를 추적한다. 대기 중이면 시작 시각을 기억하고(자동 변경 중이면 버튼에 경과 초 표시),
-        /// 자동 변경 중에 설정한 할당 대기 초를 넘겼으면 true 를 돌려준다 (호출자가 새 MAC 적용). 작업 중에는 세지 않는다.
+        /// 할당 대기 상태를 추적한다. 대기 중이면 시작 시각을 기억하고, 자동 변경 중에 설정한 할당 대기 초를 넘겼으면 true 를 돌려준다 (호출자가 새 MAC 적용).
+        /// 작업 중에는 세지 않는다. 버튼의 경과 초는 render 일 때(1초 틱)와 대기가 시작되는 순간("0초")에만 쓴다 —
+        /// 틱 사이에 온 IP 조회 결과가 숫자를 먼저 올리면 다음 틱까지의 간격이 들쭉날쭉해 보이기 때문.
         /// </summary>
-        private bool TrackWaiting(bool isWaiting, int nowTick)
+        private bool TrackWaiting(bool isWaiting, int nowTick, bool render)
         {
             if (!isWaiting || busy)
             {
+                if (waiting && autoRunning && !busy) btnAutoToggle.Text = "정지 (IP 대기)";   // 링크가 끊겨 대기가 끝났다 — 숫자를 지운다 (IP 를 받은 경우는 곧 예약 표시가 덮는다)
                 waiting = false;
                 return false;
             }
@@ -510,12 +511,11 @@ namespace MacChanger
             {
                 waiting = true;
                 waitingSinceTick = nowTick;
-                secondTimer.Stop();   // 1초 틱을 대기 시작 시각에 맞춘다 — 틱과 IP 조회 결과가 같은 초를 가리켜 숫자가 고르게 올라간다 (ScheduleAuto 와 같은 방식)
-                secondTimer.Start();
+                render = true;
             }
             if (!autoRunning) return false;
             int elapsedMs = unchecked(nowTick - waitingSinceTick);
-            btnAutoToggle.Text = "정지 (IP 대기 " + elapsedMs / 1000 + "초)";
+            if (render) btnAutoToggle.Text = "정지 (IP 대기 " + elapsedMs / 1000 + "초)";
             if (elapsedMs < (int)nudWaitTimeout.Value * 1000) return false;
             waiting = false;   // 변경 뒤 어댑터가 다시 올라오면 새로 센다
             return true;
@@ -638,10 +638,22 @@ namespace MacChanger
             txtIpLog.Enabled = on;
         }
 
+        /// <summary>안전망 폴링(알림 직후에는 settle 재조회): 알림을 놓쳤을 때를 대비해 IP 구성을 다시 읽는다 (알림을 못 쓰는 OS 에서는 이것이 유일한 갱신 경로).</summary>
+        private void ipTimer_Tick(object sender, EventArgs e)
+        {
+            RefreshIp();
+            if (ipNotifier != null && ipTimer.Interval != IpSafetyPollMs)
+            {
+                ipTimer.Stop();
+                ipTimer.Interval = IpSafetyPollMs;
+                ipTimer.Start();
+            }
+        }
+
         /// <summary>
         /// 1초마다: 선택한 어댑터의 송수신 카운터를 읽어 그래프에 한 샘플을 넣고(어댑터가 내려가 있으면 속도 0),
-        /// 자동 변경 카운트다운·할당 대기 시계를 갱신해 예약 시각이 되면 변경을 시작하고, 차례가 되면 안전망 IP 폴링을 시작한다
-        /// (알림을 놓쳤을 때를 대비; 알림을 못 쓰는 OS 에서는 이것이 유일한 갱신 경로). 조회는 작업자 스레드에서 돌므로 틱이 밀리지 않는다.
+        /// 자동 변경 카운트다운·할당 대기 시계의 숫자를 올려 예약 시각이 되면 변경을 시작한다.
+        /// 이 타이머는 ScheduleAuto 말고는 재시작하지 않는다 — 그래프가 정확히 1초 간격으로 갱신되어야 하기 때문.
         /// </summary>
         private void secondTimer_Tick(object sender, EventArgs e)
         {
@@ -658,13 +670,8 @@ namespace MacChanger
                 trafficGraph.AddSample(traffic.ReceivedSpeed, traffic.SentSpeed, traffic.ReceivedTotal, traffic.SentTotal);
             }
             RunAutoIfDue();
-            // 할당 대기 시계는 IP 를 다시 읽지 않고도 1초마다 센다 (대기 상태는 마지막 IP 조회가 정한다)
-            if (waiting && autoRunning && !busy && TrackWaiting(true, Environment.TickCount)) StartWaitTimeoutChange();
-            if (--ipPollIn <= 0)
-            {
-                ipPollIn = ipNotifier != null ? IpSafetyPollTicks : 1;
-                RefreshIp();
-            }
+            // 할당 대기 시계는 IP 를 다시 읽지 않고도 1초마다 센다 (대기 상태는 마지막 IP 조회가 정한다); 숫자는 여기서만 올린다
+            if (waiting && autoRunning && !busy && TrackWaiting(true, Environment.TickCount, true)) StartWaitTimeoutChange();
         }
 
         // ------------------------------------------------------------------
@@ -856,16 +863,16 @@ namespace MacChanger
                 lastLoggedIp = null;   // 어댑터가 내려갔거나 링크가 끊긴 경우만 기준 초기화 (다시 같은 IP를 받아도 새 할당으로 기록)
                 CancelAuto();          // IP가 사라지면 예약도 취소 (다시 받으면 새로 센다)
                 // 링크는 올라왔는데 IP가 없으면 "할당 대기" — 설정한 초를 넘기면 새 MAC (어댑터가 꺼졌거나 링크가 없으면 세지 않는다)
-                if (TrackWaiting(ip != null && up, Environment.TickCount)) StartWaitTimeoutChange();
+                if (TrackWaiting(ip != null && up, Environment.TickCount, false)) StartWaitTimeoutChange();
                 return;
             }
             if (assigned.Length == 0)
             {
                 CancelAuto();   // 임대가 빠져 169.254 만 남은 동안은 변경하지 않는다 (기준 IP 는 유지 — 같은 IP가 돌아오면 중복 기록하지 않음)
-                if (TrackWaiting(true, Environment.TickCount)) StartWaitTimeoutChange();   // 자동 사설 주소만 있는 것도 할당 대기
+                if (TrackWaiting(true, Environment.TickCount, false)) StartWaitTimeoutChange();   // 자동 사설 주소만 있는 것도 할당 대기
                 return;
             }
-            TrackWaiting(false, 0);   // 실제 IP를 받았으면 대기 종료
+            TrackWaiting(false, 0, false);   // 실제 IP를 받았으면 대기 종료
             // 지정 IP 자동 정지: 자동 변경 중 대상 IP가 할당되면 바로 멈춘다 (로그 중복 판정과 상관없이 매번 확인, IP 줄은 아래에서 평소처럼 기록)
             AutoStopIfTargetAssigned(assigned);
             // 작업 중(busy)에는 기록·예약하지 않는다: 어댑터가 올라온 직후의 IP는 작업 완료 후 새 MAC과 함께 기록된다.

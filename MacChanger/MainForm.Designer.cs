@@ -67,6 +67,7 @@
             this.txtIpLog = new System.Windows.Forms.TextBox();
             this.trafficGraph = new MacChanger.TrafficGraph();
             this.toolTip = new System.Windows.Forms.ToolTip(this.components);
+            this.ipTimer = new System.Windows.Forms.Timer(this.components);
             this.secondTimer = new System.Windows.Forms.Timer(this.components);
             this.worker = new System.ComponentModel.BackgroundWorker();
             this.btnBackground = new System.Windows.Forms.Button();
@@ -459,6 +460,10 @@
             this.trafficGraph.TabIndex = 48;
             this.trafficGraph.TabStop = false;
             // 
+            // ipTimer
+            // 
+            this.ipTimer.Tick += new System.EventHandler(this.ipTimer_Tick);
+            // 
             // secondTimer
             // 
             this.secondTimer.Interval = 1000;
@@ -592,6 +597,7 @@
         private System.Windows.Forms.TextBox txtIpLog;
         private TrafficGraph trafficGraph;
         private System.Windows.Forms.ToolTip toolTip;
+        private System.Windows.Forms.Timer ipTimer;
         private System.Windows.Forms.Timer secondTimer;
         private System.ComponentModel.BackgroundWorker worker;
     }
