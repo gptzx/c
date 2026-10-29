@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.Drawing.Text;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using MacChanger.Native;
@@ -29,11 +29,10 @@ namespace MacChanger
         private const int ShadowInset = 5;     // 그림자 상자를 판보다 조금 작게 — 옆면 그림자는 옅게(약 3%)
         private const int ShadowAlpha = 46;    // 그림자 가장 짙은 곳의 알파 (약 18%)
 
-        private static readonly Color PanelBack = Color.FromArgb(249, 249, 249);
-        private static readonly Color TextColor = Color.Black;
-        // 강조가 바뀔 때마다 만들지 않도록 붓은 한 번만 만들어 둔다 (TrafficGraph 과 같은 방식 — Dispose 하지 않는다)
-        private static readonly Brush BorderBrush = new SolidBrush(Color.FromArgb(229, 229, 229));
-        private static readonly Brush HoverBrush = new SolidBrush(Color.FromArgb(234, 234, 234));
+        // 회색 단계 (예시 플라이아웃에서 잰 값): 판 249, 테두리 229, 강조 234
+        private const int PanelGray = 249;
+        private const int BorderGray = 229;
+        private const int HoverGray = 234;
         private const TextFormatFlags TextFlags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix;
 
         private readonly Control owner;
@@ -143,86 +142,112 @@ namespace MacChanger
         }
 
         // ------------------------------------------------------------------
-        // 그리기
+        // 그리기 — 합성은 픽셀 단위로 직접 한다 (GDI+ 의 안티앨리어싱 채우기는 Windows 에서 픽셀 중심이 정수 좌표에 놓여 1px 테두리가 두 픽셀에 번진다)
         // ------------------------------------------------------------------
-        /// <summary>창 전체 비트맵: 그림자 → 테두리 → 판(글자·강조는 불투명 비트맵에 GDI ClearType 로 그린 뒤 둥근 사각형으로 오려 넣는다).</summary>
+        /// <summary>창 전체 비트맵(미리 곱한 알파): 픽셀마다 그림자 → 테두리(바깥 둥근 사각형) → 판(1px 안쪽 둥근 사각형에 오려 넣은 불투명 비트맵) 순으로 덮는다.</summary>
         private Bitmap RenderBitmap()
         {
-            Bitmap bmp = new Bitmap(Width, Height, PixelFormat.Format32bppArgb);
-            DrawShadow(bmp);
-            using (Bitmap face = new Bitmap(panel.Width, panel.Height, PixelFormat.Format32bppRgb))
+            int w = Width, h = Height, radius = S(CornerRadius);
+            Rectangle box = panel;
+            box.Inflate(-S(ShadowInset), -S(ShadowInset));
+            box.Offset(0, S(ShadowOffsetY));
+            float[] across = BlurredBox(w, box.Left, box.Right, S(ShadowBlur));   // 축에 나란한 상자의 블러는 가로 곡선 × 세로 곡선
+            float[] down = BlurredBox(h, box.Top, box.Bottom, S(ShadowBlur));
+            Bitmap bmp = new Bitmap(w, h, PixelFormat.Format32bppPArgb);
+            using (Bitmap face = DrawFace())
             {
-                using (Graphics fg = Graphics.FromImage(face))
+                BitmapData src = face.LockBits(new Rectangle(0, 0, panel.Width, panel.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppRgb);
+                BitmapData dst = bmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb);
+                try
                 {
-                    fg.Clear(PanelBack);
-                    if (hover >= 0)
+                    int[] faceRow = new int[panel.Width], row = new int[w];
+                    for (int y = 0; y < h; y++)
                     {
-                        Rectangle h = ItemRect(hover);
-                        h.Inflate(-S(4), -S(1));
-                        fg.SmoothingMode = SmoothingMode.AntiAlias;
-                        using (GraphicsPath path = RoundedRect(h, S(CornerRadius)))
-                            fg.FillPath(HoverBrush, path);
-                    }
-                    for (int i = 0; i < labels.Count; i++)
-                    {
-                        Rectangle r = ItemRect(i);
-                        r.Inflate(-S(PadX), 0);
-                        TextRenderer.DrawText(fg, labels[i], Font, r, TextColor, TextFlags);
+                        int fy = y - panel.Y;
+                        if (fy >= 0 && fy < panel.Height) Marshal.Copy(IntPtr.Add(src.Scan0, fy * src.Stride), faceRow, 0, panel.Width);
+                        for (int x = 0; x < w; x++)
+                        {
+                            int fx = x - panel.X;
+                            float a = ShadowAlpha * across[x] * down[y], r = 0, g = 0, b = 0;   // 미리 곱한 값 0..255: 검은 그림자부터
+                            float outer = Coverage(fx, fy, panel.Width, panel.Height, radius);
+                            if (outer > 0)
+                            {
+                                a += outer * (255 - a);
+                                r += outer * (BorderGray - r); g += outer * (BorderGray - g); b += outer * (BorderGray - b);
+                                float inner = Coverage(fx - 1, fy - 1, panel.Width - 2, panel.Height - 2, radius - 1);
+                                if (inner > 0)
+                                {
+                                    int f = faceRow[fx];
+                                    a += inner * (255 - a);
+                                    r += inner * (((f >> 16) & 255) - r); g += inner * (((f >> 8) & 255) - g); b += inner * ((f & 255) - b);
+                                }
+                            }
+                            row[x] = ((int)(a + 0.5f) << 24) | ((int)(r + 0.5f) << 16) | ((int)(g + 0.5f) << 8) | (int)(b + 0.5f);
+                        }
+                        Marshal.Copy(row, 0, IntPtr.Add(dst.Scan0, y * dst.Stride), w);
                     }
                 }
-                // 테두리는 선이 아니라 면으로: 바깥 둥근 사각형을 테두리 색으로 채우고 1px 안쪽의 둥근 사각형에 판을 올린다 (직선 변은 픽셀 경계에 맞아 또렷하고 모서리만 안티앨리어싱된다)
-                using (Graphics g = Graphics.FromImage(bmp))
-                using (GraphicsPath outline = RoundedRect(panel, S(CornerRadius)))
-                using (GraphicsPath inner = RoundedRect(new Rectangle(panel.X + 1, panel.Y + 1, panel.Width - 2, panel.Height - 2), S(CornerRadius) - 1))
-                using (TextureBrush brush = new TextureBrush(face))
+                finally
                 {
-                    g.SmoothingMode = SmoothingMode.AntiAlias;
-                    g.FillPath(BorderBrush, outline);
-                    brush.TranslateTransform(panel.X, panel.Y);
-                    g.FillPath(brush, inner);
+                    bmp.UnlockBits(dst);
+                    face.UnlockBits(src);
                 }
             }
             return bmp;
         }
 
-        private static GraphicsPath RoundedRect(RectangleF r, float radius)
+        /// <summary>판 크기의 불투명 비트맵: 바탕과 강조(둥근 사각형)는 픽셀로 직접 쓰고, 항목 글자는 GDI ClearType 로 그린다.</summary>
+        private Bitmap DrawFace()
         {
-            float d = radius * 2;
-            GraphicsPath path = new GraphicsPath();
-            path.AddArc(r.X, r.Y, d, d, 180, 90);
-            path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
-            path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
-            path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
-            path.CloseFigure();
-            return path;
-        }
-
-        /// <summary>
-        /// 판보다 조금 작고 아래로 내린 검은 상자를 세 번 박스 블러한 그림자를 알파 채널에 쓴다.
-        /// 축에 나란한 상자의 블러는 가로 곡선 × 세로 곡선이므로 1차원 곡선 둘만 계산한다.
-        /// </summary>
-        private void DrawShadow(Bitmap bmp)
-        {
-            Rectangle box = panel;
-            box.Inflate(-S(ShadowInset), -S(ShadowInset));
-            box.Offset(0, S(ShadowOffsetY));
-            float[] across = BlurredBox(bmp.Width, box.Left, box.Right, S(ShadowBlur));
-            float[] down = BlurredBox(bmp.Height, box.Top, box.Bottom, S(ShadowBlur));
-            BitmapData data = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+            Bitmap face = new Bitmap(panel.Width, panel.Height, PixelFormat.Format32bppRgb);
+            Rectangle mark = hover >= 0 ? ItemRect(hover) : Rectangle.Empty;
+            mark.Inflate(-S(4), -S(1));
+            BitmapData data = face.LockBits(new Rectangle(0, 0, panel.Width, panel.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppRgb);
             try
             {
-                int[] row = new int[bmp.Width];
-                for (int y = 0; y < bmp.Height; y++)
+                int[] row = new int[panel.Width];
+                for (int y = 0; y < panel.Height; y++)
                 {
-                    for (int x = 0; x < bmp.Width; x++)
-                        row[x] = (int)(ShadowAlpha * across[x] * down[y] + 0.5f) << 24;   // 검정, 알파만 다르다
-                    Marshal.Copy(row, 0, IntPtr.Add(data.Scan0, y * data.Stride), bmp.Width);
+                    for (int x = 0; x < panel.Width; x++)
+                    {
+                        float c = hover >= 0 ? Coverage(x - mark.X, y - mark.Y, mark.Width, mark.Height, S(CornerRadius)) : 0f;
+                        int v = (int)(PanelGray + c * (HoverGray - PanelGray) + 0.5f);
+                        row[x] = (v << 16) | (v << 8) | v;
+                    }
+                    Marshal.Copy(row, 0, IntPtr.Add(data.Scan0, y * data.Stride), panel.Width);
                 }
             }
             finally
             {
-                bmp.UnlockBits(data);
+                face.UnlockBits(data);
             }
+            using (Graphics g = Graphics.FromImage(face))
+            {
+                g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;   // 메모리 비트맵에서는 기본 품질이 안티앨리어싱 없이 그려지므로 화면과 같은 ClearType 을 명시한다
+                for (int i = 0; i < labels.Count; i++)
+                {
+                    Rectangle r = ItemRect(i);
+                    r.Inflate(-S(PadX), 0);
+                    TextRenderer.DrawText(g, labels[i], Font, r, Color.Black, TextFlags);
+                }
+            }
+            return face;
+        }
+
+        /// <summary>왼쪽 위가 (0,0)인 w×h 둥근 사각형(반지름 r)이 픽셀 (x,y)를 덮는 비율. 모서리 안쪽 픽셀만 4×4 표본으로 재고 나머지는 0 또는 1.</summary>
+        private static float Coverage(int x, int y, int w, int h, int r)
+        {
+            if (x < 0 || y < 0 || x >= w || y >= h) return 0f;
+            if ((x >= r && x < w - r) || (y >= r && y < h - r)) return 1f;
+            float cx = x < r ? r : w - r, cy = y < r ? r : h - r;   // 가까운 모서리 원의 중심
+            int inside = 0;
+            for (int j = 0; j < 4; j++)
+                for (int i = 0; i < 4; i++)
+                {
+                    float dx = x + (i + 0.5f) / 4 - cx, dy = y + (j + 0.5f) / 4 - cy;
+                    if (dx * dx + dy * dy <= r * r) inside++;
+                }
+            return inside / 16f;
         }
 
         /// <summary>길이 length 의 1차원 곡선: [from, to) 는 1, 밖은 0 인 상자를 반지름 radius 의 박스 블러로 세 번 흐린 값.</summary>

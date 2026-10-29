@@ -41,6 +41,7 @@ Windows 7(.NET 4.0 설치됨) / 8 / 8.1 / 10 / 11에서 추가 런타임 설치 
 ```
 MacChanger.sln
 build.cmd                              ← Visual Studio 없이 빌드 (in-box csc.exe)
+tools/Shrink.cs                        ← dist/ 용 실행 파일 축소 도구 (Mono.Cecil: 매개변수 이름·비공개 이름·무효 특성 제거, 기능 동일)
 .gitattributes                         ← build.cmd / .sln은 CRLF로 체크아웃
 MacChanger/
   MacChanger.csproj                    ← .NET Framework 4.0, AnyCPU, 매니페스트·아이콘 포함
@@ -99,6 +100,18 @@ build.cmd
 → `MacChanger\bin\Release\MacChanger.exe`. (32비트/64비트 Windows 공통 경로이며, 64비트에서는 `Framework64\v4.0.30319\MSBuild.exe`를 써도 됩니다.)
 VS나 .NET Framework 4 Multi-Targeting Pack이 없는 PC에서는 `warning MSB3644: ".NETFramework,Version=v4.0" 참조 어셈블리를 찾을 수 없습니다` 경고가 한 줄 나오지만, 내장 MSBuild(4.x 툴셋)는 GAC의 런타임 어셈블리로 계속 빌드하므로 EXE는 정상 생성됩니다(방법 A와 같은 어셈블리를 참조). 이 경고는 무시해도 됩니다.
 VS 2017 이상의 MSBuild(Developer Command Prompt의 `msbuild`)에서는 같은 상황이 **오류** MSB3644가 되므로, 그 경우에는 방법 B 3번처럼 대상 팩을 설치하거나 방법 A를 사용하세요.
+
+### dist/ 실행 파일 축소 (선택)
+
+`dist/MacChanger.exe`는 위 빌드 결과를 `tools/Shrink.cs`(Mono.Cecil 0.11)로 한 번 더 거친 것입니다. 이 단계는 IL·리소스·동작을 건드리지 않고
+메타데이터만 줄입니다: 매개변수 이름 제거, 비공개·내부 멤버와 내부 형식의 이름을 한두 글자로, 실행에 영향 없는 컴파일러 특성 제거(공개 형식의
+공개 멤버·P/Invoke 이름·열거형 멤버는 그대로). 같은 입력이면 같은 출력이 나오며(타임스탬프 보존), `build.cmd`로 직접 빌드한 EXE 는 이름만 길 뿐
+기능이 같습니다. 아이콘(`app.ico`)의 세 프레임은 모두 PNG(zopfli)로 압축되어 있습니다 (Windows Vista 이상에서 지원).
+
+```
+mcs -r:Mono.Cecil.dll -r:System.Core -out:Shrink.exe tools/Shrink.cs
+mono Shrink.exe out/MacChanger.exe dist/MacChanger.exe
+```
 
 ## 사용 방법
 

@@ -80,9 +80,6 @@
             // 
             this.lblAdapter.AutoSize = true;
             this.lblAdapter.Location = new System.Drawing.Point(12, 16);
-            this.lblAdapter.Name = "lblAdapter";
-            this.lblAdapter.Size = new System.Drawing.Size(97, 15);
-            this.lblAdapter.TabIndex = 0;
             this.lblAdapter.Text = "네트워크 어댑터:";
             // 
             // cboAdapters
@@ -90,7 +87,6 @@
             this.cboAdapters.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cboAdapters.FormattingEnabled = true;
             this.cboAdapters.Location = new System.Drawing.Point(118, 12);
-            this.cboAdapters.Name = "cboAdapters";
             this.cboAdapters.Size = new System.Drawing.Size(350, 23);
             this.cboAdapters.TabIndex = 1;
             this.cboAdapters.SelectedIndexChanged += new System.EventHandler(this.cboAdapters_SelectedIndexChanged);
@@ -98,20 +94,15 @@
             // btnRefresh
             // 
             this.btnRefresh.Location = new System.Drawing.Point(474, 11);
-            this.btnRefresh.Name = "btnRefresh";
             this.btnRefresh.Size = new System.Drawing.Size(74, 25);
             this.btnRefresh.TabIndex = 2;
             this.btnRefresh.Text = "새로 고침";
-            this.btnRefresh.UseVisualStyleBackColor = true;
             this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
             // 
             // lblPermanent
             // 
             this.lblPermanent.AutoSize = true;
             this.lblPermanent.Location = new System.Drawing.Point(12, 48);
-            this.lblPermanent.Name = "lblPermanent";
-            this.lblPermanent.Size = new System.Drawing.Size(99, 15);
-            this.lblPermanent.TabIndex = 3;
             this.lblPermanent.Text = "원래(공장) MAC:";
             // 
             // txtPermanentMac
@@ -119,7 +110,6 @@
             this.txtPermanentMac.BackColor = System.Drawing.SystemColors.Window;
             this.txtPermanentMac.Font = new System.Drawing.Font("Consolas", 10F);
             this.txtPermanentMac.Location = new System.Drawing.Point(118, 44);
-            this.txtPermanentMac.Name = "txtPermanentMac";
             this.txtPermanentMac.ReadOnly = true;
             this.txtPermanentMac.Size = new System.Drawing.Size(190, 23);
             this.txtPermanentMac.TabIndex = 4;
@@ -129,9 +119,6 @@
             // 
             this.lblCurrent.AutoSize = true;
             this.lblCurrent.Location = new System.Drawing.Point(12, 78);
-            this.lblCurrent.Name = "lblCurrent";
-            this.lblCurrent.Size = new System.Drawing.Size(64, 15);
-            this.lblCurrent.TabIndex = 5;
             this.lblCurrent.Text = "현재 MAC:";
             // 
             // txtCurrentMac
@@ -139,7 +126,6 @@
             this.txtCurrentMac.BackColor = System.Drawing.SystemColors.Window;
             this.txtCurrentMac.Font = new System.Drawing.Font("Consolas", 10F);
             this.txtCurrentMac.Location = new System.Drawing.Point(118, 74);
-            this.txtCurrentMac.Name = "txtCurrentMac";
             this.txtCurrentMac.ReadOnly = true;
             this.txtCurrentMac.Size = new System.Drawing.Size(190, 23);
             this.txtCurrentMac.TabIndex = 6;
@@ -149,9 +135,6 @@
             // 
             this.lblIp.AutoSize = true;
             this.lblIp.Location = new System.Drawing.Point(12, 108);
-            this.lblIp.Name = "lblIp";
-            this.lblIp.Size = new System.Drawing.Size(50, 15);
-            this.lblIp.TabIndex = 7;
             this.lblIp.Text = "현재 IP:";
             // 
             // txtCurrentIp
@@ -159,7 +142,6 @@
             this.txtCurrentIp.BackColor = System.Drawing.SystemColors.Window;
             this.txtCurrentIp.Font = new System.Drawing.Font("Consolas", 10F);
             this.txtCurrentIp.Location = new System.Drawing.Point(118, 104);
-            this.txtCurrentIp.Name = "txtCurrentIp";
             this.txtCurrentIp.ReadOnly = true;
             this.txtCurrentIp.Size = new System.Drawing.Size(430, 23);
             this.txtCurrentIp.TabIndex = 8;
@@ -169,9 +151,6 @@
             // 
             this.lblMask.AutoSize = true;
             this.lblMask.Location = new System.Drawing.Point(12, 138);
-            this.lblMask.Name = "lblMask";
-            this.lblMask.Size = new System.Drawing.Size(84, 15);
-            this.lblMask.TabIndex = 9;
             this.lblMask.Text = "서브넷 마스크:";
             // 
             // txtMask
@@ -179,7 +158,6 @@
             this.txtMask.BackColor = System.Drawing.SystemColors.Window;
             this.txtMask.Font = new System.Drawing.Font("Consolas", 10F);
             this.txtMask.Location = new System.Drawing.Point(118, 134);
-            this.txtMask.Name = "txtMask";
             this.txtMask.ReadOnly = true;
             this.txtMask.Size = new System.Drawing.Size(430, 23);
             this.txtMask.TabIndex = 10;
@@ -189,9 +167,6 @@
             // 
             this.lblGateway.AutoSize = true;
             this.lblGateway.Location = new System.Drawing.Point(12, 168);
-            this.lblGateway.Name = "lblGateway";
-            this.lblGateway.Size = new System.Drawing.Size(96, 15);
-            this.lblGateway.TabIndex = 11;
             this.lblGateway.Text = "기본 게이트웨이:";
             // 
             // txtGateway
@@ -199,7 +174,6 @@
             this.txtGateway.BackColor = System.Drawing.SystemColors.Window;
             this.txtGateway.Font = new System.Drawing.Font("Consolas", 10F);
             this.txtGateway.Location = new System.Drawing.Point(118, 164);
-            this.txtGateway.Name = "txtGateway";
             this.txtGateway.ReadOnly = true;
             this.txtGateway.Size = new System.Drawing.Size(430, 23);
             this.txtGateway.TabIndex = 12;
@@ -209,9 +183,6 @@
             // 
             this.lblDns.AutoSize = true;
             this.lblDns.Location = new System.Drawing.Point(12, 198);
-            this.lblDns.Name = "lblDns";
-            this.lblDns.Size = new System.Drawing.Size(62, 15);
-            this.lblDns.TabIndex = 13;
             this.lblDns.Text = "DNS 서버:";
             // 
             // txtDns
@@ -219,7 +190,6 @@
             this.txtDns.BackColor = System.Drawing.SystemColors.Window;
             this.txtDns.Font = new System.Drawing.Font("Consolas", 10F);
             this.txtDns.Location = new System.Drawing.Point(118, 194);
-            this.txtDns.Name = "txtDns";
             this.txtDns.ReadOnly = true;
             this.txtDns.Size = new System.Drawing.Size(430, 23);
             this.txtDns.TabIndex = 14;
@@ -229,9 +199,6 @@
             // 
             this.lblNew.AutoSize = true;
             this.lblNew.Location = new System.Drawing.Point(12, 228);
-            this.lblNew.Name = "lblNew";
-            this.lblNew.Size = new System.Drawing.Size(55, 15);
-            this.lblNew.TabIndex = 15;
             this.lblNew.Text = "새 MAC:";
             // 
             // txtNewMac
@@ -239,70 +206,56 @@
             this.txtNewMac.Font = new System.Drawing.Font("Consolas", 10F);
             this.txtNewMac.Location = new System.Drawing.Point(118, 224);
             this.txtNewMac.MaxLength = 17;
-            this.txtNewMac.Name = "txtNewMac";
             this.txtNewMac.Size = new System.Drawing.Size(190, 23);
             this.txtNewMac.TabIndex = 16;
             // 
             // btnRandom
             // 
             this.btnRandom.Location = new System.Drawing.Point(314, 223);
-            this.btnRandom.Name = "btnRandom";
             this.btnRandom.Size = new System.Drawing.Size(110, 25);
             this.btnRandom.TabIndex = 17;
             this.btnRandom.Text = "랜덤 MAC 주소";
-            this.btnRandom.UseVisualStyleBackColor = true;
             this.btnRandom.Click += new System.EventHandler(this.btnRandom_Click);
             // 
             // btnApply
             // 
             this.btnApply.Font = new System.Drawing.Font("맑은 고딕", 9F, System.Drawing.FontStyle.Bold);
             this.btnApply.Location = new System.Drawing.Point(118, 256);
-            this.btnApply.Name = "btnApply";
             this.btnApply.Size = new System.Drawing.Size(110, 30);
             this.btnApply.TabIndex = 19;
             this.btnApply.Text = "변경 적용";
-            this.btnApply.UseVisualStyleBackColor = true;
             this.btnApply.Click += new System.EventHandler(this.btnApply_Click);
             // 
             // btnRestore
             // 
             this.btnRestore.Location = new System.Drawing.Point(342, 256);
-            this.btnRestore.Name = "btnRestore";
             this.btnRestore.Size = new System.Drawing.Size(110, 30);
             this.btnRestore.TabIndex = 21;
             this.btnRestore.Text = "원상복구";
-            this.btnRestore.UseVisualStyleBackColor = true;
             this.btnRestore.Click += new System.EventHandler(this.btnRestore_Click);
             // 
             // btnRenewIp
             // 
             this.btnRenewIp.Location = new System.Drawing.Point(236, 256);
-            this.btnRenewIp.Name = "btnRenewIp";
             this.btnRenewIp.Size = new System.Drawing.Size(100, 30);
             this.btnRenewIp.TabIndex = 20;
             this.btnRenewIp.Text = "IP 갱신";
-            this.btnRenewIp.UseVisualStyleBackColor = true;
             this.btnRenewIp.Click += new System.EventHandler(this.btnRenewIp_Click);
             // 
             // chkIpLog
             // 
             this.chkIpLog.AutoSize = true;
             this.chkIpLog.Location = new System.Drawing.Point(258, 448);
-            this.chkIpLog.Name = "chkIpLog";
-            this.chkIpLog.Size = new System.Drawing.Size(129, 19);
             this.chkIpLog.TabIndex = 44;
             this.chkIpLog.Text = "할당 IP 로그 저장";
-            this.chkIpLog.UseVisualStyleBackColor = true;
             this.chkIpLog.CheckedChanged += new System.EventHandler(this.chkIpLog_CheckedChanged);
             // 
             // btnBackground
             // 
             this.btnBackground.Location = new System.Drawing.Point(440, 444);
-            this.btnBackground.Name = "btnBackground";
             this.btnBackground.Size = new System.Drawing.Size(108, 25);
             this.btnBackground.TabIndex = 45;
             this.btnBackground.Text = "백그라운드 실행";
-            this.btnBackground.UseVisualStyleBackColor = true;
             this.btnBackground.Click += new System.EventHandler(this.btnBackground_Click);
             // 
             // notifyIcon
@@ -314,20 +267,14 @@
             // 
             this.lblAuto.AutoSize = true;
             this.lblAuto.Location = new System.Drawing.Point(12, 297);
-            this.lblAuto.Name = "lblAuto";
-            this.lblAuto.Size = new System.Drawing.Size(62, 15);
-            this.lblAuto.TabIndex = 23;
             this.lblAuto.Text = "자동 변경:";
             // 
             // chkAuto
             // 
             this.chkAuto.AutoSize = true;
             this.chkAuto.Location = new System.Drawing.Point(118, 295);
-            this.chkAuto.Name = "chkAuto";
-            this.chkAuto.Size = new System.Drawing.Size(84, 19);
             this.chkAuto.TabIndex = 24;
             this.chkAuto.Text = "IP 할당 후";
-            this.chkAuto.UseVisualStyleBackColor = true;
             this.chkAuto.CheckedChanged += new System.EventHandler(this.chkAuto_CheckedChanged);
             // 
             // nudAutoDelay
@@ -335,7 +282,6 @@
             this.nudAutoDelay.Enabled = false;
             this.nudAutoDelay.Location = new System.Drawing.Point(210, 293);
             this.nudAutoDelay.Maximum = new decimal(new int[] { 604800, 0, 0, 0 });
-            this.nudAutoDelay.Name = "nudAutoDelay";
             this.nudAutoDelay.Size = new System.Drawing.Size(72, 23);
             this.nudAutoDelay.TabIndex = 25;
             this.nudAutoDelay.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
@@ -345,57 +291,40 @@
             // 
             this.lblAutoSuffix.AutoSize = true;
             this.lblAutoSuffix.Location = new System.Drawing.Point(288, 297);
-            this.lblAutoSuffix.Name = "lblAutoSuffix";
-            this.lblAutoSuffix.Size = new System.Drawing.Size(110, 15);
-            this.lblAutoSuffix.TabIndex = 26;
             this.lblAutoSuffix.Text = "초 뒤 새 MAC 적용";
             // 
             // btnAutoToggle
             // 
             this.btnAutoToggle.Enabled = false;
             this.btnAutoToggle.Location = new System.Drawing.Point(404, 292);
-            this.btnAutoToggle.Name = "btnAutoToggle";
             this.btnAutoToggle.Size = new System.Drawing.Size(144, 25);
             this.btnAutoToggle.TabIndex = 27;
             this.btnAutoToggle.Text = "시작";
-            this.btnAutoToggle.UseVisualStyleBackColor = true;
             this.btnAutoToggle.Click += new System.EventHandler(this.btnAutoToggle_Click);
             // 
             // lblAutoStop
             // 
             this.lblAutoStop.AutoSize = true;
             this.lblAutoStop.Location = new System.Drawing.Point(12, 359);
-            this.lblAutoStop.Name = "lblAutoStop";
-            this.lblAutoStop.Size = new System.Drawing.Size(62, 15);
-            this.lblAutoStop.TabIndex = 32;
             this.lblAutoStop.Text = "자동 정지:";
             // 
             // chkResetDns
             // 
             this.chkResetDns.AutoSize = true;
             this.chkResetDns.Location = new System.Drawing.Point(436, 226);
-            this.chkResetDns.Name = "chkResetDns";
-            this.chkResetDns.Size = new System.Drawing.Size(82, 19);
             this.chkResetDns.TabIndex = 18;
             this.chkResetDns.Text = "DNS 초기화";
-            this.chkResetDns.UseVisualStyleBackColor = true;
             // 
             // lblWait
             // 
             this.lblWait.AutoSize = true;
             this.lblWait.Location = new System.Drawing.Point(12, 328);
-            this.lblWait.Name = "lblWait";
-            this.lblWait.Size = new System.Drawing.Size(62, 15);
-            this.lblWait.TabIndex = 28;
             this.lblWait.Text = "할당 대기:";
             // 
             // lblWaitPrefix
             // 
             this.lblWaitPrefix.AutoSize = true;
             this.lblWaitPrefix.Location = new System.Drawing.Point(118, 328);
-            this.lblWaitPrefix.Name = "lblWaitPrefix";
-            this.lblWaitPrefix.Size = new System.Drawing.Size(86, 15);
-            this.lblWaitPrefix.TabIndex = 29;
             this.lblWaitPrefix.Text = "IP 할당 대기가";
             // 
             // nudWaitTimeout
@@ -404,7 +333,6 @@
             this.nudWaitTimeout.Location = new System.Drawing.Point(210, 324);
             this.nudWaitTimeout.Maximum = new decimal(new int[] { 60, 0, 0, 0 });
             this.nudWaitTimeout.Minimum = new decimal(new int[] { 10, 0, 0, 0 });
-            this.nudWaitTimeout.Name = "nudWaitTimeout";
             this.nudWaitTimeout.Size = new System.Drawing.Size(60, 23);
             this.nudWaitTimeout.TabIndex = 30;
             this.nudWaitTimeout.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
@@ -414,20 +342,14 @@
             // 
             this.lblWaitSuffix.AutoSize = true;
             this.lblWaitSuffix.Location = new System.Drawing.Point(276, 328);
-            this.lblWaitSuffix.Name = "lblWaitSuffix";
-            this.lblWaitSuffix.Size = new System.Drawing.Size(150, 15);
-            this.lblWaitSuffix.TabIndex = 31;
             this.lblWaitSuffix.Text = "초를 넘으면 새 MAC 적용";
             // 
             // chkAutoStopIp
             // 
             this.chkAutoStopIp.AutoSize = true;
             this.chkAutoStopIp.Location = new System.Drawing.Point(118, 357);
-            this.chkAutoStopIp.Name = "chkAutoStopIp";
-            this.chkAutoStopIp.Size = new System.Drawing.Size(166, 19);
             this.chkAutoStopIp.TabIndex = 33;
             this.chkAutoStopIp.Text = "지정 IP/대역 할당 시 정지";
-            this.chkAutoStopIp.UseVisualStyleBackColor = true;
             this.chkAutoStopIp.CheckedChanged += new System.EventHandler(this.chkAutoStopIp_CheckedChanged);
             // 
             // txtAutoStopIp
@@ -436,7 +358,6 @@
             this.txtAutoStopIp.Font = new System.Drawing.Font("Consolas", 10F);
             this.txtAutoStopIp.Location = new System.Drawing.Point(292, 355);
             this.txtAutoStopIp.MaxLength = 15;
-            this.txtAutoStopIp.Name = "txtAutoStopIp";
             this.txtAutoStopIp.Size = new System.Drawing.Size(130, 23);
             this.txtAutoStopIp.TabIndex = 34;
             // 
@@ -444,99 +365,71 @@
             // 
             this.lblRelease.AutoSize = true;
             this.lblRelease.Location = new System.Drawing.Point(12, 389);
-            this.lblRelease.Name = "lblRelease";
-            this.lblRelease.Size = new System.Drawing.Size(50, 15);
-            this.lblRelease.TabIndex = 35;
             this.lblRelease.Text = "IP 반환:";
             // 
             // chkReleaseIp
             // 
             this.chkReleaseIp.AutoSize = true;
             this.chkReleaseIp.Location = new System.Drawing.Point(118, 387);
-            this.chkReleaseIp.Name = "chkReleaseIp";
-            this.chkReleaseIp.Size = new System.Drawing.Size(150, 19);
             this.chkReleaseIp.TabIndex = 36;
             this.chkReleaseIp.Text = "DHCP 서버에 IP 반환";
-            this.chkReleaseIp.UseVisualStyleBackColor = true;
             // 
             // btnReleaseIp
             // 
             this.btnReleaseIp.Location = new System.Drawing.Point(404, 384);
-            this.btnReleaseIp.Name = "btnReleaseIp";
             this.btnReleaseIp.Size = new System.Drawing.Size(144, 25);
             this.btnReleaseIp.TabIndex = 37;
             this.btnReleaseIp.Text = "지금 IP 반환";
-            this.btnReleaseIp.UseVisualStyleBackColor = true;
             this.btnReleaseIp.Click += new System.EventHandler(this.btnReleaseIp_Click);
             // 
             // lblLogOptions
             // 
             this.lblLogOptions.AutoSize = true;
             this.lblLogOptions.Location = new System.Drawing.Point(12, 419);
-            this.lblLogOptions.Name = "lblLogOptions";
-            this.lblLogOptions.Size = new System.Drawing.Size(38, 15);
-            this.lblLogOptions.TabIndex = 38;
             this.lblLogOptions.Text = "로그:";
             // 
             // chkLogTime
             // 
             this.chkLogTime.AutoSize = true;
             this.chkLogTime.Location = new System.Drawing.Point(118, 417);
-            this.chkLogTime.Name = "chkLogTime";
-            this.chkLogTime.Size = new System.Drawing.Size(50, 19);
             this.chkLogTime.TabIndex = 39;
             this.chkLogTime.Text = "시간";
-            this.chkLogTime.UseVisualStyleBackColor = true;
             // 
             // chkLogMask
             // 
             this.chkLogMask.AutoSize = true;
             this.chkLogMask.Location = new System.Drawing.Point(180, 417);
-            this.chkLogMask.Name = "chkLogMask";
-            this.chkLogMask.Size = new System.Drawing.Size(105, 19);
             this.chkLogMask.TabIndex = 40;
             this.chkLogMask.Text = "서브넷 마스크";
-            this.chkLogMask.UseVisualStyleBackColor = true;
             // 
             // chkLogGateway
             // 
             this.chkLogGateway.AutoSize = true;
             this.chkLogGateway.Location = new System.Drawing.Point(297, 417);
-            this.chkLogGateway.Name = "chkLogGateway";
-            this.chkLogGateway.Size = new System.Drawing.Size(117, 19);
             this.chkLogGateway.TabIndex = 41;
             this.chkLogGateway.Text = "기본 게이트웨이";
-            this.chkLogGateway.UseVisualStyleBackColor = true;
             // 
             // chkLogMac
             // 
             this.chkLogMac.AutoSize = true;
             this.chkLogMac.Location = new System.Drawing.Point(426, 417);
-            this.chkLogMac.Name = "chkLogMac";
-            this.chkLogMac.Size = new System.Drawing.Size(55, 19);
             this.chkLogMac.TabIndex = 42;
             this.chkLogMac.Text = "MAC";
-            this.chkLogMac.UseVisualStyleBackColor = true;
             // 
             // chkLogBox
             // 
             this.chkLogBox.AutoSize = true;
             this.chkLogBox.Location = new System.Drawing.Point(118, 448);
-            this.chkLogBox.Name = "chkLogBox";
-            this.chkLogBox.Size = new System.Drawing.Size(107, 19);
             this.chkLogBox.TabIndex = 43;
             this.chkLogBox.Text = "로그 상자 사용";
-            this.chkLogBox.UseVisualStyleBackColor = true;
             this.chkLogBox.CheckedChanged += new System.EventHandler(this.chkLogBox_CheckedChanged);
             // 
             // btnClearLog
             // 
             this.btnClearLog.Location = new System.Drawing.Point(458, 258);
-            this.btnClearLog.Name = "btnClearLog";
             this.btnClearLog.Size = new System.Drawing.Size(90, 25);
             this.btnClearLog.TabIndex = 22;
             this.btnClearLog.Text = "로그 비우기";
-            this.btnClearLog.UseVisualStyleBackColor = true;
             this.btnClearLog.Click += new System.EventHandler(this.btnClearLog_Click);
             // 
             // lblStatus
@@ -544,9 +437,7 @@
             this.lblStatus.AutoEllipsis = true;
             this.lblStatus.Font = new System.Drawing.Font("맑은 고딕", 9F, System.Drawing.FontStyle.Bold);
             this.lblStatus.Location = new System.Drawing.Point(12, 477);
-            this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(536, 20);
-            this.lblStatus.TabIndex = 46;
             this.lblStatus.Text = "상태: 준비";
             // 
             // txtIpLog
@@ -555,7 +446,6 @@
             this.txtIpLog.Font = new System.Drawing.Font("Consolas", 9F);
             this.txtIpLog.Location = new System.Drawing.Point(12, 504);
             this.txtIpLog.Multiline = true;
-            this.txtIpLog.Name = "txtIpLog";
             this.txtIpLog.ReadOnly = true;
             this.txtIpLog.ScrollBars = System.Windows.Forms.ScrollBars.Both;
             this.txtIpLog.Size = new System.Drawing.Size(262, 167);
@@ -566,7 +456,6 @@
             // trafficGraph
             // 
             this.trafficGraph.Location = new System.Drawing.Point(286, 504);
-            this.trafficGraph.Name = "trafficGraph";
             this.trafficGraph.Size = new System.Drawing.Size(262, 167);
             this.trafficGraph.TabIndex = 48;
             this.trafficGraph.TabStop = false;
