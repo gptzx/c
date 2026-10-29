@@ -5,7 +5,7 @@ using Microsoft.Win32.SafeHandles;
 namespace MacChanger.Native
 {
     /// <summary>
-    /// kernel32 / user32 / iphlpapi / setupapi P/Invoke 선언.
+    /// kernel32 / user32 / gdi32 / iphlpapi / setupapi P/Invoke 선언.
     /// 구조체는 LayoutKind.Sequential로 선언하여 x86/x64 양쪽에서 Marshal.SizeOf가 올바른 크기를 돌려주도록 한다
     /// (MIB_IF_ROW2 만 예외: 필요한 필드만 실제 오프셋에 놓는 LayoutKind.Explicit, Size = 1352 고정).
     /// </summary>
@@ -55,6 +55,62 @@ namespace MacChanger.Native
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern IntPtr LoadIcon(IntPtr hInstance, IntPtr lpIconName);
+
+        // ---- 레이어드 창 (트레이 메뉴: 픽셀 알파로 둥근 판과 그림자를 그린다) ----
+        public const int WS_EX_TOOLWINDOW = 0x00000080;
+        public const int WS_EX_LAYERED = 0x00080000;
+        public const uint ULW_ALPHA = 0x00000002;
+        public const byte AC_SRC_ALPHA = 0x01;
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct POINT
+        {
+            public int X, Y;
+            public POINT(int x, int y) { X = x; Y = y; }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct SIZE
+        {
+            public int Width, Height;
+            public SIZE(int width, int height) { Width = width; Height = height; }
+        }
+
+        /// <summary>BlendOp = AC_SRC_OVER(0), BlendFlags = 0 은 기본값 그대로 둔다</summary>
+        [StructLayout(LayoutKind.Sequential)]
+        public struct BLENDFUNCTION
+        {
+            public byte BlendOp, BlendFlags, SourceConstantAlpha, AlphaFormat;
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr hdcDst, ref POINT pptDst, ref SIZE psize, IntPtr hdcSrc, ref POINT pptSrc, uint crKey, ref BLENDFUNCTION pblend, uint dwFlags);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
+
+        public const int VK_LBUTTON = 0x01;
+        public const int VK_RBUTTON = 0x02;
+        public const int VK_MBUTTON = 0x04;
+
+        /// <summary>최상위 비트 = 지금 눌림, 최하위 비트 = 지난 호출 뒤에 눌린 적 있음</summary>
+        [DllImport("user32.dll")]
+        public static extern short GetAsyncKeyState(int vKey);
+
+        [DllImport("gdi32.dll")]
+        public static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+        [DllImport("gdi32.dll")]
+        public static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
+
+        [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool DeleteObject(IntPtr hObject);
+
+        [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool DeleteDC(IntPtr hdc);
 
         // ------------------------------------------------------------------
         // iphlpapi — 인터페이스 송수신 카운터 (GetIfEntry2, Windows Vista 이상, 64비트 카운터)

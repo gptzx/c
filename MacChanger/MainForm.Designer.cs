@@ -72,10 +72,6 @@
             this.worker = new System.ComponentModel.BackgroundWorker();
             this.btnBackground = new System.Windows.Forms.Button();
             this.notifyIcon = new System.Windows.Forms.NotifyIcon(this.components);
-            this.trayMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
-            this.trayOpenItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.trayExitItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.trayMenu.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudAutoDelay)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudWaitTimeout)).BeginInit();
             this.SuspendLayout();
@@ -311,31 +307,8 @@
             // 
             // notifyIcon
             // 
-            this.notifyIcon.ContextMenuStrip = this.trayMenu;
             this.notifyIcon.Text = "MAC 주소 변경 유틸리티";
-            this.notifyIcon.DoubleClick += new System.EventHandler(this.trayOpen_Click);
-            // 
-            // trayMenu
-            // 
-            this.trayMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.trayOpenItem,
-            this.trayExitItem});
-            this.trayMenu.Name = "trayMenu";
-            this.trayMenu.Size = new System.Drawing.Size(100, 48);
-            // 
-            // trayOpenItem
-            // 
-            this.trayOpenItem.Name = "trayOpenItem";
-            this.trayOpenItem.Size = new System.Drawing.Size(99, 22);
-            this.trayOpenItem.Text = "열기";
-            this.trayOpenItem.Click += new System.EventHandler(this.trayOpen_Click);
-            // 
-            // trayExitItem
-            // 
-            this.trayExitItem.Name = "trayExitItem";
-            this.trayExitItem.Size = new System.Drawing.Size(99, 22);
-            this.trayExitItem.Text = "종료";
-            this.trayExitItem.Click += new System.EventHandler(this.trayExit_Click);
+            this.notifyIcon.MouseUp += new System.Windows.Forms.MouseEventHandler(this.notifyIcon_MouseUp);
             // 
             // lblAuto
             // 
@@ -678,7 +651,6 @@
             this.Shown += new System.EventHandler(this.MainForm_Shown);
             ((System.ComponentModel.ISupportInitialize)(this.nudAutoDelay)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudWaitTimeout)).EndInit();
-            this.trayMenu.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
         }
@@ -710,9 +682,6 @@
         private System.Windows.Forms.CheckBox chkIpLog;
         private System.Windows.Forms.Button btnBackground;
         private System.Windows.Forms.NotifyIcon notifyIcon;
-        private System.Windows.Forms.ContextMenuStrip trayMenu;
-        private System.Windows.Forms.ToolStripMenuItem trayOpenItem;
-        private System.Windows.Forms.ToolStripMenuItem trayExitItem;
         private System.Windows.Forms.Label lblAuto;
         private System.Windows.Forms.CheckBox chkAuto;
         private System.Windows.Forms.NumericUpDown nudAutoDelay;

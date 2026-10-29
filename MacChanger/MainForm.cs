@@ -69,6 +69,8 @@ namespace MacChanger
         private string operationReason;
         /// <summary>지정 IP/대역 할당으로 자동 변경을 정지했을 때의 안내문 — 작업 완료 상태에 그대로 붙인다 (어느 IP가 맞았는지 남기기 위해)</summary>
         private string autoStopMessage;
+        /// <summary>트레이 아이콘의 오른쪽 클릭 메뉴 (처음 필요할 때 만든다)</summary>
+        private TrayMenu trayMenu;
 
         /// <summary>알림을 쓸 때의 안전망 폴링 주기 / 알림 직후 한 번 더 읽는 간격(게이트웨이·DNS 는 주소보다 조금 늦게 기록된다) / 알림을 못 쓰는 OS 에서의 폴링 주기 (ms)</summary>
         private const int IpSafetyPollMs = 3000, IpSettleMs = 1000, IpFallbackPollMs = 1000;
@@ -110,7 +112,7 @@ namespace MacChanger
             toolTip.SetToolTip(chkLogMac, "로그에 그 시점의 MAC을 함께 기록합니다.");
             toolTip.SetToolTip(chkLogBox, "할당 IP 로그 상자를 켜거나 끕니다.\n끄면 흐리게 보이고 기록하지 않습니다. (로그 비우기는 언제나 가능)");
             toolTip.SetToolTip(chkIpLog, "새 IP를 받을 때마다 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 기록합니다.");
-            toolTip.SetToolTip(btnBackground, "창을 숨기고 트레이 아이콘으로 계속 실행합니다.\n트레이 아이콘을 두 번 클릭하면 창이 다시 열립니다.");
+            toolTip.SetToolTip(btnBackground, "창을 숨기고 트레이 아이콘으로 계속 실행합니다.\n트레이 아이콘을 클릭하면 창이 다시 열립니다.");
             toolTip.SetToolTip(trafficGraph, "송수신 속도 그래프 (빨강: 수신, 초록: 송신)");
         }
 
@@ -146,6 +148,7 @@ namespace MacChanger
                 ipNotifier.Dispose();
                 ipNotifier = null;
             }
+            if (trayMenu != null) trayMenu.Dispose();
             base.OnFormClosed(e);
         }
 
@@ -208,17 +211,25 @@ namespace MacChanger
         {
             notifyIcon.Visible = true;
             Hide();   // 타이머·자동 변경·그래프는 창이 숨겨져도 그대로 돈다
-            notifyIcon.ShowBalloonTip(3000, Program.AppTitle, "백그라운드에서 계속 실행 중입니다. 트레이 아이콘을 두 번 클릭하면 창이 다시 열립니다.", ToolTipIcon.Info);
+            notifyIcon.ShowBalloonTip(3000, Program.AppTitle, "백그라운드에서 계속 실행 중입니다. 트레이 아이콘을 클릭하면 창이 다시 열립니다.", ToolTipIcon.Info);
         }
 
-        private void trayOpen_Click(object sender, EventArgs e)
+        /// <summary>트레이 아이콘: 왼쪽 버튼 한 번 클릭이면 창을 다시 열고, 오른쪽이면 열기/종료 메뉴를 띄운다 (MouseUp: 빠른 두 번 클릭의 둘째 클릭도 받는다).</summary>
+        private void notifyIcon_MouseUp(object sender, MouseEventArgs e)
         {
-            RestoreFromTray();
+            if (e.Button == MouseButtons.Left) RestoreFromTray();
+            else if (e.Button == MouseButtons.Right) ShowTrayMenu();
         }
 
-        private void trayExit_Click(object sender, EventArgs e)
+        private void ShowTrayMenu()
         {
-            Close();
+            if (trayMenu == null)
+            {
+                trayMenu = new TrayMenu(this);
+                trayMenu.AddItem("열기", RestoreFromTray);
+                trayMenu.AddItem("종료", Close);
+            }
+            trayMenu.Popup(Cursor.Position);
         }
 
         /// <summary>트레이로 숨겨져 있으면 창을 다시 보이고 앞으로 가져온다 (대화 상자를 띄우기 전에도 호출).</summary>
