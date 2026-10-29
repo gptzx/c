@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.Drawing.Text;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using MacChanger.Native;
@@ -196,7 +195,7 @@ namespace MacChanger
             return bmp;
         }
 
-        /// <summary>판 크기의 불투명 비트맵: 바탕과 강조(둥근 사각형)는 픽셀로 직접 쓰고, 항목 글자는 GDI ClearType 로 그린다.</summary>
+        /// <summary>판 크기의 불투명 비트맵: 바탕과 강조(둥근 사각형)는 픽셀로 직접 쓰고, 항목 글자는 화면과 같은 방식(화면 호환 버퍼 + GDI)으로 그린다.</summary>
         private Bitmap DrawFace()
         {
             Bitmap face = new Bitmap(panel.Width, panel.Height, PixelFormat.Format32bppRgb);
@@ -221,15 +220,18 @@ namespace MacChanger
             {
                 face.UnlockBits(data);
             }
-            using (Graphics g = Graphics.FromImage(face))
+            // 글자는 예전 메뉴(ContextMenuStrip)와 똑같이 화면 호환 버퍼(DDB)에 GDI 로 그린다 — 메모리 DIB 에 그리면 GDI 가 글자를 매끄럽게(ClearType) 그리지 않는다.
+            using (Graphics screen = Graphics.FromHwnd(IntPtr.Zero))
+            using (BufferedGraphics buffer = BufferedGraphicsManager.Current.Allocate(screen, new Rectangle(0, 0, panel.Width, panel.Height)))
             {
-                g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;   // 메모리 비트맵에서는 기본 품질이 안티앨리어싱 없이 그려지므로 화면과 같은 ClearType 을 명시한다
+                buffer.Graphics.DrawImageUnscaled(face, 0, 0);   // 바탕·강조를 버퍼에 복사한 뒤 그 위에 글자
                 for (int i = 0; i < labels.Count; i++)
                 {
                     Rectangle r = ItemRect(i);
                     r.Inflate(-S(PadX), 0);
-                    TextRenderer.DrawText(g, labels[i], Font, r, Color.Black, TextFlags);
+                    TextRenderer.DrawText(buffer.Graphics, labels[i], Font, r, Color.Black, TextFlags);
                 }
+                using (Graphics g = Graphics.FromImage(face)) buffer.Render(g);   // 버퍼(DDB)의 픽셀을 그대로 face 로
             }
             return face;
         }
