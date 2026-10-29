@@ -790,9 +790,10 @@ namespace MacChanger
         /// <summary>현재 MAC을 모델과 드롭다운 항목 텍스트에 반영한다 (ComboBox는 Add 시점의 문자열을 캐시하므로 항목을 다시 넣어야 한다).</summary>
         private void ShowCurrentMac(NetworkAdapterInfo adapter, string current)
         {
-            if (current == null || string.Equals(adapter.CurrentMac, current, StringComparison.OrdinalIgnoreCase)) return;
+            if (current == null) return;
+            SetIfChanged(txtCurrentMac, MacAddressUtil.Format(current));   // 칸은 마지막으로 읽은 값을 늘 보여준다 — "(조회 실패)" 뒤에 같은 MAC 이 다시 읽혀도
+            if (string.Equals(adapter.CurrentMac, current, StringComparison.OrdinalIgnoreCase)) return;
             adapter.CurrentMac = current;
-            txtCurrentMac.Text = MacAddressUtil.Format(current);
             int i = cboAdapters.SelectedIndex;
             if (i < 0) return;
             suppressSelectionChanged = true;
@@ -1002,7 +1003,12 @@ namespace MacChanger
             NetworkAdapterInfo adapter = SelectedAdapter;
             if (adapter != null)
             {
-                if (result != null) ShowCurrentMac(adapter, result.CurrentMac);
+                if (result != null)
+                {
+                    if (result.CurrentMac != null) ShowCurrentMac(adapter, result.CurrentMac);
+                    else if (result.AdapterRestarted && !result.Success) txtCurrentMac.Text = "(조회 실패)";   // 어댑터를 멈췄는데 현재 MAC 을 읽지 못함 — 작업 전 값을 현재 값처럼 남기지 않는다
+                    if (result.PermanentMac != null) SetIfChanged(txtPermanentMac, MacAddressUtil.Format(result.PermanentMac));
+                }
                 RefreshIp();
             }
             SetStatus(finalState, finalMessage);

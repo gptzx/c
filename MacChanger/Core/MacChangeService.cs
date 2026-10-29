@@ -14,8 +14,10 @@ namespace MacChanger.Core
         public bool AdapterRestarted { get; set; }
         /// <summary>실패 시 사용자에게 추가로 보여줄 안내문(무선 제약, 임의 하드웨어 주소 등)</summary>
         public string Guidance { get; set; }
-        /// <summary>어댑터가 다시 올라온 뒤 작업자 스레드가 읽은 현재 MAC(12자리 hex). 재시작이 보류됐거나 어댑터를 건드리지 않은 작업이면 null — UI 가 다시 읽지 않도록 넘긴다</summary>
+        /// <summary>어댑터가 다시 올라온 뒤 작업자 스레드가 읽은 현재 MAC(12자리 hex). 재시작이 보류됐거나, 어댑터를 건드리지 않은 작업이거나, 재시작 뒤 MAC 을 읽지 못한 실패면 null — UI 가 다시 읽지 않도록 넘긴다</summary>
         public string CurrentMac { get; set; }
+        /// <summary>어댑터가 다시 올라온 뒤 읽은 공장 MAC (드라이버가 지원하지 않거나 읽지 못했으면 null)</summary>
+        public string PermanentMac { get; set; }
     }
 
     /// <summary>
@@ -112,9 +114,10 @@ namespace MacChanger.Core
             public string TcpipWarning;
             /// <summary>작업 전 IP 반환 옵션이 켜져 있었는데 반환에 실패했으면 그 이유 (성공·건너뜀이면 null)</summary>
             public string ReleaseWarning;
-            /// <summary>재시작 뒤 읽은 현재 MAC 과 그것을 NDIS 직접 조회로 읽었는지</summary>
+            /// <summary>재시작 뒤 읽은 현재 MAC 과 그것을 NDIS 직접 조회로 읽었는지, 그리고 그때 읽은 공장 MAC</summary>
             public string Current;
             public bool Live;
+            public string Permanent;
 
             /// <summary>성공 결과: 메시지 뒤에 Tcpip 정리 경고를 붙이고, 재시작이 보류되었으면 RebootRequired.</summary>
             public MacChangeResult Success(string message)
@@ -124,6 +127,7 @@ namespace MacChanger.Core
                 result.RebootRequired = Deferred;
                 result.AdapterRestarted = Restarted;
                 result.CurrentMac = Current;
+                result.PermanentMac = Permanent;
                 result.Message = message + WarningSuffix(TcpipWarning) + WarningSuffix(ReleaseWarning);
                 return result;
             }
@@ -134,6 +138,7 @@ namespace MacChanger.Core
                 MacChangeResult result = new MacChangeResult();
                 result.AdapterRestarted = Restarted;
                 result.CurrentMac = Current;
+                result.PermanentMac = Permanent;
                 result.Message = message;
                 result.Guidance = guidance;
                 return result;
@@ -197,7 +202,9 @@ namespace MacChanger.Core
             {
                 fail.Message = "어댑터가 " + (MacWaitTimeoutMs / 1000) + "초 안에 다시 올라오지 않았습니다. 네트워크 연결(ncpa.cpl)에서 어댑터 상태를 확인한 뒤 '새로 고침'을 누르세요.";
                 cycle.Fail = fail;
+                return cycle;
             }
+            cycle.Permanent = ReadPermanentMac(adapter);   // 올라온 어댑터의 공장 MAC 도 여기서 읽어 결과에 담는다 (UI 가 다시 읽지 않도록)
             return cycle;
         }
 
@@ -297,7 +304,7 @@ namespace MacChanger.Core
             if (cycle.Fail != null) return cycle.Fail;
             if (cycle.Deferred)
                 return cycle.Success((existed ? "MAC 설정을 지웠지만 " : "지울 MAC 설정은 없었고 ") + "어댑터를 바로 재시작하지 못했습니다. 재부팅 후 공장 MAC으로 돌아갑니다.");
-            string permanent = ReadPermanentMac(adapter);
+            string permanent = cycle.Permanent;
             if (permanent == null)
                 return cycle.Success("복구 완료 (공장 MAC 조회 불가 — 비교 생략). 현재 MAC: " + MacAddressUtil.Format(cycle.Current) + SourceNote(cycle.Live));
             if (string.Equals(cycle.Current, permanent, StringComparison.OrdinalIgnoreCase))
