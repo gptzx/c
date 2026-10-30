@@ -380,7 +380,7 @@
             this.btnReleaseIp.Location = new System.Drawing.Point(404, 384);
             this.btnReleaseIp.Size = new System.Drawing.Size(144, 25);
             this.btnReleaseIp.TabIndex = 37;
-            this.btnReleaseIp.Text = "지금 IP 반환";
+            this.btnReleaseIp.Text = "즉시 반환";
             this.btnReleaseIp.Click += new System.EventHandler(this.btnReleaseIp_Click);
             // 
             // lblLogOptions

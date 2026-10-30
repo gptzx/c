@@ -102,7 +102,7 @@ namespace MacChanger
             toolTip.SetToolTip(btnRestore, "원래(공장) MAC으로 되돌립니다. (확인 창을 거쳐 어댑터 재시작)");
             toolTip.SetToolTip(btnClearLog, "로그 상자를 비웁니다. (로그 파일은 그대로)");
             toolTip.SetToolTip(chkReleaseIp, "변경 적용·IP 갱신·원상복구·자동 변경 전에 IP를 DHCP 서버에 먼저 반환합니다.");
-            toolTip.SetToolTip(btnReleaseIp, "지금 IP를 DHCP 서버에 반환합니다.\n새 IP는 IP 갱신이나 어댑터 재시작 때 받습니다.");
+            toolTip.SetToolTip(btnReleaseIp, "현재 IP를 DHCP 서버에 즉시 반환합니다.\n새 IP는 IP 갱신이나 어댑터 재시작 때 받습니다.");
             toolTip.SetToolTip(chkAuto, "자동 변경 사용 — '시작'을 누르면 IP를 받을 때마다 지정한 초 뒤에 랜덤 MAC을 적용합니다.");
             toolTip.SetToolTip(nudAutoDelay, "IP를 받은 뒤 MAC을 바꾸기까지 기다리는 초 (0 = 즉시, 최대 7일)");
             toolTip.SetToolTip(btnAutoToggle, "자동 변경 시작 / 정지\n변경 실패·재부팅 필요·지정 IP 할당 시 스스로 멈춥니다.");
