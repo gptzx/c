@@ -42,6 +42,8 @@ Windows 7(.NET 4.0 설치됨) / 8 / 8.1 / 10 / 11에서 추가 런타임 설치 
 MacChanger.sln
 build.cmd                              ← Visual Studio 없이 빌드 (in-box csc.exe)
 tools/Shrink.cs                        ← dist/ 용 실행 파일 축소 도구 (Mono.Cecil: 이 프로그램이 정의한 모든 이름 축약(생성자·P/Invoke·가상 메서드 제외), 상수 필드·무효 특성 제거, 기능 동일)
+tools/AutoTest.cs                      ← 동작 테스트 하니스 (실제 MainForm 을 띄워 110여 개 항목 확인; 리플렉션 기반이라 Shrink 의 이름표를 주면 축소된 dist 파일에서도 그대로 돈다)
+tools/DistCheck.cs                     ← dist 파일 구조 검증 (일반 빌드와 IL 명령 순서·문자열·P/Invoke·구조체 레이아웃·리소스가 같은지, 남은 특성이 맞는지)
 .gitattributes                         ← build.cmd / .sln은 CRLF로 체크아웃
 MacChanger/
   MacChanger.csproj                    ← .NET Framework 4.0, AnyCPU, 매니페스트·아이콘 포함
@@ -110,11 +112,16 @@ VS 2017 이상의 MSBuild(Developer Command Prompt의 `msbuild`)에서는 같은
 메서드·델리게이트의 런타임 메서드만 그대로 — 런타임이 이름으로 찾는 것은 이것뿐), 컴파일 때 호출 자리에 새겨져 실행 중에는 읽히지 않는 상수 필드(const·열거형 멤버)
 제거, 실행에 영향 없는 특성(컴파일러·디버거 표식, 어셈블리 제목·설명 특성 — 파일 속성 창의 정보는 Win32 버전 리소스에 따로 있어 그대로 보임) 제거. 이 프로그램은
 리플렉션·`Enum.ToString()`·형식 이름을 쓰지 않으므로 동작이 같습니다. 같은 입력이면 같은 출력이 나오며(타임스탬프 보존), 세 번째 인수로 이름표 파일을 주면
-원래 이름 → 새 이름 대응을 적어 두어 리플렉션 기반 테스트 하니스(AutoTest.exe <exe> [names.txt])가 축소된 파일에서도 그대로 돕니다(공개 API 를 이름으로 참조하던 예전 Smoke 테스트는 이 하니스에 합쳐짐). `build.cmd`로 직접 빌드한 EXE 는 이름만 길 뿐 기능이 같습니다. 아이콘(`app.ico`)의 세 프레임은 모두 PNG(zopfli)로 압축되어 있습니다 (Windows Vista 이상에서 지원).
+원래 이름 → 새 이름 대응을 적어 두어(줄 형식 `T|원래 전체 이름|새 전체 이름`, `M|원래 형식|원래 이름|인수 개수|새 이름`, `F/P/E|원래 형식|원래 이름|새 이름`) `tools/AutoTest.cs` 하니스가 축소된 파일에서도 그대로 돕니다. `build.cmd`로 직접 빌드한 EXE 는 이름만 길 뿐 기능이 같습니다. 아이콘(`app.ico`)의 세 프레임은 모두 PNG(zopfli)로 압축되어 있습니다 (Windows Vista 이상에서 지원).
 
 ```
 mcs -r:Mono.Cecil.dll -r:System.Core -out:Shrink.exe tools/Shrink.cs
-mono Shrink.exe out/MacChanger.exe dist/MacChanger.exe [names.txt]
+mono Shrink.exe out/MacChanger.exe dist/MacChanger.exe names.txt
+mcs -r:System.Windows.Forms -r:System.Drawing -out:AutoTest.exe tools/AutoTest.cs
+AutoTest.exe out/MacChanger.exe              (일반 빌드)
+AutoTest.exe dist/MacChanger.exe names.txt   (축소 빌드 — 같은 검사를 원래 이름으로)
+mcs -r:Mono.Cecil.dll -r:System.Core -out:DistCheck.exe tools/DistCheck.cs
+mono DistCheck.exe out/MacChanger.exe dist/MacChanger.exe
 ```
 
 ## 사용 방법

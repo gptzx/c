@@ -13,13 +13,15 @@ namespace MacChanger
     {
         public event EventHandler CheckedChanged;
         private bool isChecked;
+        /// <summary>Space/Enter 를 누르고 있는 상태 — 뗄 때 한 번만 토글한다 (누르고 있어도 반복되지 않고, 다른 창에서 넘어온 KeyUp 은 무시)</summary>
+        private bool keyHeld;
 
         public ModeSwitch()
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+            SetStyle(ControlStyles.StandardDoubleClick, false);   // 빠른 두 번 클릭도 두 번 토글 (체크박스처럼) — 켜 두면 둘째 클릭이 DoubleClick 으로 가서 OnClick 이 안 불린다
             Cursor = Cursors.Hand;
-            AccessibleRole = AccessibleRole.CheckButton;   // 화면 읽기 프로그램용: 이름과 역할 (글자가 없는 컨트롤이므로 직접 준다)
-            AccessibleName = "자동 변경 방식";
+            AccessibleName = "IP 할당 시";   // 화면 읽기 프로그램용 이름 = 고른 쪽 (글자가 없는 컨트롤이므로 직접 준다; 양쪽 글자와 같은 문자열)
         }
 
         /// <summary>false = 왼쪽(기본), true = 오른쪽</summary>
@@ -30,6 +32,7 @@ namespace MacChanger
             {
                 if (isChecked == value) return;
                 isChecked = value;
+                AccessibleName = value ? "일정 시간마다" : "IP 할당 시";
                 Invalidate();
                 if (CheckedChanged != null) CheckedChanged(this, EventArgs.Empty);
             }
@@ -45,7 +48,7 @@ namespace MacChanger
             {
                 g.FillEllipse(fill, 0, 0, h, h);
                 g.FillEllipse(fill, w - h, 0, h, h);
-                g.FillRectangle(fill, h / 2, 0, w - h, h + 1);
+                g.FillRectangle(fill, h / 2, 0, w - h, h);
             }
             // 손잡이: 홈 안쪽에 2px 여백을 둔 흰 원, 고른 쪽 끝에 놓인다
             int d = h - 4;
@@ -69,6 +72,7 @@ namespace MacChanger
         protected override void OnLostFocus(EventArgs e)
         {
             base.OnLostFocus(e);
+            keyHeld = false;
             Invalidate();
         }
 
@@ -84,11 +88,20 @@ namespace MacChanger
             switch (e.KeyCode)
             {
                 case Keys.Space:
-                case Keys.Enter: Checked = !Checked; break;
+                case Keys.Enter: keyHeld = true; break;   // 토글은 뗄 때 (OnKeyUp)
                 case Keys.Left: Checked = false; break;
                 case Keys.Right: Checked = true; break;
                 default: return;
             }
+            e.Handled = true;
+        }
+
+        protected override void OnKeyUp(KeyEventArgs e)
+        {
+            base.OnKeyUp(e);
+            if (!keyHeld || (e.KeyCode != Keys.Space && e.KeyCode != Keys.Enter)) return;
+            keyHeld = false;
+            Checked = !Checked;
             e.Handled = true;
         }
     }

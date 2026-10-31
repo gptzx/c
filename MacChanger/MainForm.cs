@@ -422,7 +422,7 @@ namespace MacChanger
         {
             if (!chkAuto.Checked && autoRunning) StopAuto();
             UpdateControlStates();   // 시작 버튼과 고른 방식의 설정 칸은 체크해야 열린다
-            if (chkAuto.Checked && !busy && !autoRunning) SetStatus("준비", "자동 변경 설정이 열렸습니다 — 방식과 시간을 정한 뒤 '시작'을 누르세요.");   // 체크만으로 시작되지 않는다는 안내
+            if (chkAuto.Checked && !busy && !autoRunning) SetStatus("준비", "방식과 시간을 정한 뒤 '시작'을 누르면 자동 변경이 시작됩니다.");   // 체크만으로 시작되지 않는다는 안내
         }
 
         private void chkAutoStopIp_CheckedChanged(object sender, EventArgs e)
@@ -1093,7 +1093,14 @@ namespace MacChanger
             }
             else if (autoRunning)
             {
-                if (intervalRun) ScheduleUntil(unchecked(autoDueTick + (int)nudInterval.Value * 1000));   // 직전 변경 예정 시각 + N초: 변경에 걸린 시간과 무관하게 N초마다 (이미 지났으면 바로)
+                if (intervalRun)
+                {
+                    // 직전 변경 예정 시각 + N초: 변경에 걸린 시간과 무관하게 N초마다. 변경이 N초보다 오래 걸려 그 시각이 이미 지났으면 지금 바로 한 번만 바꾸고
+                    // 격자는 지금부터 다시 센다 (놓친 격자점을 연달아 몰아서 실행하지 않는다)
+                    int due = unchecked(autoDueTick + (int)nudInterval.Value * 1000), now = Environment.TickCount;
+                    if (unchecked(due - now) < 0) due = now;
+                    ScheduleUntil(due);
+                }
                 else btnAutoToggle.Text = "정지 (IP 대기)";   // 작업 중 "정지" 를 되돌린다 — 다음 IP 조회 결과가 "IP 대기 N초"/카운트다운으로 덮는다
             }
 
@@ -1168,6 +1175,7 @@ namespace MacChanger
             chkLogBox.Enabled = !autoRunning;
             btnAutoToggle.Enabled = chkAuto.Checked;                     // 실행 중에도 정지할 수 있어야 하므로 잠그지 않는다
             modeSwitch.Enabled = !autoRunning;                           // 방식은 정지한 뒤에만 바꿀 수 있다
+            lblModeIp.Cursor = lblModeTimer.Cursor = autoRunning ? Cursors.Default : Cursors.Hand;   // 잠긴 동안에는 양쪽 글자도 손 모양을 거둔다
             bool ipMode = !IntervalMode;
             nudAutoDelay.Enabled = !autoRunning && chkAuto.Checked && ipMode;      // 지연 초와 할당 대기 초는 "사용"을 체크하고 IP 할당 시 방식일 때 열린다
             nudWaitTimeout.Enabled = !autoRunning && chkAuto.Checked && ipMode;
