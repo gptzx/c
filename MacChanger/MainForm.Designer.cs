@@ -182,7 +182,6 @@
             txtIpLog.ScrollBars = System.Windows.Forms.ScrollBars.Both;
             txtIpLog.TabStop = false;
             txtIpLog.WordWrap = false;
-            trafficGraph.TabStop = false;
             //
             // 배치 (탭 순서대로; x, y, 너비, 높이 — 너비 0 이면 AutoSize)
             //

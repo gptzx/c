@@ -55,7 +55,8 @@ namespace MacChanger
         protected override void OnClick(EventArgs e)
         {
             base.OnClick(e);
-            Checked = !Checked;
+            MouseEventArgs mouse = e as MouseEventArgs;   // 마우스 클릭은 왼쪽 버튼만 (다른 버튼·체크박스와 같게)
+            if (mouse == null || mouse.Button == MouseButtons.Left) Checked = !Checked;
         }
 
         protected override void OnGotFocus(EventArgs e)

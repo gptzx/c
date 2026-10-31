@@ -61,6 +61,8 @@ namespace MacChanger
         /// <summary>자동 변경 예약 여부와 예약 시각(Environment.TickCount 기준 — 시스템 시계 변경에 영향받지 않음)</summary>
         private bool autoPending;
         private int autoDueTick;
+        /// <summary>실행 중인 자동 변경의 방식 (시작할 때 스위치에서 읽어 둔다 — 실행 중에는 스위치가 잠기지만, 한 번의 실행 안에서 방식이 바뀔 수 없음을 코드로도 보장)</summary>
+        private bool intervalRun;
         /// <summary>"IP 할당 대기 중"(링크는 올라왔지만 실제 IP 없음) 상태가 시작된 시각 — 할당 대기 초과 시 새 MAC 적용에 사용</summary>
         private bool waiting;
         private int waitingSinceTick;
@@ -447,8 +449,9 @@ namespace MacChanger
             }
             waiting = false;   // 할당 대기 시간은 시작 시점부터 센다
             autoRunning = true;
+            intervalRun = IntervalMode;
             UpdateControlStates();   // 실행 중에는 정지·로그 비우기·백그라운드 실행 외의 조작을 잠근다
-            if (IntervalMode)
+            if (intervalRun)
             {
                 // 일정 시간마다: IP 와 관계없이 지금부터 N초 뒤에 첫 변경, 그 뒤로는 변경이 끝날 때마다 다시 N초
                 int seconds = (int)nudInterval.Value;
@@ -475,13 +478,18 @@ namespace MacChanger
         /// <summary>(IP 할당 시) 자동 변경 중이고 어댑터에 IP가 할당되어 있으면 지연 시간 뒤로 변경을 예약하고 남은 시간을 바로 버튼에 보여준다 (0초면 다음 1초 확인 때 바로).</summary>
         private void ScheduleAuto()
         {
-            if (!autoRunning || busy || lastLoggedIp == null || IntervalMode) return;
+            if (!autoRunning || busy || lastLoggedIp == null || intervalRun) return;
             ScheduleIn((int)nudAutoDelay.Value);
         }
 
-        /// <summary>seconds 초 뒤로 변경을 예약하고 남은 시간을 버튼에 보여준다 (두 방식 공통).</summary>
+        /// <summary>seconds 초 뒤로 변경을 예약하고 남은 시간을 버튼에 보여준다 (두 방식 공통). 작업 중이면 예약하지 않는다 — 작업이 끝날 때 완료 처리가 다시 부른다.</summary>
         private void ScheduleIn(int seconds)
         {
+            if (busy)
+            {
+                btnAutoToggle.Text = "정지";
+                return;
+            }
             autoPending = true;
             autoDueTick = unchecked(Environment.TickCount + seconds * 1000);
             if (seconds > 0)
@@ -498,7 +506,7 @@ namespace MacChanger
         /// 일정 시간마다 방식으로 실행 중일 때는 IP 가 사라져도 예약을 유지한다 (정지는 StopAuto 가 autoRunning 을 먼저 끈다).</summary>
         private void CancelAuto()
         {
-            if (autoRunning && IntervalMode) return;
+            if (autoRunning && intervalRun) return;
             if (autoPending && autoRunning) btnAutoToggle.Text = "정지 (IP 대기)";
             autoPending = false;
         }
@@ -526,9 +534,14 @@ namespace MacChanger
         /// <summary>어댑터 종류에 맞는 랜덤 MAC을 만들어 바로 적용한다 (예약 시각 도달, 할당 대기 초과 두 경우 공통). reason 은 상태 표시에 붙일 이유(없으면 null).</summary>
         private void StartAutoChange(string reason)
         {
-            btnAutoToggle.Text = "정지";
             NetworkAdapterInfo adapter = SelectedAdapter;
-            if (adapter == null) return;
+            if (adapter == null)
+            {
+                StopAuto();   // 어댑터 목록이 비어 있으면 (일정 시간마다 방식) 멈춘 채 "정지" 로 남지 않도록 정지한다
+                SetStatus("실패", "어댑터를 선택하세요.");
+                return;
+            }
+            btnAutoToggle.Text = "정지";
             string mac;
             try
             {
@@ -554,7 +567,7 @@ namespace MacChanger
         /// </summary>
         private bool TrackWaiting(bool isWaiting, int nowTick, bool render)
         {
-            if (autoRunning && IntervalMode) return false;   // 일정 시간마다 방식에서는 할당 대기를 세지도, 보여주지도 않는다
+            if (autoRunning && intervalRun) return false;   // 일정 시간마다 방식에서는 할당 대기를 세지도, 보여주지도 않는다
             if (!isWaiting || busy)
             {
                 if (waiting && autoRunning && !busy) btnAutoToggle.Text = "정지 (IP 대기)";   // 링크가 끊겨 대기가 끝났다 — 숫자를 지운다 (IP 를 받은 경우는 곧 예약 표시가 덮는다)
@@ -949,7 +962,7 @@ namespace MacChanger
                 if (error != null) SetStatus("실패", error);
             }
             // 새로 할당된 IP, 또는 자동 변경을 켠 뒤(예약이 아직 없을 때) 처음 확인한 IP → 지연 시간 뒤로 변경 예약 (자동 변경이 꺼져 있으면 ScheduleAuto 가 그냥 돌아온다)
-            if (!IntervalMode && (fresh || !autoPending))
+            if (!(autoRunning && intervalRun) && (fresh || !autoPending))   // 일정 시간마다 방식으로 실행 중이면 IP 는 예약과 무관하다
             {
                 ScheduleAuto();
                 if (autoPending && (int)nudAutoDelay.Value == 0) RunAutoIfDue();   // 0초면 다음 타이머 틱을 기다리지 않고 바로 바꾼다
@@ -1043,7 +1056,7 @@ namespace MacChanger
             }
             else if (autoRunning)
             {
-                if (IntervalMode) ScheduleIn((int)nudInterval.Value);   // 변경이 끝난 지금부터 다시 N초
+                if (intervalRun) ScheduleIn((int)nudInterval.Value);   // 변경이 끝난 지금부터 다시 N초
                 else btnAutoToggle.Text = "정지 (IP 대기)";   // 작업 중 "정지" 를 되돌린다 — 다음 IP 조회 결과가 "IP 대기 N초"/카운트다운으로 덮는다
             }
 
