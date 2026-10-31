@@ -147,7 +147,7 @@
             lblIntervalPrefix.Text = "IP와 관계없이";
             nudInterval.Maximum = 604800M;
             nudInterval.Minimum = 10M;
-            nudInterval.Value = 60M;
+            nudInterval.Value = 30M;
             lblIntervalSuffix.Text = "초마다 새 MAC 적용";
             foreach (System.Windows.Forms.NumericUpDown nud in new System.Windows.Forms.NumericUpDown[] { nudAutoDelay, nudWaitTimeout, nudInterval })
             {

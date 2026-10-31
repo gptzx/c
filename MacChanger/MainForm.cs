@@ -611,6 +611,13 @@ namespace MacChanger
                 waiting = true;
                 waitingSinceTick = nowTick;
                 render = true;
+                if (autoRunning)
+                {
+                    // 1초 타이머의 위상을 대기 시작 시각에 맞춘다: 다음 틱이 정확히 1초 뒤에 와서 0초→1초도 다른 숫자처럼 1초 만에 바뀌고(맞추지 않으면 첫 숫자만 1~2초),
+                    // 할당 대기 초과도 정확히 N초에 판정된다. 그래프는 graphTimer 가 따로 돌므로 영향 없다
+                    secondTimer.Stop();
+                    secondTimer.Start();
+                }
             }
             if (!autoRunning) return false;
             int elapsedMs = unchecked(nowTick - waitingSinceTick);

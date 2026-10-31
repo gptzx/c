@@ -265,7 +265,7 @@ class AutoTest
     Button btn = (Button)C(f, "btnAutoToggle"); CheckBox stopChk = (CheckBox)C(f, "chkAutoStopIp"); TextBox stopBox = (TextBox)C(f, "txtAutoStopIp");
     Label lblModeIp = (Label)C(f, "lblModeIp"), lblModeTimer = (Label)C(f, "lblModeTimer"), lblDelayPrefix = (Label)C(f, "lblDelayPrefix"), lblIntervalPrefix = (Label)C(f, "lblIntervalPrefix"), lblWait = (Label)C(f, "lblWait"), status = (Label)C(f, "lblStatus");
     Check(!chk.Checked && !btn.Enabled && !nud.Enabled && !waitNud.Enabled && !nudInt.Enabled && !stopBox.Enabled, "default: 사용 unchecked -> 시작, delay, wait seconds, interval and stop IP box locked");
-    Check(nudInt.Minimum == 10 && nudInt.Maximum == 604800 && nudInt.Value == 60 && nud.Minimum == 0 && nud.Maximum == 604800 && nud.Value == 10 && waitNud.Minimum == 10 && waitNud.Maximum == 60 && waitNud.Value == 30, "ranges: interval 10..604800 (default 60), delay 0..604800 (10), wait 10..60 (30)");
+    Check(nudInt.Minimum == 10 && nudInt.Maximum == 604800 && nudInt.Value == 30 && nud.Minimum == 0 && nud.Maximum == 604800 && nud.Value == 10 && waitNud.Minimum == 10 && waitNud.Maximum == 60 && waitNud.Value == 30, "ranges: interval 10..604800 (default 30), delay 0..604800 (10), wait 10..60 (30)");
     Check(Vis(lblDelayPrefix) && Vis(nud) && !Vis(lblIntervalPrefix) && !Vis(nudInt) && lblWait.ForeColor == SystemColors.ControlText && lblModeIp.ForeColor == SystemColors.ControlText && lblModeTimer.ForeColor == SystemColors.GrayText && nud.Location == nudInt.Location && lblDelayPrefix.Location == lblIntervalPrefix.Location, "default mode IP 할당 시: the IP setting row is shown, the interval row hidden in the same place, left label black / right label grey");
     chk.Checked = true;
     Check(btn.Enabled && nud.Enabled && waitNud.Enabled && !nudInt.Enabled && btn.Text == "시작" && status.Text.Contains("'시작'을 누르면"), "ticking 사용 (IP mode) enables 시작 + delay + wait seconds, interval stays locked, status explains that 시작 is still needed: " + status.Text);
@@ -358,7 +358,8 @@ class AutoTest
     Set(reading, "Addresses", ""); Set(reading, "Up", true);
     t.Stop();
     Call(f, "ApplyIpInfo", fakeGuid, reading, false, Get<int>(f, "ipEpoch"));
-    Check(!Get<bool>(f, "autoPending") && Get<bool>(f, "waiting") && btn.Text == "정지 (IP 대기 0초)" && !t.Enabled, "link up without IP: countdown cancelled, wait clock starts at 0초, graph timer not restarted");
+    Check(!Get<bool>(f, "autoPending") && Get<bool>(f, "waiting") && btn.Text == "정지 (IP 대기 0초)" && t.Enabled && !g2.Enabled, "link up without IP: countdown cancelled, wait clock starts at 0초 and re-phases the 1 s timer to the wait start (so 0초→1초 also takes exactly 1 s); graph timer untouched");
+    t.Stop();
     Set(f, "waitingSinceTick", unchecked(Environment.TickCount - 1500));
     Call(f, "ApplyIpInfo", fakeGuid, reading, false, Get<int>(f, "ipEpoch"));
     Check(btn.Text == "정지 (IP 대기 0초)", "an IP read between ticks does not advance the digit (" + btn.Text + ")");
@@ -467,7 +468,8 @@ class AutoTest
     t.Stop();   // the last StartAuto re-phased (started) the countdown timer; production never stops it, tests do
     waitNud.Value = 10; Set(f, "waiting", false); Set(f, "autoRunning", true); Set(f, "intervalRun", false);   // production sets both in StartAuto
     int t0 = 1000000;
-    Check(!(bool)Call(f, "TrackWaiting", true, t0, true) && Get<bool>(f, "waiting") && !t.Enabled, "first waiting tick starts the clock, does not fire, does not restart the graph timer");
+    Check(!(bool)Call(f, "TrackWaiting", true, t0, true) && Get<bool>(f, "waiting") && t.Enabled && !g2.Enabled, "wait start: starts the clock, does not fire, re-phases the countdown timer, leaves the graph timer alone");
+    t.Stop();
     Check(!(bool)Call(f, "TrackWaiting", true, t0 + 9999, true) && btn.Text.Contains("9"), "9.999 s later: still waiting, button shows elapsed: " + btn.Text);
     Check((bool)Call(f, "TrackWaiting", true, t0 + 10000, true) && !Get<bool>(f, "waiting"), "10 s reached: fires once and resets the clock");
     Check(!(bool)Call(f, "TrackWaiting", true, t0 + 10001, true), "the tick right after a fire starts a new clock (no double fire)");
@@ -478,8 +480,8 @@ class AutoTest
     Check(!(bool)Call(f, "TrackWaiting", false, t0 + 60000, true) && !Get<bool>(f, "waiting"), "an IP arriving clears the waiting state without firing");
     Set(f, "busy", true); Set(f, "waiting", false); Call(f, "TrackWaiting", true, t0, true);
     Check(!Get<bool>(f, "waiting") && !(bool)Call(f, "TrackWaiting", true, t0 + 60000, true), "while an operation runs the clock does not count");
-    Set(f, "busy", false); Set(f, "autoRunning", false); Set(f, "waiting", false); Call(f, "TrackWaiting", true, t0, true);
-    Check(!(bool)Call(f, "TrackWaiting", true, t0 + 60000, true), "auto-change not running: tracks but never fires");
+    t.Stop(); Set(f, "busy", false); Set(f, "autoRunning", false); Set(f, "waiting", false); Call(f, "TrackWaiting", true, t0, true);
+    Check(!(bool)Call(f, "TrackWaiting", true, t0 + 60000, true) && !t.Enabled, "auto-change not running: tracks but never fires and does not touch the timer");
     t.Stop(); Set(f, "waiting", false); waitNud.Value = 30; chk.Checked = false; stopChk.Checked = false;
     Check(!nud.Enabled && !waitNud.Enabled && !nudInt.Enabled && !btn.Enabled && sw.Enabled, "unticking 사용 locks delay, wait seconds, interval and 시작 again (the switch stays usable)");
     f.Dispose();
