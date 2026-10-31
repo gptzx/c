@@ -93,36 +93,60 @@ namespace MacChanger
             }
             catch (Exception) { }
             notifyIcon.Icon = Icon;   // 백그라운드 실행 중 트레이에 같은 아이콘을 보여 준다
-            // 툴팁: 컨트롤마다 핵심 동작 한 줄 (+ 필요한 예시 한 줄). 세부 규칙은 README
-            toolTip.SetToolTip(cboAdapters, "MAC을 바꿀 네트워크 어댑터");
-            toolTip.SetToolTip(btnRefresh, "어댑터 목록과 현재 정보를 다시 읽습니다.");
-            toolTip.SetToolTip(txtNewMac, "적용할 MAC 주소 — 16진수 12자리 (-, :, . 구분자는 있어도 없어도 됨)\n예: 02-1A-2B-3C-4D-5E");
-            toolTip.SetToolTip(btnRandom, "어댑터 종류(유선/무선)에 맞는 랜덤 MAC을 새 MAC 칸에 채웁니다.");
-            toolTip.SetToolTip(chkResetDns, "변경 적용·원상복구·IP 갱신 때 직접 지정한 DNS도 함께 지웁니다. (DHCP 어댑터만)");
-            toolTip.SetToolTip(btnApply, "새 MAC을 바로 적용합니다. (어댑터 재시작, 확인 창 없음)");
-            toolTip.SetToolTip(btnRenewIp, "MAC은 그대로 두고 IP만 새로 받습니다. (어댑터 재시작, 확인 창 없음)");
-            toolTip.SetToolTip(btnRestore, "원래(공장) MAC으로 되돌립니다. (확인 창을 거쳐 어댑터 재시작)");
-            toolTip.SetToolTip(btnClearLog, "로그 상자를 비웁니다. (로그 파일은 그대로)");
-            toolTip.SetToolTip(chkReleaseIp, "변경 적용·IP 갱신·원상복구·자동 변경 전에 IP를 DHCP 서버에 먼저 반환합니다.");
-            toolTip.SetToolTip(btnReleaseIp, "누르는 즉시 IP를 반환해 인터넷 연결이 끊어집니다.\n다시 연결하려면 IP 갱신 버튼을 누르면 됩니다.");
-            toolTip.SetToolTip(chkAuto, "자동 변경 사용 — '시작'을 누르면 IP를 받을 때마다 지정한 초 뒤에 랜덤 MAC을 적용합니다.");
-            toolTip.SetToolTip(modeSwitch, "자동 변경 방식: 왼쪽 = IP를 받을 때마다, 오른쪽 = 일정 시간마다");
-            toolTip.SetToolTip(nudAutoDelay, "IP를 받은 뒤 MAC을 바꾸기까지 기다리는 초 (0 = 즉시, 최대 7일)");
-            toolTip.SetToolTip(nudInterval, "IP와 관계없이 MAC을 바꾸는 간격 (10초~7일)");
-            toolTip.SetToolTip(btnAutoToggle, "자동 변경 시작 / 정지\n변경 실패·재부팅 필요·지정 IP 할당 시 스스로 멈춥니다.");
-            toolTip.SetToolTip(nudWaitTimeout, "자동 변경 중 IP를 못 받은 채 새 MAC을 적용하기까지 기다리는 초 (10~60)");
-            toolTip.SetToolTip(chkAutoStopIp, "체크하면 오른쪽 칸의 IP(또는 그 대역의 IP)를 받는 순간 자동 변경을 멈춥니다.");
-            toolTip.SetToolTip(txtAutoStopIp, "멈출 IP 또는 대역\n123 → 123.*.*.*   123.123 → 123.123.*.*   123.123.123 → 123.123.123.*");
-            toolTip.SetToolTip(chkLogTime, "로그에 시각을 함께 기록합니다.");
-            toolTip.SetToolTip(chkLogMask, "로그에 서브넷 마스크를 함께 기록합니다.");
-            toolTip.SetToolTip(chkLogGateway, "로그에 기본 게이트웨이를 함께 기록합니다.");
-            toolTip.SetToolTip(chkLogMac, "로그에 그 시점의 MAC을 함께 기록합니다.");
-            toolTip.SetToolTip(chkLogBox, "할당 IP 로그 상자를 켜거나 끕니다.\n끄면 흐리게 보이고 기록하지 않습니다. (로그 비우기는 언제나 가능)");
-            toolTip.SetToolTip(chkIpLog, "새 IP를 받을 때마다 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 기록합니다.");
-            toolTip.SetToolTip(btnBackground, "창을 숨기고 트레이 아이콘으로 계속 실행합니다.\n트레이 아이콘을 클릭하면 창이 다시 열립니다.");
-            toolTip.SetToolTip(trafficGraph, "송수신 속도 그래프 (빨강: 수신, 초록: 송신)");
-            ApplyModeLabels();
+            // 툴팁: 일반 사용자 기준 — 무엇이 일어나는지 + 먼저 알아야 할 것 (줄당 60자 안팎, 최대 2줄; 자동 정지 IP 칸만 예시 때문에 3줄). 두 배열은 같은 순서.
+            Control[] tipTargets =
+            {
+                cboAdapters, btnRefresh, txtPermanentMac, txtCurrentMac, txtCurrentIp, txtMask,
+                txtGateway, txtDns, txtNewMac, btnRandom, chkResetDns, btnApply,
+                btnRenewIp, btnRestore, btnClearLog, chkReleaseIp, btnReleaseIp, chkAuto,
+                modeSwitch, lblModeIp, lblModeTimer, nudAutoDelay, nudWaitTimeout, nudInterval,
+                btnAutoToggle, chkAutoStopIp, txtAutoStopIp, chkLogTime, chkLogMask, chkLogGateway,
+                chkLogMac, chkLogBox, chkIpLog, btnBackground, trafficGraph,
+            };
+            string[] tips =
+            {
+                "MAC을 바꿀 어댑터를 고릅니다. [유선]·[무선] 등은 종류, 뒤는 현재 MAC입니다.",
+                "어댑터 목록과 MAC·IP 정보를 다시 읽습니다. (연결은 끊기지 않음)\n어댑터를 꽂거나 뺀 뒤 목록이 실제와 다를 때 누르세요.",
+                "어댑터에 처음부터 새겨진 원래 MAC입니다. 원상복구를 누르면 이 값으로 돌아갑니다.",
+                "어댑터가 지금 실제로 쓰고 있는 MAC입니다.",
+                "어댑터가 지금 받은 IP 주소입니다. 바뀌면 바로 갱신됩니다.\nIP가 없을 때는 그 이유(어댑터 비활성, 연결 안 됨, 할당 대기, DHCP 응답 없음)를 보여 줍니다.",
+                "같은 네트워크로 묶이는 IP 범위를 정하는 값입니다.",
+                "인터넷으로 나가는 출입구 장비(보통 공유기)의 IP입니다.",
+                "사이트 이름을 숫자 IP로 바꿔 주는 서버입니다.",
+                "변경 적용으로 바꿀 MAC — 0~9, A~F 12자리 (-, :, . 기호는 없어도 됨)\n예: 02-1A-2B-3C-4D-5E",
+                "어댑터에 맞는 랜덤 MAC을 만들어 새 MAC 칸에 채웁니다. (적용은 변경 적용 버튼)\n무선 어댑터는 무선 드라이버가 받아 주는 형식으로 만듭니다.",
+                "변경 적용·IP 갱신·원상복구·자동 변경 때 직접 입력해 둔 DNS 서버도 함께 지워\nDNS도 IP처럼 자동으로 받게 합니다. (IP를 자동으로 받는 어댑터만)",
+                "새 MAC을 확인 창 없이 바로 적용합니다. 어댑터가 재시작되어 인터넷이 몇 초 끊깁니다.\n끝나면 실제로 바뀌었는지 확인해 상태 줄에 알려 줍니다.",
+                "MAC은 그대로 두고 어댑터를 재시작해 IP를 새로 받습니다. (확인 창 없음, 몇 초 끊김)\n즉시 반환 뒤 다시 연결할 때도 이 버튼을 누릅니다.",
+                "원래 MAC으로 되돌립니다. 예/아니요 확인 창을 거친 뒤 어댑터가 재시작되어 인터넷이 몇 초 끊깁니다.",
+                "로그 상자의 내용만 지웁니다. 파일에 저장된 로그는 그대로 남습니다.",
+                "변경 적용·IP 갱신·원상복구·자동 변경 때마다 쓰던 IP를 먼저 DHCP 서버(공유기 등)에 돌려줍니다.\n서버가 다른 IP를 줄 수도, 같은 IP를 다시 줄 수도 있습니다.",
+                "누르는 즉시 IP를 반환해 인터넷 연결이 끊어집니다.\n다시 연결하려면 IP 갱신 버튼을 누르면 됩니다.",
+                "자동 변경 기능을 쓸지 정합니다. 체크해야 시작 버튼과 고른 방식의 설정 칸이 열립니다.\n실제 동작은 시작을 눌러야 하며, 새 MAC은 매번 랜덤으로 만듭니다.",
+                ModeTip,
+                ModeTip,
+                ModeTip,
+                "IP를 받고 이만큼 기다렸다가 새 MAC을 적용합니다. (IP 할당 시 방식)\n0이면 받는 즉시, 최대 7일(604800초)",
+                "연결은 됐는데 이만큼 기다려도 IP를 못 받으면 새 MAC을 적용합니다. (IP 할당 시 방식)\nIP를 받을 때까지 같은 간격으로 되풀이합니다. 10~60초",
+                "IP가 있든 없든 이 간격마다 새 MAC을 적용합니다. (일정 시간마다 방식)\n10초~7일 (1시간=3600, 하루=86400). 너무 짧으면 IP를 받기 전에 또 바뀝니다.",
+                "자동 변경을 시작/정지합니다. 실행 중에는 정지·로그 비우기·백그라운드 실행만 쓸 수 있습니다.\n남은 초나 IP 대기 초가 버튼에 보이며, 변경 실패·재부팅 필요·지정 IP 할당 때는 스스로 멈춥니다.",
+                "오른쪽 칸의 IP나 대역에 속하는 IP를 받는 순간 자동 변경이 멈춥니다.\n시작할 때와 매번 바꾸기 직전에도 확인합니다.",
+                "자동 변경을 멈출 IP나 대역. 앞부분만 적으면 그 숫자로 시작하는 IP 전부가 해당합니다.\n예: 123 → 123.*.*.*   123.123 → 123.123.*.*\n123.123.123 → 123.123.123.*   숫자 네 개를 다 적으면 그 주소 하나만 해당합니다.",
+                "로그 한 줄마다 기록한 날짜와 시각도 함께 적습니다.",
+                "로그 한 줄마다 그때의 서브넷 마스크도 함께 적습니다.",
+                "로그 한 줄마다 그때의 기본 게이트웨이(보통 공유기 IP)도 함께 적습니다.",
+                "로그 한 줄마다 그때 쓰던 MAC도 함께 적습니다. (어떤 MAC으로 어떤 IP를 받았는지)",
+                "새 IP를 받을 때마다 로그 상자에 한 줄씩 기록합니다. 끄면 상자가 흐려지고 기록하지 않습니다.\n파일로도 남기려면 할당 IP 로그 저장을 켜세요. 로그 비우기는 꺼져 있어도 쓸 수 있습니다.",
+                "새 IP를 받을 때마다 프로그램 폴더의 " + IpMonitor.LogFileName + " 파일에도 한 줄씩 저장합니다.\n로그 상자가 꺼져 있어도 저장되며, 파일은 프로그램을 닫아도 남습니다.",
+                "창을 숨기고 시계 옆 트레이 아이콘으로 계속 실행합니다. 자동 변경·그래프·로그는 그대로 돕니다.\n아이콘을 한 번 누르면 창이 다시 열리고, 마우스 오른쪽 버튼을 누르면 열기/종료 메뉴가 나옵니다.",
+                "통신 속도 그래프입니다. 빨강은 받는(수신) 속도, 초록은 보내는(송신) 속도입니다.\n아래는 누적량과 현재 속도입니다. 누적량은 변경 적용·IP 갱신·원상복구 뒤 0부터 다시 셉니다.",
+            };
+            for (int i = 0; i < tipTargets.Length; i++) toolTip.SetToolTip(tipTargets[i], tips[i]);
+            ApplyMode();
         }
+
+        /// <summary>방식 스위치와 양쪽 글자가 함께 쓰는 툴팁</summary>
+        private const string ModeTip = "자동 변경을 언제 할지 고릅니다. 왼쪽 IP 할당 시: IP를 받을 때마다 정한 초 뒤에 바꿉니다.\n오른쪽 일정 시간마다: IP와 관계없이 정한 초마다 바꿉니다. 양쪽 글자를 눌러도 바뀝니다.";
 
         /// <summary>자동 변경 방식: 토글 스위치가 오른쪽이면 IP 할당과 관계없이 일정 시간마다, 왼쪽이면 IP 할당 시</summary>
         private bool IntervalMode
@@ -397,7 +421,8 @@ namespace MacChanger
         private void chkAuto_CheckedChanged(object sender, EventArgs e)
         {
             if (!chkAuto.Checked && autoRunning) StopAuto();
-            UpdateControlStates();   // 시작 버튼, 지연 초, 할당 대기 초는 체크해야 열린다
+            UpdateControlStates();   // 시작 버튼과 고른 방식의 설정 칸은 체크해야 열린다
+            if (chkAuto.Checked && !busy && !autoRunning) SetStatus("준비", "자동 변경 설정이 열렸습니다 — 방식과 시간을 정한 뒤 '시작'을 누르세요.");   // 체크만으로 시작되지 않는다는 안내
         }
 
         private void chkAutoStopIp_CheckedChanged(object sender, EventArgs e)
@@ -406,31 +431,29 @@ namespace MacChanger
             UpdateControlStates();   // 지정 IP 칸은 체크해야 열린다
         }
 
-        private void lblModeIp_Click(object sender, EventArgs e)
+        /// <summary>스위치 양쪽 글자를 눌러도 그쪽 방식이 된다 (실행 중에는 스위치처럼 잠긴다)</summary>
+        private void lblMode_Click(object sender, EventArgs e)
         {
-            if (modeSwitch.Enabled) modeSwitch.Checked = false;
-        }
-
-        private void lblModeTimer_Click(object sender, EventArgs e)
-        {
-            if (modeSwitch.Enabled) modeSwitch.Checked = true;
+            if (modeSwitch.Enabled) modeSwitch.Checked = sender == lblModeTimer;
         }
 
         private void modeSwitch_CheckedChanged(object sender, EventArgs e)
         {
-            ApplyModeLabels();
+            ApplyMode();
             UpdateControlStates();   // 고른 방식의 칸만 열린다
-            if (!busy) SetStatus("준비", IntervalMode ? "자동 변경 방식: 일정 시간마다 (IP 할당과 관계없이)" : "자동 변경 방식: IP 할당 시");
+            if (!busy) SetStatus("준비", IntervalMode ? "자동 변경 방식: 일정 시간마다 (IP와 관계없이)" : "자동 변경 방식: IP 할당 시 (IP를 받은 뒤 지연 초가 지나면)");
         }
 
-        /// <summary>토글 스위치 양쪽 글자: 고른 쪽은 검정, 반대쪽은 회색. 고르지 않은 방식의 설정 줄 글자는 흐리게.</summary>
-        private void ApplyModeLabels()
+        /// <summary>고른 방식에 맞춘 표시: 스위치 양쪽 글자는 고른 쪽만 검정, 설정 줄은 고른 방식의 것만 보이고, IP 할당 시 방식에만 있는 할당 대기 줄은 다른 방식에서 회색.</summary>
+        private void ApplyMode()
         {
             bool interval = IntervalMode;
-            lblModeIp.ForeColor = interval ? SystemColors.GrayText : SystemColors.ControlText;
-            lblModeTimer.ForeColor = interval ? SystemColors.ControlText : SystemColors.GrayText;
-            lblDelayPrefix.Enabled = lblAutoSuffix.Enabled = lblWait.Enabled = lblWaitPrefix.Enabled = lblWaitSuffix.Enabled = !interval;
-            lblIntervalPrefix.Enabled = lblIntervalSuffix.Enabled = interval;
+            Color on = SystemColors.ControlText, off = SystemColors.GrayText;
+            lblModeIp.ForeColor = interval ? off : on;
+            lblModeTimer.ForeColor = interval ? on : off;
+            lblDelayPrefix.Visible = nudAutoDelay.Visible = lblAutoSuffix.Visible = !interval;
+            lblIntervalPrefix.Visible = nudInterval.Visible = lblIntervalSuffix.Visible = interval;
+            lblWait.ForeColor = lblWaitPrefix.ForeColor = lblWaitSuffix.ForeColor = interval ? off : on;
         }
 
         private void btnAutoToggle_Click(object sender, EventArgs e)
@@ -453,10 +476,11 @@ namespace MacChanger
             UpdateControlStates();   // 실행 중에는 정지·로그 비우기·백그라운드 실행 외의 조작을 잠근다
             if (intervalRun)
             {
-                // 일정 시간마다: IP 와 관계없이 지금부터 N초 뒤에 첫 변경, 그 뒤로는 변경이 끝날 때마다 다시 N초
+                // 일정 시간마다: IP 와 관계없이 지금부터 N초 뒤에 첫 변경, 그 뒤로는 직전 변경 예정 시각 + N초 (변경에 걸린 시간과 무관하게 N초마다; 작업 중이면 끝나는 대로)
                 int seconds = (int)nudInterval.Value;
+                autoDueTick = Environment.TickCount;   // 작업 중에 시작했으면 예약은 작업이 끝날 때 걸리고, 그 기준점은 지금
                 ScheduleIn(seconds);
-                if (!busy) SetStatus("준비", "자동 변경 시작 — IP 할당과 관계없이 " + seconds + "초마다 새 MAC 적용");
+                if (!busy) SetStatus("준비", "자동 변경 시작 — IP와 관계없이 " + seconds + "초마다 새 MAC 적용");
             }
             else
             {
@@ -482,8 +506,15 @@ namespace MacChanger
             ScheduleIn((int)nudAutoDelay.Value);
         }
 
-        /// <summary>seconds 초 뒤로 변경을 예약하고 남은 시간을 버튼에 보여준다 (두 방식 공통). 작업 중이면 예약하지 않는다 — 작업이 끝날 때 완료 처리가 다시 부른다.</summary>
+        /// <summary>seconds 초 뒤로 변경을 예약하고 남은 시간을 버튼에 보여준다 (두 방식 공통).</summary>
         private void ScheduleIn(int seconds)
+        {
+            ScheduleUntil(unchecked(Environment.TickCount + seconds * 1000));
+        }
+
+        /// <summary>dueTick(Environment.TickCount 기준)에 변경을 예약하고 남은 시간을 버튼에 보여준다. 이미 지난 시각이면 다음 1초 확인 때 바로.
+        /// 작업 중이면 예약하지 않는다 — 작업이 끝날 때 완료 처리가 다시 부른다.</summary>
+        private void ScheduleUntil(int dueTick)
         {
             if (busy)
             {
@@ -491,13 +522,14 @@ namespace MacChanger
                 return;
             }
             autoPending = true;
-            autoDueTick = unchecked(Environment.TickCount + seconds * 1000);
-            if (seconds > 0)
+            autoDueTick = dueTick;
+            int remainingMs = unchecked(dueTick - Environment.TickCount);
+            if (remainingMs > 0)
             {
-                // 1초 타이머의 위상을 예약 시각에 맞춘다: 다음 틱이 정확히 1초 뒤에 오므로 숫자마다 1초씩 표시되고 변경은 정확히 N초 뒤에 시작된다
+                // 1초 타이머의 위상을 지금에 맞춘다: 다음 틱이 정확히 1초 뒤에 오므로 숫자마다 1초씩 표시되고 변경은 정확히 N초 뒤에 시작된다
                 secondTimer.Stop();
                 secondTimer.Start();
-                btnAutoToggle.Text = "정지 (" + FormatRemaining(seconds) + ")";
+                btnAutoToggle.Text = "정지 (" + FormatRemaining((remainingMs + 999) / 1000) + ")";
             }
             else btnAutoToggle.Text = "정지";
         }
@@ -792,7 +824,7 @@ namespace MacChanger
                 if (cboAdapters.Items.Count == 0)
                 {
                     txtPermanentMac.Text = txtCurrentMac.Text = string.Empty;
-                    txtCurrentIp.Text = txtMask.Text = txtGateway.Text = txtDns.Text = string.Empty;
+                    ClearIpBoxes();
                     traffic.Attach(null);
                     trafficGraph.Clear();
                     SetStatus("실패", enumError ?? "네트워크 어댑터를 찾지 못했습니다.");
@@ -854,6 +886,11 @@ namespace MacChanger
             if (box.Text != text) box.Text = text;
         }
 
+        private void ClearIpBoxes()
+        {
+            txtCurrentIp.Text = txtMask.Text = txtGateway.Text = txtDns.Text = string.Empty;
+        }
+
         /// <summary>현재 MAC을 모델과 드롭다운 항목 텍스트에 반영한다 (ComboBox는 Add 시점의 문자열을 캐시하므로 항목을 다시 넣어야 한다).</summary>
         private void ShowCurrentMac(NetworkAdapterInfo adapter, string current)
         {
@@ -877,7 +914,7 @@ namespace MacChanger
             NetworkAdapterInfo adapter = SelectedAdapter;
             if (adapter == null)
             {
-                txtCurrentIp.Text = txtMask.Text = txtGateway.Text = txtDns.Text = string.Empty;
+                ClearIpBoxes();
                 return;
             }
             if (ipQueryRunning)
@@ -912,8 +949,8 @@ namespace MacChanger
             if (adapter == null || adapter.InterfaceGuid != guid || epoch != ipEpoch) return;   // 그사이 다른 어댑터를 골랐거나 작업이 시작·완료됐다
             if (failed)
             {
+                ClearIpBoxes();
                 txtCurrentIp.Text = "(IP 조회 실패)";
-                txtMask.Text = txtGateway.Text = txtDns.Text = string.Empty;
                 return;
             }
             string ip = info != null ? info.Addresses : null;
@@ -1056,7 +1093,7 @@ namespace MacChanger
             }
             else if (autoRunning)
             {
-                if (intervalRun) ScheduleIn((int)nudInterval.Value);   // 변경이 끝난 지금부터 다시 N초
+                if (intervalRun) ScheduleUntil(unchecked(autoDueTick + (int)nudInterval.Value * 1000));   // 직전 변경 예정 시각 + N초: 변경에 걸린 시간과 무관하게 N초마다 (이미 지났으면 바로)
                 else btnAutoToggle.Text = "정지 (IP 대기)";   // 작업 중 "정지" 를 되돌린다 — 다음 IP 조회 결과가 "IP 대기 N초"/카운트다운으로 덮는다
             }
 

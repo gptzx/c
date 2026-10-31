@@ -13,8 +13,9 @@
             base.Dispose(disposing);
         }
 
-        // 이 파일은 손으로 관리한다 (Visual Studio 디자이너용 아님): 컨트롤의 위치·크기는 아래 표(Layout)에 네 값씩(x, y, 너비, 높이; 너비 0 = AutoSize) 적고
-        // 한 루프가 적용한다. 표의 순서 = 탭 순서 = Controls 추가 순서 (TabIndex 는 모두 0 이므로 추가 순서가 탭 순서가 된다).
+        // 이 파일은 손으로 관리한다 (Visual Studio 디자이너용 아님): 컨트롤의 위치·크기는 아래 표(layout)에 네 값씩(x, y, 너비, 높이; 너비 0 = AutoSize) 적고
+        // 한 루프가 적용한다. 표의 순서 = Controls 추가 순서 = 탭 순서 (Controls.Add 가 TabIndex 를 추가 순서대로 매긴다). 두 배열(all, layout)은 같은 순서.
+        // 자동 변경 설정 줄(y=324)에는 두 방식의 세 컨트롤씩이 같은 자리에 놓이고, 스위치에 따라 한쪽만 보인다 (MainForm.ApplyMode).
         private void InitializeComponent()
         {
             components = new System.ComponentModel.Container();
@@ -88,7 +89,6 @@
             //
             lblAdapter.Text = "네트워크 어댑터:";
             cboAdapters.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            cboAdapters.FormattingEnabled = true;
             cboAdapters.SelectedIndexChanged += new System.EventHandler(cboAdapters_SelectedIndexChanged);
             btnRefresh.Text = "새로 고침";
             btnRefresh.Click += new System.EventHandler(btnRefresh_Click);
@@ -124,13 +124,16 @@
             chkAuto.Text = "사용";
             chkAuto.CheckedChanged += new System.EventHandler(chkAuto_CheckedChanged);
             lblModeIp.Text = "IP 할당 시";
-            lblModeIp.Click += new System.EventHandler(lblModeIp_Click);
+            lblModeIp.Cursor = System.Windows.Forms.Cursors.Hand;
+            lblModeIp.Click += new System.EventHandler(lblMode_Click);
             modeSwitch.CheckedChanged += new System.EventHandler(modeSwitch_CheckedChanged);
             lblModeTimer.Text = "일정 시간마다";
-            lblModeTimer.Click += new System.EventHandler(lblModeTimer_Click);
+            lblModeTimer.Cursor = System.Windows.Forms.Cursors.Hand;
+            lblModeTimer.Click += new System.EventHandler(lblMode_Click);
             btnAutoToggle.Enabled = false;
             btnAutoToggle.Text = "시작";
             btnAutoToggle.Click += new System.EventHandler(btnAutoToggle_Click);
+            // NumericUpDown: BeginInit/EndInit 를 쓰지 않으므로 Maximum → Minimum → Value 순서를 지켜야 한다 (Value 는 그때의 범위 안이어야 함)
             lblDelayPrefix.Text = "IP 할당 후";
             nudAutoDelay.Maximum = 604800M;
             nudAutoDelay.Value = 10M;
@@ -192,9 +195,8 @@
                 lblNew, txtNewMac, btnRandom, chkResetDns,
                 btnApply, btnRenewIp, btnRestore, btnClearLog,
                 lblAuto, chkAuto, lblModeIp, modeSwitch, lblModeTimer, btnAutoToggle,
-                lblDelayPrefix, nudAutoDelay, lblAutoSuffix,
+                lblDelayPrefix, nudAutoDelay, lblAutoSuffix, lblIntervalPrefix, nudInterval, lblIntervalSuffix,
                 lblWait, lblWaitPrefix, nudWaitTimeout, lblWaitSuffix,
-                lblIntervalPrefix, nudInterval, lblIntervalSuffix,
                 lblAutoStop, chkAutoStopIp, txtAutoStopIp,
                 lblRelease, chkReleaseIp, btnReleaseIp,
                 lblLogOptions, chkLogTime, chkLogMask, chkLogGateway, chkLogMac,
@@ -207,15 +209,14 @@
                 12, 48, 0, 0,   118, 44, 190, 23,   12, 78, 0, 0,   118, 74, 190, 23,   12, 108, 0, 0,   118, 104, 430, 23,   12, 138, 0, 0,   118, 134, 430, 23,   12, 168, 0, 0,   118, 164, 430, 23,   12, 198, 0, 0,   118, 194, 430, 23,
                 12, 228, 0, 0,   118, 224, 190, 23,   314, 223, 110, 25,   436, 226, 0, 0,
                 118, 256, 110, 30,   236, 256, 100, 30,   342, 256, 110, 30,   458, 258, 90, 25,
-                12, 297, 0, 0,   118, 295, 0, 0,   172, 297, 0, 0,   240, 294, 44, 20,   290, 297, 0, 0,   404, 292, 144, 25,
-                118, 328, 0, 0,   210, 324, 72, 23,   288, 328, 0, 0,
+                12, 297, 0, 0,   118, 295, 0, 0,   186, 297, 0, 0,   254, 294, 44, 20,   304, 297, 0, 0,   404, 292, 144, 25,
+                118, 328, 0, 0,   210, 324, 72, 23,   288, 328, 0, 0,   118, 328, 0, 0,   210, 324, 72, 23,   288, 328, 0, 0,
                 12, 359, 0, 0,   118, 359, 0, 0,   210, 355, 60, 23,   276, 359, 0, 0,
-                118, 390, 0, 0,   210, 386, 72, 23,   288, 390, 0, 0,
-                12, 421, 0, 0,   118, 419, 0, 0,   292, 417, 130, 23,
-                12, 451, 0, 0,   118, 449, 0, 0,   404, 446, 144, 25,
-                12, 481, 0, 0,   118, 479, 0, 0,   180, 479, 0, 0,   297, 479, 0, 0,   426, 479, 0, 0,
-                118, 510, 0, 0,   258, 510, 0, 0,   440, 506, 108, 25,
-                12, 539, 536, 20,   12, 566, 262, 167,   286, 566, 262, 167
+                12, 390, 0, 0,   118, 388, 0, 0,   292, 386, 130, 23,
+                12, 420, 0, 0,   118, 418, 0, 0,   404, 415, 144, 25,
+                12, 450, 0, 0,   118, 448, 0, 0,   180, 448, 0, 0,   297, 448, 0, 0,   426, 448, 0, 0,
+                118, 479, 0, 0,   258, 479, 0, 0,   440, 475, 108, 25,
+                12, 508, 536, 20,   12, 535, 262, 167,   286, 535, 262, 167
             };
             for (int i = 0; i < all.Length; i++)
             {
@@ -245,7 +246,7 @@
             //
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            ClientSize = new System.Drawing.Size(560, 745);
+            ClientSize = new System.Drawing.Size(560, 714);
             Font = new System.Drawing.Font("맑은 고딕", 9F);
             FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             MaximizeBox = false;

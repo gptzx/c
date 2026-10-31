@@ -71,11 +71,6 @@ namespace MacChanger
             Invalidate();
         }
 
-        protected override void OnPaintBackground(PaintEventArgs e)
-        {
-            // OnPaint 가 전체를 그린다 (깜빡임 방지)
-        }
-
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics;

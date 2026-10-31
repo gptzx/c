@@ -16,8 +16,10 @@ namespace MacChanger
 
         public ModeSwitch()
         {
-            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.StandardClick, true);
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
             Cursor = Cursors.Hand;
+            AccessibleRole = AccessibleRole.CheckButton;   // 화면 읽기 프로그램용: 이름과 역할 (글자가 없는 컨트롤이므로 직접 준다)
+            AccessibleName = "자동 변경 방식";
         }
 
         /// <summary>false = 왼쪽(기본), true = 오른쪽</summary>
@@ -38,13 +40,12 @@ namespace MacChanger
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             int h = Height - 1, w = Width - 1;
-            // 홈: 높이만큼 둥근 알약 모양. 쓸 수 있으면 강조색, 잠겨 있으면 회색
-            using (GraphicsPath track = new GraphicsPath())
+            // 홈: 높이만큼 둥근 알약 모양 (양 끝 원 + 가운데 사각형). 쓸 수 있으면 강조색, 잠겨 있으면 회색
+            using (Brush fill = new SolidBrush(Enabled ? SystemColors.Highlight : SystemColors.ControlDark))
             {
-                track.AddArc(0, 0, h, h, 90, 180);
-                track.AddArc(w - h, 0, h, h, 270, 180);
-                track.CloseFigure();
-                using (Brush fill = new SolidBrush(Enabled ? SystemColors.Highlight : SystemColors.ControlDark)) g.FillPath(fill, track);
+                g.FillEllipse(fill, 0, 0, h, h);
+                g.FillEllipse(fill, w - h, 0, h, h);
+                g.FillRectangle(fill, h / 2, 0, w - h, h + 1);
             }
             // 손잡이: 홈 안쪽에 2px 여백을 둔 흰 원, 고른 쪽 끝에 놓인다
             int d = h - 4;

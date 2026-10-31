@@ -1,7 +1,8 @@
 // 배포용 실행 파일 축소 도구 — 기능은 그대로 두고 메타데이터만 줄인다 (IL·리소스(아이콘·매니페스트·버전 정보)·동작은 바뀌지 않는다).
 //   Mono.Cecil 로 (1) 매개변수 이름을 지우고(Param 행 자체가 사라진다), (2) 이 어셈블리가 정의한 형식·메서드·필드·속성·이벤트의 이름을 한두 글자로 줄이고
 //   (생성자, P/Invoke, 가상/재정의 메서드, 델리게이트의 런타임 메서드는 이름을 그대로 둔다 — 런타임이 이름으로 찾는 것은 이것뿐이다),
-//   (3) 컴파일 때 이미 호출 자리에 새겨진 상수 필드(const, 열거형 멤버)를 지우고, (4) 실행에 영향 없는 특성(컴파일러 표식·디버거 표식·어셈블리 설명 특성)을 뗀다.
+//   (3) 컴파일 때 이미 호출 자리에 새겨진 상수 필드(const, 열거형 멤버 — 어딘가에서 boxing 되는 열거형은 제외)를 지우고,
+//   (4) 실행에 영향 없는 특성(컴파일러 표식·디버거 표식·문자열 인터닝 완화·어셈블리 설명 특성)을 뗀다 (예외 처리 의미를 정하는 RuntimeCompatibility 는 남긴다).
 //   어셈블리 설명(제목·버전 등)은 Win32 버전 리소스에 따로 들어 있어 파일 속성 창에는 그대로 보인다.
 //   이 프로그램은 리플렉션·Enum.ToString·형식 이름을 쓰지 않으므로 이름과 상수를 지워도 동작이 같다.
 // 사용: mono Shrink.exe <입력.exe> <출력.exe> [이름표.txt]   (Mono.Cecil 0.11 필요)
@@ -37,7 +38,7 @@ static class Shrink
     {
         string n = a.AttributeType.Name;
         return n == "CompilerGeneratedAttribute" || n == "DebuggerBrowsableAttribute" || n == "DebuggerHiddenAttribute" || n == "DebuggableAttribute"
-            || n == "CompilationRelaxationsAttribute" || n == "RuntimeCompatibilityAttribute"
+            || n == "CompilationRelaxationsAttribute"   // RuntimeCompatibilityAttribute 는 남긴다 — 예외 처리 의미를 바꾸는 스위치라 '영향 없음'으로 분류하지 않는다
             || n == "AssemblyTitleAttribute" || n == "AssemblyDescriptionAttribute" || n == "AssemblyProductAttribute" || n == "AssemblyFileVersionAttribute";
     }
 
@@ -47,6 +48,19 @@ static class Shrink
         uint timestamp = PeTimestamp(input);
         AssemblyDefinition asm = AssemblyDefinition.ReadAssembly(input, new ReaderParameters { ReadingMode = ReadingMode.Immediate });
         List<TypeDefinition> types = asm.MainModule.GetTypes().ToList();   // 바깥 형식이 중첩 형식보다 먼저 온다
+        // 열거형 값이 object 로 boxing 되거나(문자열 연결·ToString·Format) constrained 호출되면 멤버 이름이 실행 중에 필요할 수 있다 — 그런 열거형은 멤버를 남긴다
+        HashSet<TypeDefinition> boxedEnums = new HashSet<TypeDefinition>();
+        foreach (TypeDefinition t in types)
+            foreach (MethodDefinition m in t.Methods)
+                if (m.HasBody)
+                    foreach (Mono.Cecil.Cil.Instruction ins in m.Body.Instructions)
+                        if (ins.OpCode == Mono.Cecil.Cil.OpCodes.Box || ins.OpCode == Mono.Cecil.Cil.OpCodes.Constrained)
+                        {
+                            TypeReference operand = ins.Operand as TypeReference;
+                            TypeDefinition def = operand != null ? operand.Resolve() : null;
+                            if (def != null && def.IsEnum && types.Contains(def)) boxedEnums.Add(def);
+                        }
+        if (boxedEnums.Count > 0) Console.WriteLine("enum members kept (boxed somewhere): " + string.Join(", ", boxedEnums.Select(e => e.FullName).ToArray()));
         Dictionary<TypeDefinition, string> originalName = new Dictionary<TypeDefinition, string>();
         foreach (TypeDefinition t in types) originalName[t] = t.FullName;   // 이름을 바꾸기 전의 전체 이름 (중첩 형식은 "바깥/안쪽")
         foreach (TypeDefinition t in types)
@@ -59,8 +73,9 @@ static class Shrink
                 bool keep = m.IsConstructor || m.IsPInvokeImpl || m.IsVirtual || m.IsRuntimeSpecialName || m.IsRuntime || m.HasOverrides;
                 if (!keep) m.Name = Rename("M", full, m.Name, m.Parameters.Count.ToString());
             }
-            for (int i = t.Fields.Count - 1; i >= 0; i--)
-                if (t.Fields[i].IsLiteral) t.Fields.RemoveAt(i);   // 상수는 호출 자리에 이미 새겨져 있다 (열거형 멤버 포함)
+            if (!boxedEnums.Contains(t))
+                for (int i = t.Fields.Count - 1; i >= 0; i--)
+                    if (t.Fields[i].IsLiteral) t.Fields.RemoveAt(i);   // 상수는 호출 자리에 이미 새겨져 있다 (열거형 멤버 포함)
             foreach (FieldDefinition f in t.Fields)
                 if (!f.IsRuntimeSpecialName) f.Name = Rename("F", full, f.Name, null);
             foreach (PropertyDefinition p in t.Properties) p.Name = Rename("P", full, p.Name, null);
