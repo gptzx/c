@@ -255,10 +255,10 @@ class AutoTest
     Call(f, "ipNotifier_Changed", null, EventArgs.Empty);
     Check(Get<int>(f, "refreshQueued") == 1, "a second notification before the refresh ran is coalesced");
     Application.DoEvents();
-    Check(Get<int>(f, "refreshQueued") == 0 && ip.Enabled && ip.Interval == 1000 && !t.Enabled, "queued refresh ran on the UI thread, cleared the flag, armed the 1 s settle on the IP timer and left the graph timer alone");
+    Check(Get<int>(f, "refreshQueued") == 0 && ip.Enabled && ip.Interval == 1000 && !t.Enabled && !g2.Enabled, "queued refresh ran on the UI thread, cleared the flag, armed the 1 s settle on the IP timer and left the countdown and graph timers alone");
     ip.Stop();
     Call(f, "ipTimer_Tick", null, EventArgs.Empty);
-    Check(ip.Interval == (notifier == null ? 1000 : 3000) && !t.Enabled, "after the settle read the IP timer returns to its safety/fallback period; the graph timer is still untouched");
+    Check(ip.Interval == (notifier == null ? 1000 : 3000) && !t.Enabled && !g2.Enabled, "after the settle read the IP timer returns to its safety/fallback period; the countdown and graph timers are still untouched");
     ip.Stop();
     // ---- auto change: gating, countdown text, formats ----
     CheckBox chk = (CheckBox)C(f, "chkAuto"); NumericUpDown nud = (NumericUpDown)C(f, "nudAutoDelay"), waitNud = (NumericUpDown)C(f, "nudWaitTimeout"), nudInt = (NumericUpDown)C(f, "nudInterval");
@@ -478,8 +478,8 @@ class AutoTest
     Check(!(bool)Call(f, "TrackWaiting", true, t0 + 59999, true) && (bool)Call(f, "TrackWaiting", true, t0 + 60000, true), "60 s setting: fires at exactly 60 s, not before");
     Set(f, "waiting", false); Call(f, "TrackWaiting", true, t0, true);
     Check(!(bool)Call(f, "TrackWaiting", false, t0 + 60000, true) && !Get<bool>(f, "waiting"), "an IP arriving clears the waiting state without firing");
-    Set(f, "busy", true); Set(f, "waiting", false); Call(f, "TrackWaiting", true, t0, true);
-    Check(!Get<bool>(f, "waiting") && !(bool)Call(f, "TrackWaiting", true, t0 + 60000, true), "while an operation runs the clock does not count");
+    t.Stop(); Set(f, "busy", true); Set(f, "waiting", false); Call(f, "TrackWaiting", true, t0, true);
+    Check(!Get<bool>(f, "waiting") && !(bool)Call(f, "TrackWaiting", true, t0 + 60000, true) && !t.Enabled, "while an operation runs the clock does not count and the timer is not re-phased");
     t.Stop(); Set(f, "busy", false); Set(f, "autoRunning", false); Set(f, "waiting", false); Call(f, "TrackWaiting", true, t0, true);
     Check(!(bool)Call(f, "TrackWaiting", true, t0 + 60000, true) && !t.Enabled, "auto-change not running: tracks but never fires and does not touch the timer");
     t.Stop(); Set(f, "waiting", false); waitNud.Value = 30; chk.Checked = false; stopChk.Checked = false;

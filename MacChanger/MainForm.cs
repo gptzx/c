@@ -776,7 +776,7 @@ namespace MacChanger
 
         /// <summary>
         /// 1초마다 자동 변경 카운트다운·할당 대기 시계의 숫자를 올려 예약 시각이 되면 변경을 시작한다.
-        /// ScheduleAuto 가 예약 시각에 맞춰 이 타이머만 재시작한다 (그래프는 graphTimer 가 따로 돌므로 영향 없음).
+        /// ScheduleUntil(예약 시각)과 TrackWaiting(할당 대기 시작 시각)이 이 타이머만 재시작한다 (그래프는 graphTimer 가 따로 돌므로 영향 없음).
         /// </summary>
         private void secondTimer_Tick(object sender, EventArgs e)
         {
