@@ -36,7 +36,6 @@ namespace MacChanger.Native
             IntPtr hTemplateFile);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool DeviceIoControl(
             SafeFileHandle hDevice,
             uint dwIoControlCode,
@@ -84,7 +83,6 @@ namespace MacChanger.Native
         }
 
         [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr hdcDst, ref POINT pptDst, ref SIZE psize, IntPtr hdcSrc, ref POINT pptSrc, uint crKey, ref BLENDFUNCTION pblend, uint dwFlags);
 
         [DllImport("user32.dll")]
@@ -105,11 +103,9 @@ namespace MacChanger.Native
         public static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
 
         [DllImport("gdi32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool DeleteObject(IntPtr hObject);
 
         [DllImport("gdi32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool DeleteDC(IntPtr hdc);
 
         // ------------------------------------------------------------------
@@ -139,9 +135,8 @@ namespace MacChanger.Native
 
         /// <summary>
         /// PIPINTERFACE_CHANGE_CALLBACK / PUNICAST_IPADDRESS_CHANGE_CALLBACK / PIPFORWARD_CHANGE_CALLBACK —
-        /// 셋 다 (PVOID CallerContext, PMIB_*_ROW Row, MIB_NOTIFICATION_TYPE NotificationType) 로 모양이 같다 (Row 는 읽지 않으므로 IntPtr). 사용자 모드에서는 WINAPI(stdcall).
+        /// 셋 다 (PVOID CallerContext, PMIB_*_ROW Row, MIB_NOTIFICATION_TYPE NotificationType) 로 모양이 같다 (Row 는 읽지 않으므로 IntPtr). 사용자 모드에서는 WINAPI(stdcall) = 델리게이트의 기본 호출 규약이므로 따로 지정하지 않는다.
         /// </summary>
-        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         public delegate void MibChangeCallback(IntPtr callerContext, IntPtr row, int notificationType);
 
         [DllImport("iphlpapi.dll")]
@@ -260,11 +255,9 @@ namespace MacChanger.Native
         public static extern IntPtr SetupDiGetClassDevs(ref Guid classGuid, IntPtr enumerator, IntPtr hwndParent, uint flags);
 
         [DllImport("setupapi.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool SetupDiEnumDeviceInfo(IntPtr deviceInfoSet, uint memberIndex, ref SP_DEVINFO_DATA deviceInfoData);
 
         [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool SetupDiGetDeviceRegistryProperty(
             IntPtr deviceInfoSet,
             ref SP_DEVINFO_DATA deviceInfoData,
@@ -275,7 +268,6 @@ namespace MacChanger.Native
             out uint requiredSize);
 
         [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool SetupDiSetClassInstallParams(
             IntPtr deviceInfoSet,
             ref SP_DEVINFO_DATA deviceInfoData,
@@ -283,18 +275,15 @@ namespace MacChanger.Native
             uint classInstallParamsSize);
 
         [DllImport("setupapi.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool SetupDiCallClassInstaller(uint installFunction, IntPtr deviceInfoSet, ref SP_DEVINFO_DATA deviceInfoData);
 
         [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool SetupDiGetDeviceInstallParams(
             IntPtr deviceInfoSet,
             ref SP_DEVINFO_DATA deviceInfoData,
             ref SP_DEVINSTALL_PARAMS deviceInstallParams);
 
         [DllImport("setupapi.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool SetupDiDestroyDeviceInfoList(IntPtr deviceInfoSet);
     }
 }

@@ -104,7 +104,9 @@ namespace MacChanger
             toolTip.SetToolTip(chkReleaseIp, "변경 적용·IP 갱신·원상복구·자동 변경 전에 IP를 DHCP 서버에 먼저 반환합니다.");
             toolTip.SetToolTip(btnReleaseIp, "누르는 즉시 IP를 반환해 인터넷 연결이 끊어집니다.\n다시 연결하려면 IP 갱신 버튼을 누르면 됩니다.");
             toolTip.SetToolTip(chkAuto, "자동 변경 사용 — '시작'을 누르면 IP를 받을 때마다 지정한 초 뒤에 랜덤 MAC을 적용합니다.");
+            toolTip.SetToolTip(modeSwitch, "자동 변경 방식: 왼쪽 = IP를 받을 때마다, 오른쪽 = 일정 시간마다");
             toolTip.SetToolTip(nudAutoDelay, "IP를 받은 뒤 MAC을 바꾸기까지 기다리는 초 (0 = 즉시, 최대 7일)");
+            toolTip.SetToolTip(nudInterval, "IP와 관계없이 MAC을 바꾸는 간격 (10초~7일)");
             toolTip.SetToolTip(btnAutoToggle, "자동 변경 시작 / 정지\n변경 실패·재부팅 필요·지정 IP 할당 시 스스로 멈춥니다.");
             toolTip.SetToolTip(nudWaitTimeout, "자동 변경 중 IP를 못 받은 채 새 MAC을 적용하기까지 기다리는 초 (10~60)");
             toolTip.SetToolTip(chkAutoStopIp, "체크하면 오른쪽 칸의 IP(또는 그 대역의 IP)를 받는 순간 자동 변경을 멈춥니다.");
@@ -117,6 +119,13 @@ namespace MacChanger
             toolTip.SetToolTip(chkIpLog, "새 IP를 받을 때마다 실행 파일 옆 " + IpMonitor.LogFileName + " 에도 기록합니다.");
             toolTip.SetToolTip(btnBackground, "창을 숨기고 트레이 아이콘으로 계속 실행합니다.\n트레이 아이콘을 클릭하면 창이 다시 열립니다.");
             toolTip.SetToolTip(trafficGraph, "송수신 속도 그래프 (빨강: 수신, 초록: 송신)");
+            ApplyModeLabels();
+        }
+
+        /// <summary>자동 변경 방식: 토글 스위치가 오른쪽이면 IP 할당과 관계없이 일정 시간마다, 왼쪽이면 IP 할당 시</summary>
+        private bool IntervalMode
+        {
+            get { return modeSwitch.Checked; }
         }
 
         private NetworkAdapterInfo SelectedAdapter
@@ -395,6 +404,33 @@ namespace MacChanger
             UpdateControlStates();   // 지정 IP 칸은 체크해야 열린다
         }
 
+        private void lblModeIp_Click(object sender, EventArgs e)
+        {
+            if (modeSwitch.Enabled) modeSwitch.Checked = false;
+        }
+
+        private void lblModeTimer_Click(object sender, EventArgs e)
+        {
+            if (modeSwitch.Enabled) modeSwitch.Checked = true;
+        }
+
+        private void modeSwitch_CheckedChanged(object sender, EventArgs e)
+        {
+            ApplyModeLabels();
+            UpdateControlStates();   // 고른 방식의 칸만 열린다
+            if (!busy) SetStatus("준비", IntervalMode ? "자동 변경 방식: 일정 시간마다 (IP 할당과 관계없이)" : "자동 변경 방식: IP 할당 시");
+        }
+
+        /// <summary>토글 스위치 양쪽 글자: 고른 쪽은 검정, 반대쪽은 회색. 고르지 않은 방식의 설정 줄 글자는 흐리게.</summary>
+        private void ApplyModeLabels()
+        {
+            bool interval = IntervalMode;
+            lblModeIp.ForeColor = interval ? SystemColors.GrayText : SystemColors.ControlText;
+            lblModeTimer.ForeColor = interval ? SystemColors.ControlText : SystemColors.GrayText;
+            lblDelayPrefix.Enabled = lblAutoSuffix.Enabled = lblWait.Enabled = lblWaitPrefix.Enabled = lblWaitSuffix.Enabled = !interval;
+            lblIntervalPrefix.Enabled = lblIntervalSuffix.Enabled = interval;
+        }
+
         private void btnAutoToggle_Click(object sender, EventArgs e)
         {
             if (autoRunning) StopAuto();
@@ -412,9 +448,19 @@ namespace MacChanger
             waiting = false;   // 할당 대기 시간은 시작 시점부터 센다
             autoRunning = true;
             UpdateControlStates();   // 실행 중에는 정지·로그 비우기·백그라운드 실행 외의 조작을 잠근다
-            btnAutoToggle.Text = "정지 (IP 대기)";
-            if (!busy) SetStatus("준비", "자동 변경 시작 — IP 할당 " + nudAutoDelay.Value + "초 뒤, 또는 할당 대기 " + nudWaitTimeout.Value + "초 초과 시 새 MAC 적용");
-            RefreshIp();   // 지금 상태를 읽어 ApplyIpInfo 가 결정한다: 이미 IP가 있으면 지금부터 세고(지정 IP면 바로 정지), 링크만 올라와 있으면 할당 대기 시계가 이 순간부터 센다
+            if (IntervalMode)
+            {
+                // 일정 시간마다: IP 와 관계없이 지금부터 N초 뒤에 첫 변경, 그 뒤로는 변경이 끝날 때마다 다시 N초
+                int seconds = (int)nudInterval.Value;
+                ScheduleIn(seconds);
+                if (!busy) SetStatus("준비", "자동 변경 시작 — IP 할당과 관계없이 " + seconds + "초마다 새 MAC 적용");
+            }
+            else
+            {
+                btnAutoToggle.Text = "정지 (IP 대기)";
+                if (!busy) SetStatus("준비", "자동 변경 시작 — IP 할당 " + nudAutoDelay.Value + "초 뒤, 또는 할당 대기 " + nudWaitTimeout.Value + "초 초과 시 새 MAC 적용");
+            }
+            RefreshIp();   // 지금 상태를 읽어 ApplyIpInfo 가 결정한다: (IP 할당 시) 이미 IP가 있으면 지금부터 세고, 링크만 올라와 있으면 할당 대기 시계가 이 순간부터 센다; 지정 IP 가 이미 할당되어 있으면 두 방식 모두 바로 정지
         }
 
         private void StopAuto()
@@ -426,26 +472,33 @@ namespace MacChanger
             if (!busy) SetStatus("준비", "자동 변경 정지");
         }
 
-        /// <summary>자동 변경 중이고 어댑터에 IP가 할당되어 있으면 지연 시간 뒤로 변경을 예약하고 남은 시간을 바로 버튼에 보여준다 (0초면 다음 1초 확인 때 바로).</summary>
+        /// <summary>(IP 할당 시) 자동 변경 중이고 어댑터에 IP가 할당되어 있으면 지연 시간 뒤로 변경을 예약하고 남은 시간을 바로 버튼에 보여준다 (0초면 다음 1초 확인 때 바로).</summary>
         private void ScheduleAuto()
         {
-            if (!autoRunning || busy || lastLoggedIp == null) return;
-            int delay = (int)nudAutoDelay.Value;
+            if (!autoRunning || busy || lastLoggedIp == null || IntervalMode) return;
+            ScheduleIn((int)nudAutoDelay.Value);
+        }
+
+        /// <summary>seconds 초 뒤로 변경을 예약하고 남은 시간을 버튼에 보여준다 (두 방식 공통).</summary>
+        private void ScheduleIn(int seconds)
+        {
             autoPending = true;
-            autoDueTick = unchecked(Environment.TickCount + delay * 1000);
-            if (delay > 0)
+            autoDueTick = unchecked(Environment.TickCount + seconds * 1000);
+            if (seconds > 0)
             {
                 // 1초 타이머의 위상을 예약 시각에 맞춘다: 다음 틱이 정확히 1초 뒤에 오므로 숫자마다 1초씩 표시되고 변경은 정확히 N초 뒤에 시작된다
                 secondTimer.Stop();
                 secondTimer.Start();
-                btnAutoToggle.Text = "정지 (" + FormatRemaining(delay) + ")";
+                btnAutoToggle.Text = "정지 (" + FormatRemaining(seconds) + ")";
             }
             else btnAutoToggle.Text = "정지";
         }
 
-        /// <summary>예약된 변경을 취소한다. 카운트다운을 보여주던 중이었다면 버튼을 "IP 대기"로 되돌린다 (할당 대기 숫자가 보이는 중이면 건드리지 않는다).</summary>
+        /// <summary>예약된 변경을 취소한다. 카운트다운을 보여주던 중이었다면 버튼을 "IP 대기"로 되돌린다 (할당 대기 숫자가 보이는 중이면 건드리지 않는다).
+        /// 일정 시간마다 방식으로 실행 중일 때는 IP 가 사라져도 예약을 유지한다 (정지는 StopAuto 가 autoRunning 을 먼저 끈다).</summary>
         private void CancelAuto()
         {
+            if (autoRunning && IntervalMode) return;
             if (autoPending && autoRunning) btnAutoToggle.Text = "정지 (IP 대기)";
             autoPending = false;
         }
@@ -501,6 +554,7 @@ namespace MacChanger
         /// </summary>
         private bool TrackWaiting(bool isWaiting, int nowTick, bool render)
         {
+            if (autoRunning && IntervalMode) return false;   // 일정 시간마다 방식에서는 할당 대기를 세지도, 보여주지도 않는다
             if (!isWaiting || busy)
             {
                 if (waiting && autoRunning && !busy) btnAutoToggle.Text = "정지 (IP 대기)";   // 링크가 끊겨 대기가 끝났다 — 숫자를 지운다 (IP 를 받은 경우는 곧 예약 표시가 덮는다)
@@ -895,7 +949,7 @@ namespace MacChanger
                 if (error != null) SetStatus("실패", error);
             }
             // 새로 할당된 IP, 또는 자동 변경을 켠 뒤(예약이 아직 없을 때) 처음 확인한 IP → 지연 시간 뒤로 변경 예약 (자동 변경이 꺼져 있으면 ScheduleAuto 가 그냥 돌아온다)
-            if (fresh || !autoPending)
+            if (!IntervalMode && (fresh || !autoPending))
             {
                 ScheduleAuto();
                 if (autoPending && (int)nudAutoDelay.Value == 0) RunAutoIfDue();   // 0초면 다음 타이머 틱을 기다리지 않고 바로 바꾼다
@@ -987,7 +1041,11 @@ namespace MacChanger
                 StopAuto();
                 finalMessage += " 자동 변경을 정지했습니다.";
             }
-            else if (autoRunning) btnAutoToggle.Text = "정지 (IP 대기)";   // 작업 중 "정지" 를 되돌린다 — 다음 IP 조회 결과가 "IP 대기 N초"/카운트다운으로 덮는다
+            else if (autoRunning)
+            {
+                if (IntervalMode) ScheduleIn((int)nudInterval.Value);   // 변경이 끝난 지금부터 다시 N초
+                else btnAutoToggle.Text = "정지 (IP 대기)";   // 작업 중 "정지" 를 되돌린다 — 다음 IP 조회 결과가 "IP 대기 N초"/카운트다운으로 덮는다
+            }
 
             // 어댑터가 실제로 중지되었다면 이후 받는 IP는 같은 값이라도 새 할당이므로 새 MAC과 함께 기록한다.
             if (result != null && result.AdapterRestarted) lastLoggedIp = null;
@@ -1059,8 +1117,11 @@ namespace MacChanger
             chkLogMac.Enabled = !autoRunning;
             chkLogBox.Enabled = !autoRunning;
             btnAutoToggle.Enabled = chkAuto.Checked;                     // 실행 중에도 정지할 수 있어야 하므로 잠그지 않는다
-            nudAutoDelay.Enabled = !autoRunning && chkAuto.Checked;        // 지연 초와 할당 대기 초는 자동 변경을 체크해야 열린다
-            nudWaitTimeout.Enabled = !autoRunning && chkAuto.Checked;
+            modeSwitch.Enabled = !autoRunning;                           // 방식은 정지한 뒤에만 바꿀 수 있다
+            bool ipMode = !IntervalMode;
+            nudAutoDelay.Enabled = !autoRunning && chkAuto.Checked && ipMode;      // 지연 초와 할당 대기 초는 "사용"을 체크하고 IP 할당 시 방식일 때 열린다
+            nudWaitTimeout.Enabled = !autoRunning && chkAuto.Checked && ipMode;
+            nudInterval.Enabled = !autoRunning && chkAuto.Checked && !ipMode;    // 간격은 일정 시간마다 방식일 때
             chkAutoStopIp.Enabled = !autoRunning;
             txtAutoStopIp.Enabled = !autoRunning && chkAutoStopIp.Checked;   // 체크해야 입력 칸이 열린다
             chkResetDns.Enabled = !autoRunning;
