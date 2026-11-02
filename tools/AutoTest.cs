@@ -130,7 +130,7 @@ class AutoTest
     List<string> order = new List<string>();
     for (Control cur = f.GetNextControl(null, true); cur != null; cur = f.GetNextControl(cur, true)) if (cur.TabStop && Vis(cur)) order.Add(cur == C(f, "cboAdapters") ? "cbo" : cur.Text);
     string tabs = string.Join(",", order.ToArray());
-    Check(tabs == "cbo,새로 고침,,랜덤 MAC 주소,DNS 초기화,변경 적용,IP 갱신,원상복구,로그 비우기,사용,,시작,10,30,지정 IP/대역 할당 시 정지,,DHCP 서버에 IP 반환,즉시 반환,시간,서브넷 마스크,기본 게이트웨이,MAC,로그 상자 사용,할당 IP 로그 저장,백그라운드 실행", "tab order follows the rows (switch after 사용; the hidden interval field is skipped): " + tabs);
+    Check(tabs == "cbo,새로 고침,,랜덤 MAC 주소,DNS 초기화,변경 적용,IP 갱신,원상복구,로그 비우기,사용,,시작,10,30,지정 IP/대역 할당 시 정지,,DHCP 서버에 IP 반환,즉시 반환,시간,서브넷 마스크,기본 게이트웨이,MAC,로그 박스 사용,할당 IP 로그 저장,백그라운드 실행", "tab order follows the rows (switch after 사용; the hidden interval field is skipped): " + tabs);
     Check(C(f, "lblModeIp").Cursor == Cursors.Hand && C(f, "lblModeTimer").Cursor == Cursors.Hand && C(f, "modeSwitch").AccessibleName == "IP 할당 시", "side labels show a hand cursor; the switch has an accessible name");
     // ---- tooltips ----
     ToolTip tip = Get<ToolTip>(f, "toolTip");
