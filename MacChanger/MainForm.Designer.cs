@@ -169,7 +169,7 @@
             chkLogMask.Text = "서브넷 마스크";
             chkLogGateway.Text = "기본 게이트웨이";
             chkLogMac.Text = "MAC";
-            chkLogBox.Text = "로그 박스 사용";
+            chkLogBox.Text = "로그 보기";
             chkLogBox.CheckedChanged += new System.EventHandler(chkLogBox_CheckedChanged);
             chkIpLog.Text = "할당 IP 로그 저장";
             chkIpLog.CheckedChanged += new System.EventHandler(chkIpLog_CheckedChanged);

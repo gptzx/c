@@ -12,7 +12,7 @@ namespace MacChanger.Core
     /// <summary>선택한 어댑터의 현재 IPv4 구성 조회와 "할당 IP 로그" 줄 만들기 / 파일 기록.</summary>
     public static class IpMonitor
     {
-        public const string LogFileName = "MacChanger-ip.log";
+        public const string LogFileName = "MacChanger-ip.txt";
 
         /// <summary>어댑터의 현재 IPv4 구성. 목록은 쉼표로 구분하며 주소가 없으면 빈 문자열.</summary>
         public sealed class IpInfo
@@ -142,11 +142,11 @@ namespace MacChanger.Core
             return sb.ToString();
         }
 
-        /// <summary>실행 파일 옆 로그 파일에 한 줄을 추가한다 (UTF-8). 저장 옵션이 켜져 있을 때만 호출된다.</summary>
+        /// <summary>실행 파일 옆 로그 파일에 한 줄을 추가한다 (ANSI = 시스템 기본 코드 페이지, 한국어 Windows 에서는 CP949). 저장 옵션이 켜져 있을 때만 호출된다.</summary>
         public static void AppendLine(string exePath, string line)
         {
             string path = Path.Combine(Path.GetDirectoryName(exePath), LogFileName);
-            File.AppendAllText(path, line + Environment.NewLine, new UTF8Encoding(true));
+            File.AppendAllText(path, line + Environment.NewLine, Encoding.Default);
         }
     }
 }

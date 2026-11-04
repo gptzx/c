@@ -45,8 +45,6 @@ namespace MacChanger
         private string lastInfoGuid;
         /// <summary>선택한 어댑터에 대해 마지막으로 로그에 남긴 "실제 할당 IP"(169.254 제외, 정렬). 어댑터가 내려가거나 재시작되면 초기화한다.</summary>
         private string lastLoggedIp;
-        /// <summary>lastLoggedIp 와 함께 읽은 서브넷 마스크·기본 게이트웨이 (로그 상자를 켜거나 파일 저장을 켤 때 같은 줄을 다시 만들기 위해)</summary>
-        private string lastLoggedMask, lastLoggedGateway;
         /// <summary>IP 구성 변화 알림 (Windows 가 알려 줄 때만 다시 읽는다; 못 쓰는 OS 에서는 ipTimer 가 1초 폴링으로 대신)</summary>
         private IpChangeNotifier ipNotifier;
         /// <summary>알림이 몰려와도 UI 스레드에는 한 번만 넘기기 위한 플래그 (0: 대기 중 없음, 1: 넘겨 둠)</summary>
@@ -54,8 +52,6 @@ namespace MacChanger
         /// <summary>선택한 어댑터의 송수신 카운터 (1초마다 읽어 그래프에 넣는다)</summary>
         private readonly TrafficMonitor traffic = new TrafficMonitor();
         /// <summary>직전 RefreshIp 에서 발생한 로그 저장 오류 (없으면 null)</summary>
-        /// <summary>로그 상자에 마지막으로 넣은 "실제 할당 IP" — 상자를 다시 켤 때 같은 줄을 반복하지 않기 위한 기준</summary>
-        private string lastBoxIp;
         /// <summary>자동 변경이 "시작" 상태인지 (체크박스는 기능 사용 여부, 버튼이 실제 시작/정지)</summary>
         private bool autoRunning;
         /// <summary>자동 변경 예약 여부와 예약 시각(Environment.TickCount 기준 — 시스템 시계 변경에 영향받지 않음)</summary>
@@ -83,7 +79,7 @@ namespace MacChanger
         public MainForm()
         {
             InitializeComponent();
-            ApplyLogBoxEnabled();   // 기본값: 로그 상자 꺼짐(흐리게 표시, 기록 안 함)
+            ApplyLogBoxEnabled();   // 기본값: 로그 보기 꺼짐(흐리게 표시, 기록 안 함)
             try
             {
                 // 실행 파일에 내장된 아이콘(그룹 아이콘 ID 32512)을 EXE 리소스에서 직접 읽어 창/작업표시줄 아이콘으로 쓴다.
@@ -109,15 +105,15 @@ namespace MacChanger
                 "어댑터 목록과 MAC·IP 정보를 다시 읽습니다. (연결은 끊기지 않음)\n어댑터를 꽂거나 뺀 뒤 목록이 실제와 다를 때 누르세요.",
                 "어댑터에 처음부터 새겨진 원래 MAC입니다. 원상복구를 누르면 이 값으로 돌아갑니다.",
                 "어댑터가 지금 실제로 쓰고 있는 MAC입니다.",
-                "어댑터가 지금 받은 IP 주소입니다. 바뀌면 바로 갱신됩니다.\nIP가 없을 때는 그 이유(어댑터 비활성, 연결 안 됨, 할당 대기, DHCP 응답 없음)를 보여 줍니다.",
+                "어댑터가 지금 받은 IP 주소입니다. 바뀌면 바로 갱신됩니다.\nIP가 없을 때는 그 이유를 대신 보여 줍니다.",
                 "같은 네트워크로 묶이는 IP 범위를 정하는 값입니다.",
                 "인터넷으로 나가는 출입구 장비(보통 공유기)의 IP입니다.",
                 "사이트 이름을 숫자 IP로 바꿔 주는 서버입니다.",
-                "변경 적용으로 바꿀 MAC — 0~9, A~F 12자리 (-, :, . 기호는 없어도 됨)\n예: 02-1A-2B-3C-4D-5E",
-                "어댑터에 맞는 랜덤 MAC을 만들어 새 MAC 칸에 채웁니다. (적용은 변경 적용 버튼)\n무선 어댑터는 무선 드라이버가 받아 주는 형식으로 만듭니다.",
-                "변경 적용·IP 갱신·원상복구·자동 변경 때 직접 입력해 둔 DNS 서버도 함께 지워\nDNS도 IP처럼 자동으로 받게 합니다. (IP를 자동으로 받는 어댑터만)",
+                "변경 적용으로 바꿀 MAC — 0~9, A~F 12자리. -, :, . 기호는 있어도 없어도 됩니다.\n예: 02-1A-2B-3C-4D-5E",
+                "어댑터에 맞는 랜덤 MAC을 만들어 새 MAC 칸에 채웁니다. 적용은 변경 적용을 눌러야 합니다.\n무선 어댑터는 무선 드라이버가 받아 주는 형식으로 만듭니다.",
+                "변경 적용·IP 갱신·원상복구·자동 변경 때 직접 입력해 둔 DNS 서버도 함께 지워\nDNS도 IP처럼 자동으로 받게 합니다. IP를 자동으로 받는 어댑터에만 해당합니다.",
                 "새 MAC을 확인 창 없이 바로 적용합니다. 어댑터가 재시작되어 인터넷이 몇 초 끊깁니다.\n끝나면 실제로 바뀌었는지 확인해 상태 줄에 알려 줍니다.",
-                "MAC은 그대로 두고 어댑터를 재시작해 IP를 새로 받습니다. (확인 창 없음, 몇 초 끊김)\n즉시 반환 뒤 다시 연결할 때도 이 버튼을 누릅니다.",
+                "MAC은 그대로 두고 어댑터를 재시작해 IP를 새로 받습니다. 재시작 중 인터넷이 몇 초 끊깁니다.\n즉시 반환 뒤 다시 연결할 때도 이 버튼을 누릅니다.",
                 "원래 MAC으로 되돌립니다. 예/아니요 확인 창을 거친 뒤 어댑터가 재시작되어 인터넷이 몇 초 끊깁니다.",
                 "로그 박스의 내용만 지웁니다. 파일에 저장된 로그는 그대로 남습니다.",
                 "변경 적용·IP 갱신·원상복구·자동 변경 때마다 쓰던 IP를 먼저 DHCP 서버(공유기 등)에 돌려줍니다.\n서버가 다른 IP를 줄 수도, 같은 IP를 다시 줄 수도 있습니다.",
@@ -126,18 +122,18 @@ namespace MacChanger
                 ModeTip,
                 ModeTip,
                 ModeTip,
-                "IP를 받고 이만큼 기다렸다가 새 MAC을 적용합니다. (IP 할당 시 방식)\n0이면 받는 즉시, 최대 7일(604800초)",
-                "연결은 됐는데 이만큼 기다려도 IP를 못 받으면 새 MAC을 적용합니다. (IP 할당 시 방식)\nIP를 받을 때까지 같은 간격으로 되풀이합니다. 10~60초",
-                "IP가 있든 없든 이 간격마다 새 MAC을 적용합니다. (일정 시간마다 방식)\n10초~7일 (1시간=3600, 하루=86400). 너무 짧으면 IP를 받기 전에 또 바뀝니다.",
+                "IP를 받고 이만큼 기다렸다가 새 MAC을 적용합니다.\n0이면 받는 즉시 적용하며, 최대 7일까지 정할 수 있습니다.",
+                "연결은 됐는데 이만큼 기다려도 IP를 못 받으면 새 MAC을 적용합니다.\nIP를 받을 때까지 같은 간격으로 되풀이합니다. 10~60초",
+                "IP가 있든 없든 이 간격마다 새 MAC을 적용합니다. 10초~7일, 1시간은 3600, 하루는 86400.\n너무 짧으면 IP를 받기 전에 또 바뀝니다.",
                 "자동 변경을 시작/정지합니다. 실행 중에는 정지·로그 비우기·백그라운드 실행만 쓸 수 있습니다.\n남은 초나 IP 대기 초가 버튼에 보이며, 변경 실패·재부팅 필요·지정 IP 할당 때는 스스로 멈춥니다.",
                 "오른쪽 칸의 IP나 대역에 속하는 IP를 받는 순간 자동 변경이 멈춥니다.\n시작할 때와 매번 바꾸기 직전에도 확인합니다.",
                 "자동 변경을 멈출 IP나 대역. 앞부분만 적으면 그 숫자로 시작하는 IP 전부가 해당합니다.\n예: 123 → 123.*.*.*   123.123 → 123.123.*.*\n123.123.123 → 123.123.123.*   숫자 네 개를 다 적으면 그 주소 하나만 해당합니다.",
                 "로그 한 줄마다 기록한 날짜와 시각도 함께 적습니다.",
                 "로그 한 줄마다 그때의 서브넷 마스크도 함께 적습니다.",
-                "로그 한 줄마다 그때의 기본 게이트웨이(보통 공유기 IP)도 함께 적습니다.",
-                "로그 한 줄마다 그때 쓰던 MAC도 함께 적습니다. (어떤 MAC으로 어떤 IP를 받았는지)",
-                "새 IP를 받을 때마다 로그 박스에 한 줄씩 기록합니다. 끄면 박스가 흐려지고 기록하지 않습니다.\n파일로도 남기려면 할당 IP 로그 저장을 켜세요. 로그 비우기는 꺼져 있어도 쓸 수 있습니다.",
-                "새 IP를 받을 때마다 프로그램 폴더의 " + IpMonitor.LogFileName + " 파일에도 한 줄씩 저장합니다.\n로그 박스가 꺼져 있어도 저장되며, 파일은 프로그램을 닫아도 남습니다.",
+                "로그 한 줄마다 그때의 기본 게이트웨이도 함께 적습니다.",
+                "로그 한 줄마다 그때 쓰던 MAC도 함께 적습니다.",
+                "체크한 뒤부터 새로 받는 IP를 로그 박스에 한 줄씩 보여 줍니다. 끄면 박스가 흐려지고 기록하지 않습니다.\n파일로도 남기려면 할당 IP 로그 저장을 켜세요. 로그 비우기는 꺼져 있어도 쓸 수 있습니다.",
+                "체크한 뒤부터 새로 받는 IP를 프로그램 폴더의 " + IpMonitor.LogFileName + " 파일에도 한 줄씩 저장합니다.\n로그 보기가 꺼져 있어도 저장되며, 파일은 프로그램을 닫아도 남습니다.",
                 "창을 숨기고 시계 옆 트레이 아이콘으로 계속 실행합니다. 자동 변경·그래프·로그는 그대로 돕니다.\n아이콘을 한 번 누르면 창이 다시 열리고, 마우스 오른쪽 버튼을 누르면 열기/종료 메뉴가 나옵니다.",
                 "통신 속도 그래프입니다. 빨강은 받는(수신) 속도, 초록은 보내는(송신) 속도입니다.\n아래는 누적량과 현재 속도입니다. 누적량은 변경 적용·IP 갱신·원상복구 뒤 0부터 다시 셉니다.",
             };
@@ -406,11 +402,8 @@ namespace MacChanger
                 SetStatus("준비", "할당 IP 로그 파일 저장을 껐습니다.");
                 return;
             }
-            // 켜는 순간 현재 할당된 IP를 기준 줄로 파일에만 한 번 기록한다 (상자는 표시 중일 때만 RefreshIp 가 채운다).
-            NetworkAdapterInfo adapter = SelectedAdapter;
-            string error = adapter != null && lastLoggedIp != null ? AppendToFile(BuildLastLogLine(adapter)) : null;
-            if (error != null) SetStatus("실패", error);
-            else SetStatus("준비", "할당 IP 로그를 실행 파일 옆 " + IpMonitor.LogFileName + " 에 저장합니다.");
+            // 켜는 순간에는 아무것도 쓰지 않는다 — 이후 새로 받는 IP 부터 ApplyIpInfo 가 기록한다
+            SetStatus("준비", "지금부터 새로 받는 IP를 실행 파일 옆 " + IpMonitor.LogFileName + " 에 저장합니다.");
         }
 
         private void chkLogBox_CheckedChanged(object sender, EventArgs e)
@@ -701,21 +694,11 @@ namespace MacChanger
         private void btnClearLog_Click(object sender, EventArgs e)
         {
             txtIpLog.Clear();
-            lastBoxIp = null;
         }
 
-        /// <summary>마지막으로 기록한 할당 IP·마스크·게이트웨이와 지금 쓰는 MAC으로, 현재 로그 옵션에 맞는 한 줄을 만든다.</summary>
-        private string BuildLastLogLine(NetworkAdapterInfo adapter)
-        {
-            return IpMonitor.BuildLogLine(lastLoggedIp, lastLoggedMask, lastLoggedGateway, adapter.CurrentMac,
-                                          chkLogTime.Checked, chkLogMask.Checked, chkLogGateway.Checked, chkLogMac.Checked);
-        }
-
-        /// <summary>상자에 한 줄 추가하고 마지막 줄의 할당 IP를 기억한다.</summary>
-        private void AppendToBox(string assignedIps, string line)
+        private void AppendToBox(string line)
         {
             txtIpLog.AppendText(line + Environment.NewLine);
-            lastBoxIp = assignedIps;
         }
 
         /// <summary>저장 옵션이 켜져 있으면 파일에 한 줄 추가한다. 실패하면 옵션을 끄고 오류 메시지를 돌려준다 (성공/꺼짐이면 null).</summary>
@@ -734,14 +717,10 @@ namespace MacChanger
             }
         }
 
-        /// <summary>로그 상자 사용 여부에 맞춘다: 상자는 늘 보이되 꺼져 있으면 흐리게(비활성) 표시하고 기록하지 않는다. 로그 비우기는 언제나 된다.</summary>
+        /// <summary>로그 보기에 맞춘다: 박스는 늘 보이되 꺼져 있으면 흐리게(비활성) 표시하고 기록하지 않는다. 켜는 순간에는 쓰지 않고 이후 새로 받는 IP 부터 기록한다. 로그 비우기는 언제나 된다.</summary>
         private void ApplyLogBoxEnabled()
         {
-            bool on = chkLogBox.Checked;
-            NetworkAdapterInfo adapter = SelectedAdapter;
-            if (on && adapter != null && lastLoggedIp != null && lastLoggedIp != lastBoxIp)   // 켜는 순간 현재 IP (마지막 줄과 같으면 생략)
-                AppendToBox(lastLoggedIp, BuildLastLogLine(adapter));
-            txtIpLog.Enabled = on;
+            txtIpLog.Enabled = chkLogBox.Checked;
         }
 
         /// <summary>안전망 폴링(알림 직후에는 settle 재조회): 알림을 놓쳤을 때를 대비해 IP 구성을 다시 읽는다 (알림을 못 쓰는 OS 에서는 이것이 유일한 갱신 경로).</summary>
@@ -998,10 +977,9 @@ namespace MacChanger
             if (fresh)
             {
                 lastLoggedIp = assigned;
-                lastLoggedMask = assignedMasks;
-                lastLoggedGateway = info.Gateways;
-                string line = BuildLastLogLine(adapter);   // 상자와 파일에 같은 줄
-                if (chkLogBox.Checked) AppendToBox(assigned, line);   // 꺼져 있는 동안에는 상자에 기록하지 않음
+                string line = IpMonitor.BuildLogLine(assigned, assignedMasks, info.Gateways, adapter.CurrentMac,
+                                                     chkLogTime.Checked, chkLogMask.Checked, chkLogGateway.Checked, chkLogMac.Checked);   // 박스와 파일에 같은 줄
+                if (chkLogBox.Checked) AppendToBox(line);   // 꺼져 있는 동안에는 박스에 기록하지 않음
                 string error = AppendToFile(line);
                 if (error != null) SetStatus("실패", error);
             }
