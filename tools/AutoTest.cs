@@ -260,6 +260,19 @@ class AutoTest
     Call(f, "ipTimer_Tick", null, EventArgs.Empty);
     Check(ip.Interval == (notifier == null ? 1000 : 3000) && !t.Enabled && !g2.Enabled, "after the settle read the IP timer returns to its safety/fallback period; the countdown and graph timers are still untouched");
     ip.Stop();
+    // ---- adapter list auto refresh: notification -> one UI hand-off -> 1.5 s settle timer -> worker enumeration -> apply only when changed ----
+    System.Windows.Forms.Timer at = Get<System.Windows.Forms.Timer>(f, "adapterTimer");
+    Check(at.Interval == 1500 && !at.Enabled, "adapter-list settle timer: 1500 ms, idle at start");
+    Set(f, "listQueued", 0);
+    Call(f, "ipNotifier_InterfacesChanged", null, EventArgs.Empty); Call(f, "ipNotifier_InterfacesChanged", null, EventArgs.Empty);
+    Check(Get<int>(f, "listQueued") == 1, "interface notifications are coalesced into one UI hand-off");
+    Application.DoEvents();
+    Check(Get<int>(f, "listQueued") == 0 && at.Enabled && !t.Enabled && !g2.Enabled && !ip.Enabled, "the hand-off arms the settle timer only (IP, countdown and graph timers untouched)");
+    at.Stop();
+    Set(f, "busy", true);
+    Call(f, "adapterTimer_Tick", null, EventArgs.Empty);
+    Check(!at.Enabled && Get<bool>(f, "listDirty") && !Get<bool>(f, "listQueryRunning"), "settle tick while an operation runs: deferred (dirty), no enumeration");
+    Set(f, "busy", false);
     // ---- auto change: gating, countdown text, formats ----
     CheckBox chk = (CheckBox)C(f, "chkAuto"); NumericUpDown nud = (NumericUpDown)C(f, "nudAutoDelay"), waitNud = (NumericUpDown)C(f, "nudWaitTimeout"), nudInt = (NumericUpDown)C(f, "nudInterval");
     Button btn = (Button)C(f, "btnAutoToggle"); CheckBox stopChk = (CheckBox)C(f, "chkAutoStopIp"); TextBox stopBox = (TextBox)C(f, "txtAutoStopIp");
@@ -460,6 +473,29 @@ class AutoTest
     Call(f, "RunAutoIfDue");
     Check(!Get<bool>(f, "autoRunning") && !Get<bool>(f, "autoPending") && btn.Text == "시작" && status.Text.Contains("어댑터를 선택"), "interval mode without an adapter: the due change stops auto-change and says so: " + status.Text);
     Set(f, "suppressSelectionChanged", true); cbo.SelectedItem = fake; Set(f, "suppressSelectionChanged", false);
+    // adapter list apply: same list -> nothing; new adapter added -> selection kept (same object); selected adapter gone -> auto stops, first adapter chosen
+    {
+      Call(f, "StopAuto"); t.Stop();
+      object other = New("MacChanger.Core.NetworkAdapterInfo");
+      SetProp(other, "InterfaceGuid", "{99999999-2222-3333-4444-555555555555}"); SetProp(other, "Description", "other"); SetProp(other, "ConnectionName", "other"); SetProp(other, "CurrentMac", "AABBCCDDEEFF");
+      object same = New("MacChanger.Core.NetworkAdapterInfo");
+      SetProp(same, "InterfaceGuid", fakeGuid); SetProp(same, "Description", "test"); SetProp(same, "ConnectionName", "test"); SetProp(same, "CurrentMac", "02AABBCCDDEE");   // same adapter, different MAC
+      Type listType = typeof(List<>).MakeGenericType(T("MacChanger.Core.NetworkAdapterInfo"));
+      System.Collections.IList l1 = (System.Collections.IList)Activator.CreateInstance(listType); l1.Add(same);
+      Set(f, "listQueryRunning", true); Set(f, "listDirty", true); at.Stop();
+      Call(f, "ApplyAdapterList", l1);
+      Check(!Get<bool>(f, "listQueryRunning") && !Get<bool>(f, "listDirty") && at.Enabled && cbo.Items.Count == 1 && cbo.SelectedItem == fake, "unchanged list (MAC differs only): nothing replaced; a change seen during the read re-arms the timer");
+      at.Stop();
+      System.Collections.IList l2 = (System.Collections.IList)Activator.CreateInstance(listType); l2.Add(same); l2.Add(other);
+      Call(f, "ApplyAdapterList", l2);
+      Check(cbo.Items.Count == 2 && cbo.SelectedItem == fake && status.Text.Contains("다시 읽었습니다"), "a new adapter appears: list updated, the selected adapter keeps its object and selection: " + status.Text);
+      Set(f, "autoRunning", true); Set(f, "intervalRun", false);
+      System.Collections.IList l3 = (System.Collections.IList)Activator.CreateInstance(listType); l3.Add(other);
+      try { Call(f, "ApplyAdapterList", l3); } catch (Exception) { }   // selecting the other adapter reads its MAC through P/Invoke, which does not exist on this platform
+      Check(!Get<bool>(f, "autoRunning") && cbo.Items.Count == 1 && cbo.SelectedIndex == 0 && btn.Text == "시작", "the selected adapter vanished while auto-change ran: auto-change stopped, first adapter selected");
+      Set(f, "suppressSelectionChanged", true); cbo.Items.Clear(); cbo.Items.Add(fake); cbo.SelectedItem = fake; Set(f, "suppressSelectionChanged", false);
+      Set(f, "lastInfoGuid", fakeGuid);
+    }
     // log options: ticking writes nothing; only an IP that is new afterwards produces a line
     Call(f, "StopAuto"); t.Stop(); logBox.Text = ""; logChk.Checked = true;
     Set(f, "lastLoggedIp", "10.0.0.5"); Set(reading, "Addresses", "10.0.0.5"); Set(reading, "Up", true);

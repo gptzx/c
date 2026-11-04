@@ -79,6 +79,7 @@
             ipTimer = new System.Windows.Forms.Timer(components);
             graphTimer = new System.Windows.Forms.Timer(components);
             secondTimer = new System.Windows.Forms.Timer(components);
+            adapterTimer = new System.Windows.Forms.Timer(components);
             worker = new System.ComponentModel.BackgroundWorker();
             notifyIcon = new System.Windows.Forms.NotifyIcon(components);
             SuspendLayout();
@@ -237,6 +238,8 @@
             graphTimer.Tick += new System.EventHandler(graphTimer_Tick);
             secondTimer.Interval = 1000;
             secondTimer.Tick += new System.EventHandler(secondTimer_Tick);
+            adapterTimer.Interval = 1500;
+            adapterTimer.Tick += new System.EventHandler(adapterTimer_Tick);
             worker.WorkerReportsProgress = true;
             worker.DoWork += new System.ComponentModel.DoWorkEventHandler(worker_DoWork);
             worker.ProgressChanged += new System.ComponentModel.ProgressChangedEventHandler(worker_ProgressChanged);
@@ -318,6 +321,7 @@
         private System.Windows.Forms.Timer ipTimer;
         private System.Windows.Forms.Timer graphTimer;
         private System.Windows.Forms.Timer secondTimer;
+        private System.Windows.Forms.Timer adapterTimer;
         private System.ComponentModel.BackgroundWorker worker;
         private System.Windows.Forms.NotifyIcon notifyIcon;
     }

@@ -8,7 +8,7 @@ Windows 7(.NET 4.0 설치됨) / 8 / 8.1 / 10 / 11에서 추가 런타임 설치 
 
 | 기능 | 구현 |
 |---|---|
-| 어댑터 열거 | `root\StandardCimv2\MSFT_NetAdapter` → 실패/빈 결과 시 `Win32_NetworkAdapter` → `GetAdaptersAddresses` 순으로 폴백. 드롭다운에 `[유선]/[무선]/[블루투스]/[기타]` 라벨 + 설명 + 현재 MAC 표시 (Windows 7의 `Win32_NetworkAdapter` 경로에서는 `GetAdaptersAddresses`의 IfType으로 무선 여부를 보강) |
+| 어댑터 열거 | `root\StandardCimv2\MSFT_NetAdapter` → 실패/빈 결과 시 `Win32_NetworkAdapter` → `GetAdaptersAddresses` 순으로 폴백. 목록은 Windows 의 인터페이스 추가/삭제 알림(`NotifyIpInterfaceChange` 의 MibAddInstance/MibDeleteInstance — 어댑터를 꽂거나 뺄 때, 사용/사용 안 함, 드라이버 설치/제거)을 받아 자동 갱신: 알림이 몰려오면 마지막 알림 1.5초 뒤 한 번만, 작업자 스레드에서 다시 읽어(UI 가 멈추지 않음) GUID·설명·연결 이름·종류가 바뀐 경우에만 드롭다운을 바꾸고 선택은 유지(선택한 어댑터가 사라지면 자동 변경을 정지하고 첫 어댑터 선택). 작업 중(이 프로그램의 어댑터 재시작)에는 끝난 뒤에 읽는다. **새로 고침** 버튼은 만약을 위해 그대로. 드롭다운에 `[유선]/[무선]/[블루투스]/[기타]` 라벨 + 설명 + 현재 MAC 표시 (Windows 7의 `Win32_NetworkAdapter` 경로에서는 `GetAdaptersAddresses`의 IfType으로 무선 여부를 보강) |
 | 원래(공장) MAC | `\\.\{GUID}`에 `IOCTL_NDIS_QUERY_GLOBAL_STATS` + `OID_802_3_PERMANENT_ADDRESS`로 조회, 실패 시 열거 시점에 읽어 둔 `MSFT_NetAdapter.PermanentAddress`. 파일에 저장하지 않고 매번 조회 |
 | 현재 MAC | `OID_802_3_CURRENT_ADDRESS` → `GetAdaptersAddresses` → WMI 순으로 조회 |
 | 랜덤 MAC 주소 | 선택한 어댑터 종류에 따라 자동. **무선**: 12자리 중 왼쪽에서 두 번째 자리만 `2/6/A/E` 중 하나(`X2/X6/XA/XE-XX-XX-XX-XX-XX`), 나머지 11자리는 `0~F` 전부 무작위(첫 자리도 고정하지 않음). **유선/기타**: 두 번째 자리만 짝수(`0/2/4/6/8/A/C/E`), 나머지 11자리 `0~F`, `00-00-00-00-00-00` 제외(`FF-FF-FF-FF-FF-FF`는 짝수 규칙으로 이미 나오지 않음) |
@@ -61,7 +61,7 @@ MacChanger/
     NetworkAdapterInfo.cs              ← 어댑터 정보 모델, 유선/무선/블루투스 라벨
     AdapterEnumerator.cs               ← MSFT_NetAdapter → Win32_NetworkAdapter → GetAdaptersAddresses(NetworkInterface) 열거
     DhcpRelease.cs                     ← DHCP 서버에 IP 반환 (GetInterfaceInfo + IpReleaseAddress, ipconfig /release 와 같음)
-    IpChangeNotifier.cs                ← Windows IP 변경 알림(NotifyIpInterfaceChange / NotifyUnicastIpAddressChange / NotifyRouteChange2) 등록·해제
+    IpChangeNotifier.cs                ← Windows IP 변경 알림(NotifyIpInterfaceChange / NotifyUnicastIpAddressChange / NotifyRouteChange2) 등록·해제, 인터페이스 추가/삭제는 어댑터 목록 갱신 이벤트로도 알림
     IpMonitor.cs                       ← 현재 IPv4 구성(주소·마스크·게이트웨이·DNS) 조회, 169.254 제외(주소·마스크), 로그 줄 만들기(IP·마스크·게이트웨이·MAC), 로그 파일 기록
     TrafficMonitor.cs                  ← 송수신 바이트 카운터 읽기(GetIfEntry2), 속도·누적량 계산, MAC 변경·원상복구·IP 갱신 시 누적량 초기화, KB/MB 서식
     NdisQuery.cs                       ← IOCTL_NDIS_QUERY_GLOBAL_STATS로 공장/현재 MAC 조회

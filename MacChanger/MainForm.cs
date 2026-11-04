@@ -50,6 +50,9 @@ namespace MacChanger
         private IpChangeNotifier ipNotifier;
         /// <summary>알림이 몰려와도 UI 스레드에는 한 번만 넘기기 위한 플래그 (0: 대기 중 없음, 1: 넘겨 둠)</summary>
         private int refreshQueued;
+        /// <summary>어댑터 목록 자동 갱신: 인터페이스가 생기거나 없어졌다는 알림을 UI 스레드에 한 번만 넘기는 플래그 / 목록을 작업자 스레드에서 읽는 중인지 / 읽는 동안(또는 작업 중에) 또 바뀌었는지</summary>
+        private int listQueued;
+        private bool listQueryRunning, listDirty;
         /// <summary>선택한 어댑터의 송수신 카운터 (1초마다 읽어 그래프에 넣는다)</summary>
         private readonly TrafficMonitor traffic = new TrafficMonitor();
         /// <summary>자동 변경이 "시작" 상태인지 (체크박스는 기능 사용 여부, 버튼이 실제 시작/정지)</summary>
@@ -102,7 +105,7 @@ namespace MacChanger
             string[] tips =
             {
                 "MAC을 바꿀 어댑터를 고릅니다. [유선]·[무선] 등은 종류, 뒤는 현재 MAC입니다.",
-                "어댑터 목록과 MAC·IP 정보를 다시 읽습니다. (연결은 끊기지 않음)\n어댑터를 꽂거나 뺀 뒤 목록이 실제와 다를 때 누르세요.",
+                "어댑터 목록과 MAC·IP 정보를 다시 읽습니다. 연결은 끊기지 않습니다.\n목록은 어댑터를 꽂거나 뺄 때 자동으로 갱신되므로 평소에는 누를 일이 없습니다.",
                 "어댑터에 처음부터 새겨진 원래 MAC입니다. 원상복구를 누르면 이 값으로 돌아갑니다.",
                 "어댑터가 지금 실제로 쓰고 있는 MAC입니다.",
                 "어댑터가 지금 받은 IP 주소입니다. 바뀌면 바로 갱신됩니다.\nIP가 없을 때는 그 이유를 대신 보여 줍니다.",
@@ -199,6 +202,7 @@ namespace MacChanger
             if (ipNotifier.Available)
             {
                 ipNotifier.Changed += ipNotifier_Changed;
+                ipNotifier.InterfacesChanged += ipNotifier_InterfacesChanged;
                 ipTimer.Interval = IpSafetyPollMs;
             }
             else
@@ -225,6 +229,114 @@ namespace MacChanger
             {
                 Interlocked.Exchange(ref refreshQueued, 0);
             }
+        }
+
+        /// <summary>시스템 스레드에서 온 인터페이스 추가/삭제 알림 — UI 스레드에 한 번만 넘긴다.</summary>
+        private void ipNotifier_InterfacesChanged(object sender, EventArgs e)
+        {
+            if (Interlocked.Exchange(ref listQueued, 1) != 0) return;
+            try
+            {
+                if (IsHandleCreated && !IsDisposed) BeginInvoke(new MethodInvoker(ArmAdapterRefresh));
+                else Interlocked.Exchange(ref listQueued, 0);
+            }
+            catch (Exception)   // 창이 닫히는 중
+            {
+                Interlocked.Exchange(ref listQueued, 0);
+            }
+        }
+
+        /// <summary>어댑터 목록 자동 갱신 예약: 알림이 몰려오면(어댑터 하나가 올라올 때도 여러 번) 마지막 알림 뒤 1.5초에 한 번만 읽는다.</summary>
+        private void ArmAdapterRefresh()
+        {
+            Interlocked.Exchange(ref listQueued, 0);
+            if (IsDisposed) return;
+            adapterTimer.Stop();
+            adapterTimer.Start();
+        }
+
+        /// <summary>
+        /// 어댑터 목록을 작업자 스레드에서 다시 읽는다 (WMI 열거는 몇 초 걸릴 수 있어 UI 스레드에서 하면 그래프·카운트다운이 밀린다).
+        /// 작업 중(우리가 어댑터를 재시작하는 중)이거나 이미 읽는 중이면 표시만 해 두고, 끝난 뒤에 다시 읽는다. 결과는 ApplyAdapterList 가 바뀐 것이 있을 때만 반영한다.
+        /// </summary>
+        private void adapterTimer_Tick(object sender, EventArgs e)
+        {
+            adapterTimer.Stop();
+            if (busy || listQueryRunning)
+            {
+                listDirty = true;
+                return;
+            }
+            listQueryRunning = true;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                List<NetworkAdapterInfo> list = null;
+                try { list = AdapterEnumerator.Enumerate(); }
+                catch (Exception) { }
+                try { BeginInvoke(new Action<List<NetworkAdapterInfo>>(ApplyAdapterList), list); }
+                catch (Exception) { }   // 창이 이미 닫혔다
+            });
+        }
+
+        /// <summary>
+        /// 다시 읽은 어댑터 목록을 반영한다 (UI 스레드). 목록(GUID·설명·연결 이름·종류)이 같으면 아무것도 하지 않는다 — MAC 은 비교하지 않는다 (선택한 어댑터의 MAC 은 따로 갱신된다).
+        /// 선택한 어댑터는 같은 개체를 그대로 두고 선택을 유지하며, 사라졌으면 자동 변경을 정지하고 첫 어댑터를 고른다(목록이 비면 칸을 비운다).
+        /// </summary>
+        private void ApplyAdapterList(List<NetworkAdapterInfo> list)
+        {
+            listQueryRunning = false;
+            if (listDirty)
+            {
+                listDirty = false;   // 읽는 동안 또 바뀌었다 — 잠시 뒤 다시
+                adapterTimer.Start();
+            }
+            if (list == null || busy) return;   // 열거 실패나 작업 중이면 이번은 건너뛴다 (작업이 끝나면 완료 처리가 다시 예약한다)
+            if (Signature(list) == Signature(cboAdapters.Items)) return;
+            NetworkAdapterInfo selected = SelectedAdapter;
+            int index = -1;
+            suppressSelectionChanged = true;
+            try
+            {
+                cboAdapters.BeginUpdate();
+                cboAdapters.Items.Clear();
+                foreach (NetworkAdapterInfo a in list)
+                {
+                    bool same = selected != null && string.Equals(a.InterfaceGuid, selected.InterfaceGuid, StringComparison.OrdinalIgnoreCase);
+                    int i = cboAdapters.Items.Add(same ? selected : a);
+                    if (same) index = i;
+                }
+                cboAdapters.EndUpdate();
+                if (index >= 0) cboAdapters.SelectedIndex = index;
+            }
+            finally
+            {
+                suppressSelectionChanged = false;
+            }
+            if (index >= 0)
+            {
+                SetStatus("준비", "어댑터 목록이 바뀌어 다시 읽었습니다.");
+                return;
+            }
+            bool stopped = autoRunning;   // 선택한 어댑터가 사라졌다 (뽑혔거나 사용 안 함) — 자동 변경은 멈춘다
+            if (stopped) StopAuto();
+            if (list.Count > 0) cboAdapters.SelectedIndex = 0;   // 선택 변경 → 그 어댑터의 정보를 읽는다
+            else
+            {
+                txtPermanentMac.Text = txtCurrentMac.Text = string.Empty;
+                ClearIpBoxes();
+                traffic.Attach(null);
+                trafficGraph.Clear();
+            }
+            SetStatus(list.Count > 0 ? "준비" : "실패", "선택한 어댑터가 사라졌습니다." + (stopped ? " 자동 변경을 정지했습니다." : ""));
+        }
+
+        /// <summary>목록 비교용 문자열: GUID·설명·연결 이름·종류·가상 여부 (MAC 제외)</summary>
+        private static string Signature(System.Collections.IEnumerable items)
+        {
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            foreach (NetworkAdapterInfo a in items)
+                sb.Append(a.InterfaceGuid).Append('\t').Append(a.Description).Append('\t').Append(a.ConnectionName).Append('\t').Append((int)a.Kind).Append(a.IsVirtual ? 'v' : '-').Append('\n');
+            return sb.ToString();
         }
 
         private void RefreshIpFromNotification()
@@ -1065,6 +1177,11 @@ namespace MacChanger
         {
             ipEpoch++;
             SetBusy(false);
+            if (listDirty)   // 작업 중에 인터페이스 알림이 왔다 (대개 우리가 재시작한 어댑터) — 잠시 뒤 목록을 읽어 바뀐 것이 있는지 본다
+            {
+                listDirty = false;
+                adapterTimer.Start();
+            }
 
             MacChangeResult result = e.Error == null ? e.Result as MacChangeResult : null;
             string finalState = result != null && result.Success ? "완료" : "실패";

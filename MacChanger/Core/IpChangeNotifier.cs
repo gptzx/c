@@ -12,6 +12,8 @@ namespace MacChanger.Core
     {
         /// <summary>IPv4 구성에 변화가 있었다 (어느 인터페이스인지는 구분하지 않는다 — 구독자가 선택한 어댑터를 다시 읽는다). 시스템 스레드에서 발생.</summary>
         public event EventHandler Changed;
+        /// <summary>IPv4 인터페이스가 생기거나 없어졌다 (어댑터를 꽂거나 뺌, 사용/사용 안 함, 드라이버 설치/제거, 그리고 이 프로그램의 어댑터 재시작) — 어댑터 목록을 다시 읽을 때. 시스템 스레드에서 발생.</summary>
+        public event EventHandler InterfacesChanged;
 
         private IntPtr interfaceHandle, addressHandle, routeHandle;
         // 델리게이트를 필드에 붙들어 두어야 GC 가 콜백을 거두지 않는다 (네이티브 쪽이 포인터를 계속 쓴다). 세 등록이 같은 콜백을 쓴다.
@@ -28,7 +30,7 @@ namespace MacChanger.Core
             callback = OnChange;
             try
             {
-                int r1 = NativeMethods.NotifyIpInterfaceChange(NativeMethods.AF_INET, callback, IntPtr.Zero, false, out interfaceHandle);
+                int r1 = NativeMethods.NotifyIpInterfaceChange(NativeMethods.AF_INET, callback, new IntPtr(1), false, out interfaceHandle);   // 컨텍스트 1 = 인터페이스 알림 (콜백에서 구분)
                 int r2 = NativeMethods.NotifyUnicastIpAddressChange(NativeMethods.AF_INET, callback, IntPtr.Zero, false, out addressHandle);
                 int r3 = NativeMethods.NotifyRouteChange2(NativeMethods.AF_INET, callback, IntPtr.Zero, false, out routeHandle);
                 if (r1 != 0) interfaceHandle = IntPtr.Zero;
@@ -45,11 +47,16 @@ namespace MacChanger.Core
             }
         }
 
-        /// <summary>세 알림 공통 콜백 (시스템 스레드)</summary>
+        /// <summary>세 알림 공통 콜백 (시스템 스레드). 인터페이스 알림(컨텍스트 1)의 MibAddInstance(1)/MibDeleteInstance(2) 는 어댑터 목록 변화로도 알린다.</summary>
         private void OnChange(IntPtr callerContext, IntPtr row, int notificationType)
         {
             if (disposed) return;
-            EventHandler handler = Changed;
+            Raise(Changed);
+            if (callerContext != IntPtr.Zero && (notificationType == 1 || notificationType == 2)) Raise(InterfacesChanged);
+        }
+
+        private void Raise(EventHandler handler)
+        {
             if (handler == null) return;
             try { handler(this, EventArgs.Empty); }
             catch (Exception) { }   // 네이티브 콜백 안에서 예외가 새어 나가면 프로세스가 죽는다
