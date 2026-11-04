@@ -91,6 +91,7 @@
             lblAdapter.Text = "네트워크 어댑터:";
             cboAdapters.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             cboAdapters.SelectedIndexChanged += new System.EventHandler(cboAdapters_SelectedIndexChanged);
+            cboAdapters.DropDownClosed += new System.EventHandler(cboAdapters_DropDownClosed);
             btnRefresh.Text = "새로 고침";
             btnRefresh.Click += new System.EventHandler(btnRefresh_Click);
             lblPermanent.Text = "원래(공장) MAC:";

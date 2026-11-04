@@ -53,6 +53,9 @@ namespace MacChanger
         /// <summary>어댑터 목록 자동 갱신: 인터페이스가 생기거나 없어졌다는 알림을 UI 스레드에 한 번만 넘기는 플래그 / 목록을 작업자 스레드에서 읽는 중인지 / 읽는 동안(또는 작업 중에) 또 바뀌었는지</summary>
         private int listQueued;
         private bool listQueryRunning, listDirty;
+        /// <summary>새로 고침(LoadAdapters)마다 +1 / 작업자 스레드가 읽기 시작할 때의 값 — 다르면 그 결과는 새로 고침보다 오래된 것이라 버린다. 드롭다운이 열려 있어 미룬 갱신은 listDeferred.</summary>
+        private int listEpoch, listJobEpoch;
+        private bool listDeferred;
         /// <summary>선택한 어댑터의 송수신 카운터 (1초마다 읽어 그래프에 넣는다)</summary>
         private readonly TrafficMonitor traffic = new TrafficMonitor();
         /// <summary>자동 변경이 "시작" 상태인지 (체크박스는 기능 사용 여부, 버튼이 실제 시작/정지)</summary>
@@ -268,6 +271,7 @@ namespace MacChanger
                 return;
             }
             listQueryRunning = true;
+            listJobEpoch = listEpoch;
             ThreadPool.QueueUserWorkItem(delegate
             {
                 List<NetworkAdapterInfo> list = null;
@@ -279,19 +283,30 @@ namespace MacChanger
         }
 
         /// <summary>
-        /// 다시 읽은 어댑터 목록을 반영한다 (UI 스레드). 목록(GUID·설명·연결 이름·종류)이 같으면 아무것도 하지 않는다 — MAC 은 비교하지 않는다 (선택한 어댑터의 MAC 은 따로 갱신된다).
-        /// 선택한 어댑터는 같은 개체를 그대로 두고 선택을 유지하며, 사라졌으면 자동 변경을 정지하고 첫 어댑터를 고른다(목록이 비면 칸을 비운다).
+        /// 다시 읽은 어댑터 목록을 반영한다 (UI 스레드). 목록(GUID·설명·연결 이름·종류·가상 여부)이 같으면 아무것도 하지 않는다 — MAC 은 비교하지 않는다 (선택한 어댑터의 MAC 은 따로 갱신된다).
+        /// 선택한 어댑터는 같은 개체를 그대로 두되 설명·이름·종류는 새 값으로 맞추고 선택을 유지한다. 사라졌으면 자동 변경을 정지하고 첫 어댑터를 고른다(목록이 비면 칸을 비운다).
+        /// 작업 중이면 결과를 버리고 작업이 끝날 때 다시 읽게 표시해 두고, 새로 고침이 그사이 더 새 목록을 넣었으면(listEpoch) 버리며, 드롭다운이 열려 있으면 닫힌 뒤로 미룬다.
         /// </summary>
         private void ApplyAdapterList(List<NetworkAdapterInfo> list)
         {
             listQueryRunning = false;
+            if (busy)
+            {
+                listDirty = true;   // 읽는 동안 작업이 시작됐다 — worker_RunWorkerCompleted 가 다시 예약한다 (IP 반환처럼 인터페이스 알림이 없는 작업도)
+                return;
+            }
             if (listDirty)
             {
                 listDirty = false;   // 읽는 동안 또 바뀌었다 — 잠시 뒤 다시
                 adapterTimer.Start();
             }
-            if (list == null || busy) return;   // 열거 실패나 작업 중이면 이번은 건너뛴다 (작업이 끝나면 완료 처리가 다시 예약한다)
+            if (list == null || listJobEpoch != listEpoch) return;   // 열거 실패, 또는 그사이 새로 고침이 더 새 목록을 넣었다
             if (Signature(list) == Signature(cboAdapters.Items)) return;
+            if (cboAdapters.DroppedDown)
+            {
+                listDeferred = true;   // 열린 목록을 다시 채우면 강조·선택이 어긋난다 — 닫힌 뒤에 다시 읽는다
+                return;
+            }
             NetworkAdapterInfo selected = SelectedAdapter;
             int index = -1;
             suppressSelectionChanged = true;
@@ -302,7 +317,16 @@ namespace MacChanger
                 foreach (NetworkAdapterInfo a in list)
                 {
                     bool same = selected != null && string.Equals(a.InterfaceGuid, selected.InterfaceGuid, StringComparison.OrdinalIgnoreCase);
-                    int i = cboAdapters.Items.Add(same ? selected : a);
+                    if (same)
+                    {
+                        // 같은 개체를 유지하되(실시간으로 읽은 CurrentMac 보존) 비교 대상 필드는 새로 읽은 값으로 맞춘다 — 안 맞추면 서명이 영원히 달라 알림마다 다시 채운다
+                        selected.Description = a.Description;
+                        selected.ConnectionName = a.ConnectionName;
+                        selected.Kind = a.Kind;
+                        selected.IsVirtual = a.IsVirtual;
+                        if (a.PermanentMacHint != null) selected.PermanentMacHint = a.PermanentMacHint;
+                    }
+                    int i = cboAdapters.Items.Add(same ? selected : a);   // Add 전에 바꿔야 콤보가 캐시하는 표시 문자열에 새 이름·종류가 들어간다
                     if (same) index = i;
                 }
                 cboAdapters.EndUpdate();
@@ -312,8 +336,9 @@ namespace MacChanger
             {
                 suppressSelectionChanged = false;
             }
-            if (index >= 0)
+            if (index >= 0 || selected == null)   // 선택 유지, 또는 비어 있던 목록에 어댑터가 생겼다 (빈→빈은 위의 서명 비교에서 이미 돌아갔다)
             {
+                if (selected == null) cboAdapters.SelectedIndex = 0;   // 선택 변경 → 그 어댑터의 정보를 읽는다
                 SetStatus("준비", "어댑터 목록이 바뀌어 다시 읽었습니다.");
                 return;
             }
@@ -328,6 +353,15 @@ namespace MacChanger
                 trafficGraph.Clear();
             }
             SetStatus(list.Count > 0 ? "준비" : "실패", "선택한 어댑터가 사라졌습니다." + (stopped ? " 자동 변경을 정지했습니다." : ""));
+        }
+
+        /// <summary>드롭다운이 열려 있는 동안 미룬 목록 갱신을 닫힌 뒤에 다시 읽는다.</summary>
+        private void cboAdapters_DropDownClosed(object sender, EventArgs e)
+        {
+            if (!listDeferred) return;
+            listDeferred = false;
+            adapterTimer.Stop();
+            adapterTimer.Start();
         }
 
         /// <summary>목록 비교용 문자열: GUID·설명·연결 이름·종류·가상 여부 (MAC 제외)</summary>
@@ -881,6 +915,7 @@ namespace MacChanger
         // ------------------------------------------------------------------
         private void LoadAdapters(string guidToSelect)
         {
+            listEpoch++;   // 작업자 스레드가 이보다 먼저 읽기 시작한 목록은 버린다 (이쪽이 최신)
             Cursor = Cursors.WaitCursor;
             try
             {

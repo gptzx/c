@@ -273,6 +273,12 @@ class AutoTest
     Call(f, "adapterTimer_Tick", null, EventArgs.Empty);
     Check(!at.Enabled && Get<bool>(f, "listDirty") && !Get<bool>(f, "listQueryRunning"), "settle tick while an operation runs: deferred (dirty), no enumeration");
     Set(f, "busy", false);
+    {
+      object ok = New("MacChanger.Core.MacChangeResult"); SetProp(ok, "Success", true); SetProp(ok, "Message", "ok");
+      Call(f, "worker_RunWorkerCompleted", null, new System.ComponentModel.RunWorkerCompletedEventArgs(ok, null, false));
+      Check(at.Enabled && !Get<bool>(f, "listDirty"), "completion with a deferred list change re-arms the settle timer and clears the flag");
+      at.Stop();
+    }
     // ---- auto change: gating, countdown text, formats ----
     CheckBox chk = (CheckBox)C(f, "chkAuto"); NumericUpDown nud = (NumericUpDown)C(f, "nudAutoDelay"), waitNud = (NumericUpDown)C(f, "nudWaitTimeout"), nudInt = (NumericUpDown)C(f, "nudInterval");
     Button btn = (Button)C(f, "btnAutoToggle"); CheckBox stopChk = (CheckBox)C(f, "chkAutoStopIp"); TextBox stopBox = (TextBox)C(f, "txtAutoStopIp");
@@ -479,20 +485,41 @@ class AutoTest
       object other = New("MacChanger.Core.NetworkAdapterInfo");
       SetProp(other, "InterfaceGuid", "{99999999-2222-3333-4444-555555555555}"); SetProp(other, "Description", "other"); SetProp(other, "ConnectionName", "other"); SetProp(other, "CurrentMac", "AABBCCDDEEFF");
       object same = New("MacChanger.Core.NetworkAdapterInfo");
-      SetProp(same, "InterfaceGuid", fakeGuid); SetProp(same, "Description", "test"); SetProp(same, "ConnectionName", "test"); SetProp(same, "CurrentMac", "02AABBCCDDEE");   // same adapter, different MAC
+      SetProp(same, "InterfaceGuid", fakeGuid); SetProp(same, "Description", "test"); SetProp(same, "ConnectionName", "test"); SetProp(same, "CurrentMac", "AABBCCDDEE00");   // same adapter, different MAC (fake holds 02AABBCCDDEE)
       Type listType = typeof(List<>).MakeGenericType(T("MacChanger.Core.NetworkAdapterInfo"));
       System.Collections.IList l1 = (System.Collections.IList)Activator.CreateInstance(listType); l1.Add(same);
       Set(f, "listQueryRunning", true); Set(f, "listDirty", true); at.Stop();
       Call(f, "ApplyAdapterList", l1);
-      Check(!Get<bool>(f, "listQueryRunning") && !Get<bool>(f, "listDirty") && at.Enabled && cbo.Items.Count == 1 && cbo.SelectedItem == fake, "unchanged list (MAC differs only): nothing replaced; a change seen during the read re-arms the timer");
+      Check(!Get<bool>(f, "listQueryRunning") && !Get<bool>(f, "listDirty") && at.Enabled && cbo.Items.Count == 1 && cbo.SelectedItem == fake && status.Text.Contains("자동 변경 정지"), "unchanged list (MAC differs only): nothing replaced, status untouched; a change seen during the read re-arms the timer");
       at.Stop();
+      Set(f, "busy", true);
+      Call(f, "ApplyAdapterList", l1);
+      Check(Get<bool>(f, "listDirty") && !Get<bool>(f, "listQueryRunning"), "a result arriving while an operation runs is dropped but flagged for a re-read");
+      Set(f, "busy", false); Set(f, "listDirty", false);
+      Set(f, "listEpoch", 7); Set(f, "listJobEpoch", 6);
+      Call(f, "ApplyAdapterList", l1);
+      Set(f, "listJobEpoch", 7);
       System.Collections.IList l2 = (System.Collections.IList)Activator.CreateInstance(listType); l2.Add(same); l2.Add(other);
       Call(f, "ApplyAdapterList", l2);
       Check(cbo.Items.Count == 2 && cbo.SelectedItem == fake && status.Text.Contains("다시 읽었습니다"), "a new adapter appears: list updated, the selected adapter keeps its object and selection: " + status.Text);
+      SetProp(other, "ConnectionName", "renamed");
+      object fake2 = New("MacChanger.Core.NetworkAdapterInfo");
+      SetProp(fake2, "InterfaceGuid", fakeGuid); SetProp(fake2, "Description", "test v2"); SetProp(fake2, "ConnectionName", "test"); SetProp(fake2, "CurrentMac", "AABBCCDDEE00");
+      System.Collections.IList l2b = (System.Collections.IList)Activator.CreateInstance(listType); l2b.Add(fake2); l2b.Add(other);
+      Call(f, "ApplyAdapterList", l2b);
+      Check(cbo.SelectedItem == fake && (string)GetProp(fake, "Description") == "test v2" && (string)GetProp(fake, "CurrentMac") == "02AABBCCDDEE" && cbo.GetItemText(fake).Contains("test v2"), "renamed selected adapter: object kept, its description refreshed (MAC untouched), item text updated");
+      status.Text = "x";
+      Call(f, "ApplyAdapterList", l2b);
+      Check(status.Text == "x", "applying the same list again is a no-op (signature converges)");
       Set(f, "autoRunning", true); Set(f, "intervalRun", false);
       System.Collections.IList l3 = (System.Collections.IList)Activator.CreateInstance(listType); l3.Add(other);
       try { Call(f, "ApplyAdapterList", l3); } catch (Exception) { }   // selecting the other adapter reads its MAC through P/Invoke, which does not exist on this platform
-      Check(!Get<bool>(f, "autoRunning") && cbo.Items.Count == 1 && cbo.SelectedIndex == 0 && btn.Text == "시작", "the selected adapter vanished while auto-change ran: auto-change stopped, first adapter selected");
+      Check(!Get<bool>(f, "autoRunning") && cbo.Items.Count == 1 && cbo.SelectedIndex == 0 && btn.Text == "시작", "the selected adapter vanished while auto-change ran: auto-change stopped, first adapter selected (the final status is written after the selection read, which needs Windows)");
+      Set(f, "suppressSelectionChanged", true); cbo.Items.Clear(); Set(f, "suppressSelectionChanged", false);
+      Set(f, "autoRunning", true); Set(f, "intervalRun", false);
+      try { Call(f, "ApplyAdapterList", l3); } catch (Exception) { }
+      Check(Get<bool>(f, "autoRunning") && cbo.Items.Count == 1 && cbo.SelectedIndex == 0 && !status.Text.Contains("사라졌"), "an adapter appearing in an empty list is not a vanish: auto-change untouched, first adapter selected");
+      Set(f, "autoRunning", false);
       Set(f, "suppressSelectionChanged", true); cbo.Items.Clear(); cbo.Items.Add(fake); cbo.SelectedItem = fake; Set(f, "suppressSelectionChanged", false);
       Set(f, "lastInfoGuid", fakeGuid);
     }
