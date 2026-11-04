@@ -43,7 +43,8 @@ namespace MacChanger
         private bool suppressSelectionChanged;
         /// <summary>마지막으로 정보를 읽은 어댑터 GUID (실제로 다른 어댑터를 선택했을 때만 IP 로그 기준을 초기화)</summary>
         private string lastInfoGuid;
-        /// <summary>선택한 어댑터에 대해 마지막으로 로그에 남긴 "실제 할당 IP"(169.254 제외, 정렬). 어댑터가 내려가거나 재시작되면 초기화한다.</summary>
+        /// <summary>선택한 어댑터에서 마지막으로 본 "실제 할당 IP"(169.254 제외, 정렬) — 로그·예약의 기준. 로그 옵션이 꺼져 있어도 갱신한다
+        /// (그래야 옵션을 켜는 순간 지금 IP 가 기록되지 않고 그 뒤에 새로 받는 IP 부터 기록된다). 어댑터가 내려가거나 재시작되거나 다른 어댑터를 고르면 초기화한다.</summary>
         private string lastLoggedIp;
         /// <summary>IP 구성 변화 알림 (Windows 가 알려 줄 때만 다시 읽는다; 못 쓰는 OS 에서는 ipTimer 가 1초 폴링으로 대신)</summary>
         private IpChangeNotifier ipNotifier;
@@ -51,7 +52,6 @@ namespace MacChanger
         private int refreshQueued;
         /// <summary>선택한 어댑터의 송수신 카운터 (1초마다 읽어 그래프에 넣는다)</summary>
         private readonly TrafficMonitor traffic = new TrafficMonitor();
-        /// <summary>직전 RefreshIp 에서 발생한 로그 저장 오류 (없으면 null)</summary>
         /// <summary>자동 변경이 "시작" 상태인지 (체크박스는 기능 사용 여부, 버튼이 실제 시작/정지)</summary>
         private bool autoRunning;
         /// <summary>자동 변경 예약 여부와 예약 시각(Environment.TickCount 기준 — 시스템 시계 변경에 영향받지 않음)</summary>

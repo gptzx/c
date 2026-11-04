@@ -460,6 +460,17 @@ class AutoTest
     Call(f, "RunAutoIfDue");
     Check(!Get<bool>(f, "autoRunning") && !Get<bool>(f, "autoPending") && btn.Text == "시작" && status.Text.Contains("어댑터를 선택"), "interval mode without an adapter: the due change stops auto-change and says so: " + status.Text);
     Set(f, "suppressSelectionChanged", true); cbo.SelectedItem = fake; Set(f, "suppressSelectionChanged", false);
+    // log options: ticking writes nothing; only an IP that is new afterwards produces a line
+    Call(f, "StopAuto"); t.Stop(); logBox.Text = ""; logChk.Checked = true;
+    Set(f, "lastLoggedIp", "10.0.0.5"); Set(reading, "Addresses", "10.0.0.5"); Set(reading, "Up", true);
+    Call(f, "ApplyIpInfo", fakeGuid, reading, false, Get<int>(f, "ipEpoch"));
+    Check(logBox.Text == "", "로그 보기 ticked while an IP is held: nothing is written for the current IP");
+    Set(reading, "Addresses", "10.0.0.6");
+    Call(f, "ApplyIpInfo", fakeGuid, reading, false, Get<int>(f, "ipEpoch"));
+    Check(logBox.Text.Trim() == "10.0.0.6" && ((TextBox)logBox).Lines.Length <= 2, "the next new IP is written as exactly one line: " + logBox.Text.Trim());
+    Call(f, "ApplyIpInfo", fakeGuid, reading, false, Get<int>(f, "ipEpoch"));
+    Check(logBox.Text.Trim() == "10.0.0.6", "the same IP read again is not written twice");
+    logChk.Checked = false; logBox.Text = "";
     // mode switch back to IP mode restores the IP-mode gating (nothing leaks from the interval run)
     Call(f, "lblMode_Click", lblModeIp, EventArgs.Empty);
     Check(!(bool)GetProp(sw, "Checked") && nud.Enabled && waitNud.Enabled && !nudInt.Enabled && btn.Text == "시작", "back to IP 할당 시: delay/wait enabled, interval locked");
