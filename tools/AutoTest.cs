@@ -262,7 +262,7 @@ class AutoTest
     ip.Stop();
     // ---- adapter list auto refresh: notification -> one UI hand-off -> 1.5 s settle timer -> worker enumeration -> apply only when changed ----
     System.Windows.Forms.Timer at = Get<System.Windows.Forms.Timer>(f, "adapterTimer");
-    Check(at.Interval == 1500 && !at.Enabled, "adapter-list settle timer: 1500 ms, idle at start");
+    Check(at.Interval == 500 && !at.Enabled, "adapter-list settle timer: 500 ms, idle at start");
     Set(f, "listQueued", 0);
     Call(f, "ipNotifier_InterfacesChanged", null, EventArgs.Empty); Call(f, "ipNotifier_InterfacesChanged", null, EventArgs.Empty);
     Check(Get<int>(f, "listQueued") == 1, "interface notifications are coalesced into one UI hand-off");

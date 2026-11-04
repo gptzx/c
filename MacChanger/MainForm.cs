@@ -249,7 +249,7 @@ namespace MacChanger
             }
         }
 
-        /// <summary>어댑터 목록 자동 갱신 예약: 알림이 몰려오면(어댑터 하나가 올라올 때도 여러 번) 마지막 알림 뒤 1.5초에 한 번만 읽는다.</summary>
+        /// <summary>어댑터 목록 자동 갱신 예약: 알림이 몰려오면(어댑터 하나가 올라올 때도 여러 번) 마지막 알림 뒤 0.5초에 한 번만 읽는다.</summary>
         private void ArmAdapterRefresh()
         {
             Interlocked.Exchange(ref listQueued, 0);

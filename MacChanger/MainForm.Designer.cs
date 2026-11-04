@@ -239,7 +239,7 @@
             graphTimer.Tick += new System.EventHandler(graphTimer_Tick);
             secondTimer.Interval = 1000;
             secondTimer.Tick += new System.EventHandler(secondTimer_Tick);
-            adapterTimer.Interval = 1500;
+            adapterTimer.Interval = 500;
             adapterTimer.Tick += new System.EventHandler(adapterTimer_Tick);
             worker.WorkerReportsProgress = true;
             worker.DoWork += new System.ComponentModel.DoWorkEventHandler(worker_DoWork);
