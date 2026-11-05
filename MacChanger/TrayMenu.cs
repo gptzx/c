@@ -91,10 +91,12 @@ namespace MacChanger
             Size size = MeasurePanel();
             Point at = PlacePanel(anchor, size, Screen.FromPoint(anchor).WorkingArea);
             int margin = S(ShadowMargin);
-            panel = new Rectangle(margin, margin, size.Width, size.Height);
+            panel = new Rectangle(new Point(margin, margin), size);
             hover = -1;
             foreground = false;
-            Bounds = new Rectangle(at.X - margin, at.Y - margin, size.Width + 2 * margin, size.Height + 2 * margin);
+            Rectangle bounds = new Rectangle(at, size);
+            bounds.Inflate(margin, margin);   // 창 = 판 + 사방 그림자 여백
+            Bounds = bounds;
             Render();
             Show();
             Activate();   // = SetForegroundWindow(Handle): 트레이 아이콘을 누른 직후에는 포그라운드를 가져올 수 있다 (TrackPopupMenu 와 같은 규칙)
@@ -105,18 +107,20 @@ namespace MacChanger
         /// <summary>판의 왼쪽 위 좌표: 커서에서 오른쪽·아래로 펼치되 작업 영역을 넘으면 왼쪽·위로 뒤집고, 그래도 넘으면 안쪽으로 민다.</summary>
         private static Point PlacePanel(Point anchor, Size size, Rectangle work)
         {
-            int x = anchor.X + size.Width <= work.Right ? anchor.X : anchor.X - size.Width;
-            int y = anchor.Y + size.Height <= work.Bottom ? anchor.Y : anchor.Y - size.Height;
-            x = Math.Max(work.Left, Math.Min(x, work.Right - size.Width));
-            y = Math.Max(work.Top, Math.Min(y, work.Bottom - size.Height));
-            return new Point(x, y);
+            return new Point(Place(anchor.X, size.Width, work.Left, work.Right), Place(anchor.Y, size.Height, work.Top, work.Bottom));
+        }
+
+        /// <summary>PlacePanel 의 한 축(가로 또는 세로): at 에서 length 만큼 뒤쪽으로 펼치되 end 를 넘으면 앞쪽으로 뒤집고, 그래도 넘으면 start..end 안으로 민다.</summary>
+        private static int Place(int at, int length, int start, int end)
+        {
+            return Math.Max(start, Math.Min(at + length <= end ? at : at - length, end - length));
         }
 
         private Size MeasurePanel()
         {
             int width = S(MinPanelWidth);
-            foreach (string label in labels)
-                width = Math.Max(width, TextRenderer.MeasureText(label, Font, Size.Empty, TextFlags).Width + 2 * S(PadX));
+            for (int i = 0; i < labels.Count; i++)
+                width = Math.Max(width, TextRenderer.MeasureText(labels[i], Font, Size.Empty, TextFlags).Width + 2 * S(PadX));
             return new Size(width, labels.Count * S(ItemHeight) + 2 * S(PadY));
         }
 
@@ -147,6 +151,7 @@ namespace MacChanger
         private Bitmap RenderBitmap()
         {
             int w = Width, h = Height, radius = S(CornerRadius);
+            int pw = panel.Width, ph = panel.Height;   // 판(face 비트맵) 크기
             Rectangle box = panel;
             box.Inflate(-S(ShadowInset), -S(ShadowInset));
             box.Offset(0, S(ShadowOffsetY));
@@ -155,25 +160,25 @@ namespace MacChanger
             Bitmap bmp = new Bitmap(w, h, PixelFormat.Format32bppPArgb);
             using (Bitmap face = DrawFace())
             {
-                BitmapData src = face.LockBits(new Rectangle(0, 0, panel.Width, panel.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppRgb);
+                BitmapData src = face.LockBits(new Rectangle(0, 0, pw, ph), ImageLockMode.ReadOnly, PixelFormat.Format32bppRgb);
                 BitmapData dst = bmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb);
                 try
                 {
-                    int[] faceRow = new int[panel.Width], row = new int[w];
+                    int[] faceRow = new int[pw], row = new int[w];
                     for (int y = 0; y < h; y++)
                     {
                         int fy = y - panel.Y;
-                        if (fy >= 0 && fy < panel.Height) Marshal.Copy(IntPtr.Add(src.Scan0, fy * src.Stride), faceRow, 0, panel.Width);
+                        if (fy >= 0 && fy < ph) Marshal.Copy(IntPtr.Add(src.Scan0, fy * src.Stride), faceRow, 0, pw);
                         for (int x = 0; x < w; x++)
                         {
                             int fx = x - panel.X;
                             float a = ShadowAlpha * across[x] * down[y], r = 0, g = 0, b = 0;   // 미리 곱한 값 0..255: 검은 그림자부터
-                            float outer = Coverage(fx, fy, panel.Width, panel.Height, radius);
+                            float outer = Coverage(fx, fy, pw, ph, radius);
                             if (outer > 0)
                             {
                                 a += outer * (255 - a);
                                 r += outer * (BorderGray - r); g += outer * (BorderGray - g); b += outer * (BorderGray - b);
-                                float inner = Coverage(fx - 1, fy - 1, panel.Width - 2, panel.Height - 2, radius - 1);
+                                float inner = Coverage(fx - 1, fy - 1, pw - 2, ph - 2, radius - 1);
                                 if (inner > 0)
                                 {
                                     int f = faceRow[fx];
@@ -198,22 +203,23 @@ namespace MacChanger
         /// <summary>판 크기의 불투명 비트맵: 바탕과 강조(둥근 사각형)는 픽셀로 직접 쓰고, 항목 글자는 화면과 같은 방식(화면 호환 버퍼 + GDI)으로 그린다.</summary>
         private Bitmap DrawFace()
         {
-            Bitmap face = new Bitmap(panel.Width, panel.Height, PixelFormat.Format32bppRgb);
+            int w = panel.Width, h = panel.Height;
+            Bitmap face = new Bitmap(w, h, PixelFormat.Format32bppRgb);
             Rectangle mark = hover >= 0 ? ItemRect(hover) : Rectangle.Empty;
             mark.Inflate(-S(4), -S(1));
-            BitmapData data = face.LockBits(new Rectangle(0, 0, panel.Width, panel.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppRgb);
+            BitmapData data = face.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppRgb);
             try
             {
-                int[] row = new int[panel.Width];
-                for (int y = 0; y < panel.Height; y++)
+                int[] row = new int[w];
+                for (int y = 0; y < h; y++)
                 {
-                    for (int x = 0; x < panel.Width; x++)
+                    for (int x = 0; x < w; x++)
                     {
-                        float c = hover >= 0 ? Coverage(x - mark.X, y - mark.Y, mark.Width, mark.Height, S(CornerRadius)) : 0f;
+                        float c = Coverage(x - mark.X, y - mark.Y, mark.Width, mark.Height, S(CornerRadius));   // 강조가 없으면 mark 는 너비·높이가 음수인 빈 사각형이라 늘 0
                         int v = (int)(PanelGray + c * (HoverGray - PanelGray) + 0.5f);
                         row[x] = (v << 16) | (v << 8) | v;
                     }
-                    Marshal.Copy(row, 0, IntPtr.Add(data.Scan0, y * data.Stride), panel.Width);
+                    Marshal.Copy(row, 0, IntPtr.Add(data.Scan0, y * data.Stride), w);
                 }
             }
             finally
@@ -222,7 +228,7 @@ namespace MacChanger
             }
             // 글자는 예전 메뉴(ContextMenuStrip)와 똑같이 화면 호환 버퍼(DDB)에 GDI 로 그린다 — 메모리 DIB 에 그리면 GDI 가 글자를 매끄럽게(ClearType) 그리지 않는다.
             using (Graphics screen = Graphics.FromHwnd(IntPtr.Zero))
-            using (BufferedGraphics buffer = BufferedGraphicsManager.Current.Allocate(screen, new Rectangle(0, 0, panel.Width, panel.Height)))
+            using (BufferedGraphics buffer = BufferedGraphicsManager.Current.Allocate(screen, new Rectangle(0, 0, w, h)))
             {
                 buffer.Graphics.DrawImageUnscaled(face, 0, 0);   // 바탕·강조를 버퍼에 복사한 뒤 그 위에 글자
                 for (int i = 0; i < labels.Count; i++)
@@ -288,7 +294,7 @@ namespace MacChanger
                     previous = NativeMethods.SelectObject(memory, hBitmap);
                     NativeMethods.POINT at = new NativeMethods.POINT(Left, Top);
                     NativeMethods.POINT origin = new NativeMethods.POINT(0, 0);
-                    NativeMethods.SIZE size = new NativeMethods.SIZE(bmp.Width, bmp.Height);
+                    NativeMethods.SIZE size = new NativeMethods.SIZE(Width, Height);   // 창 크기 = RenderBitmap 이 만든 비트맵 크기
                     NativeMethods.BLENDFUNCTION blend = new NativeMethods.BLENDFUNCTION();
                     blend.SourceConstantAlpha = 255;
                     blend.AlphaFormat = NativeMethods.AC_SRC_ALPHA;

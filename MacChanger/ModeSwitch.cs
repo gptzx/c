@@ -11,7 +11,9 @@ namespace MacChanger
     /// </summary>
     internal sealed class ModeSwitch : Control
     {
-        public event EventHandler CheckedChanged;
+        /// <summary>Checked 가 바뀐 뒤에 알린다. 이벤트 대신 델리게이트 필드로 둔다 — += 로 구독하는 방법은 같고(디자이너 코드가 UI 스레드에서 한 번),
+        /// 접근자 메서드가 없는 만큼 실행 파일이 작다 (다른 스레드에서 구독·해제하게 되면 event 로 되돌린다)</summary>
+        public EventHandler CheckedChanged;
         private bool isChecked;
         /// <summary>Space/Enter 를 누르고 있는 상태 — 뗄 때 한 번만 토글한다 (누르고 있어도 반복되지 않고, 다른 창에서 넘어온 KeyUp 은 무시)</summary>
         private bool keyHeld;
@@ -63,8 +65,8 @@ namespace MacChanger
         protected override void OnClick(EventArgs e)
         {
             base.OnClick(e);
-            MouseEventArgs mouse = e as MouseEventArgs;   // 마우스 클릭은 왼쪽 버튼만 (다른 버튼·체크박스와 같게)
-            if (mouse == null || mouse.Button == MouseButtons.Left) Checked = !Checked;
+            // 마우스 클릭은 왼쪽 버튼만 (다른 버튼·체크박스와 같게)
+            if (!(e is MouseEventArgs) || ((MouseEventArgs)e).Button == MouseButtons.Left) Checked = !Checked;
         }
 
         protected override void OnGotFocus(EventArgs e)

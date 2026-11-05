@@ -12,21 +12,14 @@ namespace MacChanger.Core
     /// </summary>
     public static class DhcpRelease
     {
-        /// <summary>반환 시도. 성공하면 true. 실패하면 false 와 이유(IPv4 어댑터 목록에서 못 찾음, API 오류 등).</summary>
+        /// <summary>
+        /// 반환 시도: GetInterfaceInfo 목록에서 GUID 가 맞는 항목을 찾아(목록 버퍼는 놓고 그 사본으로) IpReleaseAddress 를 호출한다.
+        /// 성공하면 true. 실패하면 false 와 이유(IPv4 어댑터 목록에서 못 찾음, API 오류 등).
+        /// </summary>
         public static bool Release(string interfaceGuid, out string error)
         {
-            NativeMethods.IP_ADAPTER_INDEX_MAP map;
-            if (!TryFindAdapter(interfaceGuid, out map, out error)) return false;
-            int rc = NativeMethods.IpReleaseAddress(ref map);
-            if (rc == 0) return true;
-            error = ApiError("IpReleaseAddress", rc);
-            return false;
-        }
-
-        /// <summary>GetInterfaceInfo 목록에서 GUID 가 맞는 항목을 찾는다.</summary>
-        private static bool TryFindAdapter(string interfaceGuid, out NativeMethods.IP_ADAPTER_INDEX_MAP map, out string error)
-        {
-            map = new NativeMethods.IP_ADAPTER_INDEX_MAP();
+            NativeMethods.IP_ADAPTER_INDEX_MAP map = new NativeMethods.IP_ADAPTER_INDEX_MAP();
+            bool found = false;
             error = null;
             uint size = 0;
             int rc = NativeMethods.GetInterfaceInfo(IntPtr.Zero, ref size);
@@ -51,23 +44,26 @@ namespace MacChanger.Core
                 }
                 int count = Marshal.ReadInt32(buffer);   // LONG NumAdapters, 바로 뒤에 항목 배열 (260바이트씩, 패딩 없음)
                 int entrySize = Marshal.SizeOf(typeof(NativeMethods.IP_ADAPTER_INDEX_MAP));
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < count && !found; i++)
                 {
                     IntPtr entryPtr = IntPtr.Add(buffer, 4 + i * entrySize);
-                    NativeMethods.IP_ADAPTER_INDEX_MAP entry = (NativeMethods.IP_ADAPTER_INDEX_MAP)Marshal.PtrToStructure(entryPtr, typeof(NativeMethods.IP_ADAPTER_INDEX_MAP));
-                    if (NameMatchesGuid(entry.Name, interfaceGuid))
-                    {
-                        map = entry;
-                        return true;
-                    }
+                    map = (NativeMethods.IP_ADAPTER_INDEX_MAP)Marshal.PtrToStructure(entryPtr, typeof(NativeMethods.IP_ADAPTER_INDEX_MAP));
+                    found = NameMatchesGuid(map.Name, interfaceGuid);
                 }
-                error = "IPv4 어댑터 목록에서 어댑터(" + interfaceGuid + ")를 찾지 못했습니다 (어댑터가 꺼져 있거나 IPv4 가 없음).";
-                return false;
             }
             finally
             {
                 Marshal.FreeHGlobal(buffer);
             }
+            if (!found)
+            {
+                error = "IPv4 어댑터 목록에서 어댑터(" + interfaceGuid + ")를 찾지 못했습니다 (어댑터가 꺼져 있거나 IPv4 가 없음).";
+                return false;
+            }
+            rc = NativeMethods.IpReleaseAddress(ref map);
+            if (rc == 0) return true;
+            error = ApiError("IpReleaseAddress", rc);
+            return false;
         }
 
         private static string ApiError(string api, int rc)

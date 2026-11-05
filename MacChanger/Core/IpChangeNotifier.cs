@@ -6,14 +6,15 @@ namespace MacChanger.Core
     /// <summary>
     /// IP 구성 변화를 Windows 가 알려 주는 대로 받는다 (주기 폴링 대신). iphlpapi 의 NotifyIpInterfaceChange(인터페이스 상태: 링크 연결/끊김, 어댑터 추가/제거),
     /// NotifyUnicastIpAddressChange(IPv4 주소 추가/삭제/상태 변화), NotifyRouteChange2(기본 게이트웨이 등 경로 변화)에 콜백을 등록한다 — Vista 이상, CPU 소모 없음.
-    /// 콜백은 시스템 스레드에서 오므로 Changed 이벤트의 구독자가 UI 스레드로 넘겨야 한다. 등록에 실패하면(XP 등) Available 이 false 이고 호출자가 폴링으로 대신한다.
+    /// 콜백은 시스템 스레드에서 오므로 Changed 의 구독자가 UI 스레드로 넘겨야 한다. 등록에 실패하면(XP 등) Available 이 false 이고 호출자가 폴링으로 대신한다.
     /// </summary>
     public sealed class IpChangeNotifier : IDisposable
     {
+        // 아래 두 알림은 event 대신 대리자 필드다 (구독은 똑같이 += 로 한다) — 구독자는 창 하나가 UI 스레드에서 한 번 붙일 뿐이라 event 접근자가 필요 없다.
         /// <summary>IPv4 구성에 변화가 있었다 (어느 인터페이스인지는 구분하지 않는다 — 구독자가 선택한 어댑터를 다시 읽는다). 시스템 스레드에서 발생.</summary>
-        public event EventHandler Changed;
+        public EventHandler Changed;
         /// <summary>IPv4 인터페이스가 생기거나 없어졌다 (어댑터를 꽂거나 뺌, 사용/사용 안 함, 드라이버 설치/제거, 그리고 이 프로그램의 어댑터 재시작) — 어댑터 목록을 다시 읽을 때. 시스템 스레드에서 발생.</summary>
-        public event EventHandler InterfacesChanged;
+        public EventHandler InterfacesChanged;
 
         private IntPtr interfaceHandle, addressHandle, routeHandle;
         // 델리게이트를 필드에 붙들어 두어야 GC 가 콜백을 거두지 않는다 (네이티브 쪽이 포인터를 계속 쓴다). 세 등록이 같은 콜백을 쓴다.
@@ -21,9 +22,9 @@ namespace MacChanger.Core
         private bool disposed;
 
         /// <summary>인터페이스 알림과 주소 알림 가운데 하나라도 등록되었는지 (경로 알림만으로는 IP 할당을 알 수 없으므로 세지 않는다). false 면 이 OS 에서는 쓸 수 없다(폴링으로 대신).</summary>
-        public bool Available { get; private set; }
+        public readonly bool Available;
         /// <summary>등록 실패 사유 (모두 성공했으면 null)</summary>
-        public string Error { get; private set; }
+        public readonly string Error;
 
         public IpChangeNotifier()
         {

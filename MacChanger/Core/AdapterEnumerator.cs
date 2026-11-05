@@ -38,15 +38,16 @@ namespace MacChanger.Core
         /// <summary>물리 유선 → 물리 무선 → 블루투스 → 기타 순, 가상 어댑터는 뒤로.</summary>
         private static List<NetworkAdapterInfo> Sort(List<NetworkAdapterInfo> list)
         {
-            list.Sort(delegate(NetworkAdapterInfo a, NetworkAdapterInfo b)
-            {
-                int c = a.IsVirtual.CompareTo(b.IsVirtual);
-                if (c != 0) return c;
-                c = ((int)a.Kind).CompareTo((int)b.Kind);
-                if (c != 0) return c;
-                return string.Compare(a.Description, b.Description, StringComparison.CurrentCultureIgnoreCase);
-            });
+            list.Sort(CompareAdapters);
             return list;
+        }
+
+        /// <summary>정렬은 결과의 부호만 본다 (음수 = a 가 앞).</summary>
+        private static int CompareAdapters(NetworkAdapterInfo a, NetworkAdapterInfo b)
+        {
+            if (a.IsVirtual != b.IsVirtual) return a.IsVirtual ? 1 : -1;
+            if (a.Kind != b.Kind) return a.Kind - b.Kind;
+            return string.Compare(a.Description, b.Description, StringComparison.CurrentCultureIgnoreCase);
         }
 
         // ------------------------------------------------------------------
@@ -66,20 +67,18 @@ namespace MacChanger.Core
             return string.IsNullOrEmpty(s) ? null : s;
         }
 
+        /// <summary>CIM boolean 속성 (Hidden, Virtual, PhysicalAdapter — WMI 가 System.Boolean 으로 돌려준다). 없으면 false.</summary>
         private static bool PropBool(ManagementBaseObject mo, string name)
         {
             object o = Prop(mo, name);
-            if (o == null) return false;
-            try { return Convert.ToBoolean(o, CultureInfo.InvariantCulture); }
-            catch { return false; }
+            return o is bool && (bool)o;
         }
 
+        /// <summary>CIM uint16/uint32 속성 (WMI 가 UInt16/UInt32 로 돌려주므로 Int64 로 바꿀 때 실패하지 않는다). 없으면 -1.</summary>
         private static long PropLong(ManagementBaseObject mo, string name)
         {
             object o = Prop(mo, name);
-            if (o == null) return -1;
-            try { return Convert.ToInt64(o, CultureInfo.InvariantCulture); }
-            catch { return -1; }
+            return o == null ? -1 : Convert.ToInt64(o, CultureInfo.InvariantCulture);
         }
 
         internal static ManagementObjectSearcher CreateSearcher(string scopePath, string query)
@@ -156,12 +155,8 @@ namespace MacChanger.Core
 
             // Win32_NetworkAdapter.AdapterTypeID는 NDIS_MEDIUM 값이라 Wi-Fi도 0("Ethernet 802.3")으로 보고된다.
             // 활성 상태인 어댑터는 GetAdaptersAddresses의 IfType(IEEE 802.11)이 가장 믿을 만한 무선 판별 근거이므로 먼저 모아 둔다.
-            Dictionary<string, AdapterKind> liveKinds = new Dictionary<string, AdapterKind>(StringComparer.OrdinalIgnoreCase);
-            try
-            {
-                foreach (NetworkAdapterInfo g in EnumerateGetAdaptersAddresses())
-                    liveKinds[g.InterfaceGuid] = g.Kind;
-            }
+            List<NetworkAdapterInfo> live = null;
+            try { live = EnumerateGetAdaptersAddresses(); }
             catch (Exception) { }
 
             using (ManagementObjectSearcher searcher = CreateSearcher(@"root\cimv2", "SELECT * FROM Win32_NetworkAdapter WHERE GUID IS NOT NULL"))
@@ -178,9 +173,8 @@ namespace MacChanger.Core
                         string mac = MacAddressUtil.Normalize(PropString(mo, "MACAddress"));
                         string connectionName = PropString(mo, "NetConnectionID");
                         // 비활성화된 물리 어댑터는 MACAddress가 null이므로 PhysicalAdapter로도 포함시킨다.
-                        if (!physical && mac == null) continue;
                         // 숨겨진 의사 어댑터(RAS Async Adapter, WAN Miniport 등)는 네트워크 연결 이름이 없다.
-                        if (!physical && connectionName == null) continue;
+                        if (!physical && (mac == null || connectionName == null)) continue;
 
                         NetworkAdapterInfo info = new NetworkAdapterInfo();
                         info.InterfaceGuid = guid;
@@ -191,17 +185,20 @@ namespace MacChanger.Core
 
                         // AdapterTypeID: 0 = Ethernet 802.3, 9 = Wireless WAN (어댑터가 비활성화 상태이면 null)
                         long adapterTypeId = PropLong(mo, "AdapterTypeID");
-                        AdapterKind liveKind;
-                        bool hasLiveKind = liveKinds.TryGetValue(guid, out liveKind);
+                        // 활성 목록에서 GUID 가 같은 어댑터의 종류 (같은 GUID 가 여럿이면 마지막 것). 활성 상태가 아니면 Other — 아래 비교는 모두 거짓이 된다.
+                        AdapterKind liveKind = AdapterKind.Other;
+                        if (live != null)
+                            for (int i = 0; i < live.Count; i++)
+                                if (string.Equals(live[i].InterfaceGuid, guid, StringComparison.OrdinalIgnoreCase)) liveKind = live[i].Kind;
 
                         if (NetworkAdapterInfo.LooksBluetooth(info.Description) || NetworkAdapterInfo.LooksBluetooth(connectionName)
-                            || (hasLiveKind && liveKind == AdapterKind.Bluetooth))
+                            || liveKind == AdapterKind.Bluetooth)
                             info.Kind = AdapterKind.Bluetooth;
-                        else if ((hasLiveKind && liveKind == AdapterKind.Wireless) || adapterTypeId == 9
+                        else if (liveKind == AdapterKind.Wireless || adapterTypeId == 9
                             || NetworkAdapterInfo.LooksWireless(info.Description) || NetworkAdapterInfo.LooksWireless(connectionName)
                             || NetworkAdapterInfo.LooksWireless(PropString(mo, "AdapterType")))
                             info.Kind = AdapterKind.Wireless;
-                        else if (adapterTypeId == 0 || physical || (hasLiveKind && liveKind == AdapterKind.Wired))
+                        else if (adapterTypeId == 0 || physical || liveKind == AdapterKind.Wired)
                             info.Kind = AdapterKind.Wired;
                         else
                             info.Kind = AdapterKind.Other;
@@ -232,12 +229,13 @@ namespace MacChanger.Core
                 info.Description = ni.Description;
                 info.ConnectionName = ni.Name;
                 info.CurrentMac = mac;
-                if (ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
+                NetworkInterfaceType type = ni.NetworkInterfaceType;
+                if (type == NetworkInterfaceType.Wireless80211)
                     info.Kind = AdapterKind.Wireless;
                 else if (NetworkAdapterInfo.LooksBluetooth(ni.Description) || NetworkAdapterInfo.LooksBluetooth(ni.Name))
                     info.Kind = AdapterKind.Bluetooth;
-                else if (ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet || ni.NetworkInterfaceType == NetworkInterfaceType.FastEthernetT
-                      || ni.NetworkInterfaceType == NetworkInterfaceType.FastEthernetFx || ni.NetworkInterfaceType == NetworkInterfaceType.GigabitEthernet)
+                else if (type == NetworkInterfaceType.Ethernet || type == NetworkInterfaceType.FastEthernetT
+                      || type == NetworkInterfaceType.FastEthernetFx || type == NetworkInterfaceType.GigabitEthernet)
                     info.Kind = NetworkAdapterInfo.LooksWireless(ni.Description) ? AdapterKind.Wireless : AdapterKind.Wired;
                 else
                     info.Kind = AdapterKind.Other;
@@ -259,12 +257,18 @@ namespace MacChanger.Core
         {
             try
             {
-                foreach (NetworkAdapterInfo a in EnumerateMsftNetAdapter())
-                    if (string.Equals(a.InterfaceGuid, interfaceGuid, StringComparison.OrdinalIgnoreCase) && a.CurrentMac != null) return a.CurrentMac;
+                string mac = FindMac(EnumerateMsftNetAdapter(), interfaceGuid);
+                if (mac != null) return mac;
             }
             catch (Exception) { }
-            foreach (NetworkAdapterInfo a in EnumerateWin32NetworkAdapter())
-                if (string.Equals(a.InterfaceGuid, interfaceGuid, StringComparison.OrdinalIgnoreCase) && a.CurrentMac != null) return a.CurrentMac;
+            return FindMac(EnumerateWin32NetworkAdapter(), interfaceGuid);
+        }
+
+        /// <summary>목록에서 GUID 가 같은 어댑터의 MAC (없거나 MAC 을 모르면 null)</summary>
+        private static string FindMac(List<NetworkAdapterInfo> list, string interfaceGuid)
+        {
+            for (int i = 0; i < list.Count; i++)
+                if (string.Equals(list[i].InterfaceGuid, interfaceGuid, StringComparison.OrdinalIgnoreCase) && list[i].CurrentMac != null) return list[i].CurrentMac;
             return null;
         }
     }

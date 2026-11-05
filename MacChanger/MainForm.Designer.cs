@@ -6,10 +6,7 @@
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing && (components != null))
-            {
-                components.Dispose();
-            }
+            if (disposing) components.Dispose();   // components 는 InitializeComponent 의 첫 줄에서 만들어지므로 null 이 아니다
             base.Dispose(disposing);
         }
 
@@ -114,51 +111,42 @@
             btnRandom.Click += new System.EventHandler(btnRandom_Click);
             btnApply.Font = bold;
             btnApply.Click += new System.EventHandler(btnApply_Click);
-            btnRenewIp.Click += new System.EventHandler(btnRenewIp_Click);
+            btnRenewIp.Click += new System.EventHandler(btnIp_Click);
             btnRestore.Click += new System.EventHandler(btnRestore_Click);
             btnClearLog.Click += new System.EventHandler(btnClearLog_Click);
             chkAuto.CheckedChanged += new System.EventHandler(chkAuto_CheckedChanged);
-            lblModeIp.Click += new System.EventHandler(lblMode_Click);
+            System.EventHandler labelClick = new System.EventHandler(lblMode_Click);   // 스위치 양쪽 글자는 처리기 하나를 함께 쓴다
+            lblModeIp.Click += labelClick;
             modeSwitch.CheckedChanged += new System.EventHandler(modeSwitch_CheckedChanged);
-            lblModeTimer.Click += new System.EventHandler(lblMode_Click);
+            lblModeTimer.Click += labelClick;
             btnAutoToggle.Click += new System.EventHandler(btnAutoToggle_Click);
-            // NumericUpDown: BeginInit/EndInit 를 쓰지 않으므로 Maximum → Minimum → Value 순서를 지켜야 한다 (Value 는 그때의 범위 안이어야 함)
-            nudAutoDelay.Maximum = 604800M;
-            nudAutoDelay.Value = 10M;
-            nudWaitTimeout.Maximum = 60M;
-            nudWaitTimeout.Minimum = 10M;
-            nudWaitTimeout.Value = 30M;
-            nudInterval.Maximum = 604800M;
-            nudInterval.Minimum = 10M;
-            nudInterval.Value = 30M;
-            nudLimitTime.Maximum = 31536000M;
-            nudLimitTime.Minimum = 60M;
-            nudLimitTime.Value = 3600M;
-            nudLimitCount.Maximum = 10000000M;
-            nudLimitCount.Minimum = 1M;
-            nudLimitCount.Value = 100M;
-            foreach (System.Windows.Forms.NumericUpDown nud in new System.Windows.Forms.NumericUpDown[] { nudAutoDelay, nudWaitTimeout, nudInterval, nudLimitTime, nudLimitCount })
-                nud.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+            SetNumber(nudAutoDelay, 604800, 0, 10);   // 숫자 칸: 최대, 최소, 처음 값 (최소 0 은 원래 기본값이라 다시 넣어도 바뀌는 것이 없다)
+            SetNumber(nudWaitTimeout, 60, 10, 30);
+            SetNumber(nudInterval, 604800, 10, 30);
+            SetNumber(nudLimitTime, 31536000, 60, 3600);
+            SetNumber(nudLimitCount, 10000000, 1, 100);
             chkAutoStopIp.CheckedChanged += new System.EventHandler(chkAutoStopIp_CheckedChanged);
             txtAutoStopIp.Font = mono;
             txtAutoStopIp.MaxLength = 15;
             chkAutoLimit.CheckedChanged += new System.EventHandler(chkAutoLimit_CheckedChanged);
-            lblLimitTime.Click += new System.EventHandler(lblLimit_Click);
+            labelClick = new System.EventHandler(lblLimit_Click);   // 제한 스위치의 양쪽 글자도 마찬가지
+            lblLimitTime.Click += labelClick;
             limitSwitch.CheckedChanged += new System.EventHandler(limitSwitch_CheckedChanged);
-            lblLimitCount.Click += new System.EventHandler(lblLimit_Click);
-            btnReleaseIp.Click += new System.EventHandler(btnReleaseIp_Click);
+            lblLimitCount.Click += labelClick;
+            btnReleaseIp.Click += new System.EventHandler(btnIp_Click);
             chkLogBox.CheckedChanged += new System.EventHandler(chkLogBox_CheckedChanged);
             chkIpLog.CheckedChanged += new System.EventHandler(chkIpLog_CheckedChanged);
             btnBackground.Click += new System.EventHandler(btnBackground_Click);
             lblStatus.AutoEllipsis = true;
             lblStatus.Font = bold;
-            txtIpLog.BackColor = System.Drawing.SystemColors.Window;
-            txtIpLog.Font = new System.Drawing.Font("Consolas", 9F);
-            txtIpLog.Multiline = true;
-            txtIpLog.ReadOnly = true;
-            txtIpLog.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-            txtIpLog.TabStop = false;
-            txtIpLog.WordWrap = false;
+            System.Windows.Forms.TextBox logBox = txtIpLog;
+            logBox.BackColor = System.Drawing.SystemColors.Window;
+            logBox.Font = new System.Drawing.Font("Consolas", 9F);
+            logBox.Multiline = true;
+            logBox.ReadOnly = true;
+            logBox.ScrollBars = System.Windows.Forms.ScrollBars.Both;
+            logBox.TabStop = false;
+            logBox.WordWrap = false;
             //
             // 배치 (탭 순서대로; x, y, 너비, 높이 — 너비 0 이면 AutoSize)
             //
@@ -323,6 +311,15 @@
             Shown += new System.EventHandler(MainForm_Shown);
             ResumeLayout(false);
             PerformLayout();
+        }
+
+        /// <summary>숫자 칸의 범위와 처음 값을 정하고 오른쪽 정렬한다. BeginInit/EndInit 를 쓰지 않으므로 Maximum → Minimum → Value 순서를 지켜야 한다 (Value 는 그때의 범위 안이어야 함)</summary>
+        private static void SetNumber(System.Windows.Forms.NumericUpDown nud, int maximum, int minimum, int value)
+        {
+            nud.Maximum = new decimal(maximum);
+            nud.Minimum = new decimal(minimum);
+            nud.Value = new decimal(value);
+            nud.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
         }
 
         private System.Windows.Forms.Label lblAdapter;

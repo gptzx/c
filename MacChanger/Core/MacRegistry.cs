@@ -14,11 +14,7 @@ namespace MacChanger.Core
     public static class MacRegistry
     {
         public const string NetClassGuid = "{4D36E972-E325-11CE-BFC1-08002BE10318}";
-        public const string NetClassKeyPath = @"SYSTEM\CurrentControlSet\Control\Class\" + NetClassGuid;
         public const string TcpipParametersKeyPath = @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters";
-        public const string TcpipInterfacesKeyPath = TcpipParametersKeyPath + @"\Interfaces";
-        /// <summary>EnableDHCP=1 인 어댑터를 정리할 때 Tcpip\Parameters(전역)에서 함께 삭제하는 값</summary>
-        public static readonly string[] GlobalDhcpValueNames = new string[] { "DhcpDomain", "DhcpNameServer" };
         public const string WlanSvcInterfacesKeyPath = @"SOFTWARE\Microsoft\WlanSvc\Interfaces";
 
         public const string NetCfgInstanceIdValueName = "NetCfgInstanceId";
@@ -27,9 +23,29 @@ namespace MacChanger.Core
         public const string NameServerValueName = "NameServer";
         public const string RandomMacStateValueName = "RandomMacState";
 
-        private static RegistryKey OpenHklm64()
+        /// <summary>
+        /// HKLM(64비트 뷰) 아래 하위 키를 연다 (없으면 null). HKLM 기본 키는 바로 닫는다 — 미리 정의된 키라 Dispose 해도 핸들을 닫지 않으며,
+        /// 열어 둔 하위 키는 그대로 유효하다.
+        /// </summary>
+        private static RegistryKey OpenHklm64(string subKeyPath, bool writable)
         {
-            return RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            using (RegistryKey hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                return hklm.OpenSubKey(subKeyPath, writable);
+        }
+
+        /// <summary>HKLM\SYSTEM\CurrentControlSet\Control\Class 아래 relativePath("{4D36E972-...}" 또는 "{4D36E972-...}\0001")의 키 경로</summary>
+        private static string ClassKeyPath(string relativePath)
+        {
+            return @"SYSTEM\CurrentControlSet\Control\Class\" + relativePath;
+        }
+
+        /// <summary>
+        /// Tcpip\Parameters\Interfaces\{GUID} 키 경로. string.Concat 으로 실행 중에 잇는다 —
+        /// + 로 이으면 컴파일러가 앞의 두 상수를 미리 합쳐 같은 경로가 문자열로 한 번 더 실린다.
+        /// </summary>
+        private static string InterfaceKeyPath(string interfaceGuid)
+        {
+            return string.Concat(TcpipParametersKeyPath, @"\Interfaces\", interfaceGuid);
         }
 
         /// <summary>
@@ -63,8 +79,7 @@ namespace MacChanger.Core
         public static string ReadNetCfgInstanceId(string driverKeyRelativePath)
         {
             if (string.IsNullOrEmpty(driverKeyRelativePath)) return null;
-            using (RegistryKey hklm = OpenHklm64())
-            using (RegistryKey key = hklm.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\" + driverKeyRelativePath, false))
+            using (RegistryKey key = OpenHklm64(ClassKeyPath(driverKeyRelativePath), false))
             {
                 if (key == null) return null;
                 return NetworkAdapterInfo.NormalizeGuid(key.GetValue(NetCfgInstanceIdValueName) as string);
@@ -75,11 +90,11 @@ namespace MacChanger.Core
         {
             if (string.IsNullOrEmpty(interfaceGuid)) throw new ArgumentNullException("interfaceGuid");
 
-            using (RegistryKey hklm = OpenHklm64())
-            using (RegistryKey classKey = hklm.OpenSubKey(NetClassKeyPath, false))
+            string classKeyPath = ClassKeyPath(NetClassGuid);   // 아래 오류 메시지에도 쓴다
+            using (RegistryKey classKey = OpenHklm64(classKeyPath, false))
             {
                 if (classKey == null)
-                    throw new InvalidOperationException("네트워크 클래스 키를 열 수 없습니다: HKLM\\" + NetClassKeyPath);
+                    throw new InvalidOperationException("네트워크 클래스 키를 열 수 없습니다: HKLM\\" + classKeyPath);
                 string subKeyName = FindClassSubKeyName(classKey, interfaceGuid);
                 if (subKeyName == null)
                     throw new InvalidOperationException("NetCfgInstanceId가 " + interfaceGuid + "인 클래스 하위 키(00XX)를 찾지 못했습니다.");
@@ -136,8 +151,7 @@ namespace MacChanger.Core
         public static int? GetEnableDhcp(string interfaceGuid, out bool keyExists)
         {
             keyExists = false;
-            using (RegistryKey hklm = OpenHklm64())
-            using (RegistryKey key = hklm.OpenSubKey(TcpipInterfacesKeyPath + "\\" + interfaceGuid, false))
+            using (RegistryKey key = OpenHklm64(InterfaceKeyPath(interfaceGuid), false))
             {
                 if (key == null) return null;
                 keyExists = true;
@@ -154,11 +168,10 @@ namespace MacChanger.Core
         public static void DeleteGlobalDhcpValues()
         {
             List<string> failed = new List<string>();
-            using (RegistryKey hklm = OpenHklm64())
-            using (RegistryKey key = hklm.OpenSubKey(TcpipParametersKeyPath, true))
+            using (RegistryKey key = OpenHklm64(TcpipParametersKeyPath, true))
             {
                 if (key == null) throw new InvalidOperationException("Tcpip\\Parameters 키를 열 수 없습니다.");
-                foreach (string name in GlobalDhcpValueNames)
+                foreach (string name in new string[] { "DhcpDomain", "DhcpNameServer" })   // EnableDHCP=1 인 어댑터를 정리할 때 전역에서 함께 삭제하는 값
                 {
                     if (key.GetValue(name) == null) continue;
                     key.DeleteValue(name, false);
@@ -182,8 +195,7 @@ namespace MacChanger.Core
             List<string> failed = new List<string>();
             bool keepNameServer;
             leaseCachesDeleted = 0;
-            using (RegistryKey hklm = OpenHklm64())
-            using (RegistryKey key = hklm.OpenSubKey(TcpipInterfacesKeyPath + "\\" + interfaceGuid, true))
+            using (RegistryKey key = OpenHklm64(InterfaceKeyPath(interfaceGuid), true))
             {
                 if (key == null) return false;
                 keepNameServer = !resetDns && HasData(key.GetValue(NameServerValueName));
@@ -226,8 +238,7 @@ namespace MacChanger.Core
         /// </summary>
         public static int DeleteLeaseCacheSubKeys(string interfaceGuid)
         {
-            using (RegistryKey hklm = OpenHklm64())
-            using (RegistryKey key = hklm.OpenSubKey(TcpipInterfacesKeyPath + "\\" + interfaceGuid, true))
+            using (RegistryKey key = OpenHklm64(InterfaceKeyPath(interfaceGuid), true))
             {
                 return key == null ? 0 : DeleteLeaseCaches(key, null);
             }
@@ -275,28 +286,30 @@ namespace MacChanger.Core
         /// </summary>
         public static bool? GetWlanRandomMacState(string interfaceGuid)
         {
-            bool? interfaceState = null;
-            using (RegistryKey hklm = OpenHklm64())
-            using (RegistryKey key = hklm.OpenSubKey(WlanSvcInterfacesKeyPath + "\\" + interfaceGuid, false))
+            bool known = false;   // 전역 설정 키나 프로필 폴더 가운데 하나라도 있었는지
+            bool on = false;      // 전역 설정이 켜져 있거나 어느 한 프로필에서 켜져 있는지
+            using (RegistryKey key = OpenHklm64(WlanSvcInterfacesKeyPath + "\\" + interfaceGuid, false))
             {
                 if (key != null)
-                    interfaceState = IsNonZero(key.GetValue(RandomMacStateValueName));
+                {
+                    known = true;
+                    on = IsNonZero(key.GetValue(RandomMacStateValueName));
+                }
             }
 
-            bool? profileState = null;
             try
             {
                 string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                     @"Microsoft\Wlansvc\Profiles\Interfaces\" + interfaceGuid);
                 if (Directory.Exists(dir))
                 {
-                    profileState = false;
+                    known = true;
                     foreach (string file in Directory.GetFiles(dir, "*.xml"))
                     {
                         string xml = File.ReadAllText(file);
                         if (xml.IndexOf("<enableRandomization>true</enableRandomization>", StringComparison.OrdinalIgnoreCase) >= 0)
                         {
-                            profileState = true;
+                            on = true;
                             break;
                         }
                     }
@@ -306,8 +319,8 @@ namespace MacChanger.Core
             catch (UnauthorizedAccessException) { }
             catch (SecurityException) { }
 
-            if (interfaceState == null && profileState == null) return null;
-            return (interfaceState == true) || (profileState == true);
+            if (!known) return null;
+            return on;
         }
 
         private static bool IsNonZero(object value)

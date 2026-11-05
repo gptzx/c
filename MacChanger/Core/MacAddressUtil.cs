@@ -11,14 +11,14 @@ namespace MacChanger.Core
         public static string Normalize(string input)
         {
             if (string.IsNullOrEmpty(input)) return null;
-            StringBuilder sb = new StringBuilder(12);
+            StringBuilder sb = new StringBuilder();
             foreach (char c in input.Trim())
             {
                 if (c == '-' || c == ':' || c == '.' || c == ' ' || c == '\t') continue;
                 if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) return null;
-                sb.Append(char.ToUpperInvariant(c));
+                sb.Append(c);
             }
-            return sb.Length == 12 ? sb.ToString() : null;
+            return sb.Length == 12 ? sb.ToString().ToUpperInvariant() : null;
         }
 
         /// <summary>12자리 hex를 "AA-BB-CC-DD-EE-FF" 형태로 표시한다. 정규화 불가능하면 입력을 그대로 돌려준다.</summary>
@@ -26,7 +26,7 @@ namespace MacChanger.Core
         {
             string n = Normalize(mac);
             if (n == null) return mac ?? string.Empty;
-            StringBuilder sb = new StringBuilder(17);
+            StringBuilder sb = new StringBuilder();
             for (int i = 0; i < 12; i += 2)
             {
                 if (i > 0) sb.Append('-');
@@ -39,14 +39,7 @@ namespace MacChanger.Core
         public static string FromBytes(byte[] bytes)
         {
             if (bytes == null || bytes.Length < 6) return null;
-            const string hex = "0123456789ABCDEF";
-            char[] c = new char[12];
-            for (int i = 0; i < 6; i++)
-            {
-                c[2 * i] = hex[bytes[i] >> 4];
-                c[2 * i + 1] = hex[bytes[i] & 0x0F];
-            }
-            return new string(c);
+            return BitConverter.ToString(bytes, 0, 6).Replace("-", string.Empty);   // "AA-BB-…"(대문자) 에서 구분자를 뺀다
         }
 
         /// <summary>왼쪽에서 두 번째 16진 자리(첫 옥텟의 하위 니블)</summary>

@@ -27,11 +27,7 @@ namespace MacChanger
         private static readonly Brush TableBack = new SolidBrush(Color.FromArgb(248, 248, 248));
         private static readonly Pen TableLine = new Pen(Color.FromArgb(240, 240, 240));
         private static readonly Pen TableBorder = new Pen(Color.FromArgb(100, 100, 100));
-        private static readonly Pen ReceivedLine = new Pen(Color.Red);
         private static readonly Pen SentLine = new Pen(Color.FromArgb(10, 128, 10));
-        private static readonly Color ReceivedText = Color.FromArgb(192, 0, 0);
-        private static readonly Color SentText = Color.Green;
-        private static readonly string[] Labels = { "수신", "--속도", "송신", "--속도" };
         private const TextFormatFlags TextFlags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
         /// <summary>값 칸: 폭이 모자라면(TB 단위 값 등) 끝을 "…" 으로 줄인다</summary>
         private const TextFormatFlags ValueFlags = TextFlags | TextFormatFlags.EndEllipsis;
@@ -59,26 +55,31 @@ namespace MacChanger
         /// <summary>누적량 표시만 0으로 되돌린다 (MAC 변경 완료 시 — 그래프 이력과 속도는 유지).</summary>
         public void ResetTotals()
         {
-            receivedTotal = sentTotal = 0;
+            receivedTotal = 0;
+            sentTotal = 0;
             Invalidate();
         }
 
         /// <summary>이력과 숫자를 모두 지운다 (다른 어댑터를 선택했을 때).</summary>
         public void Clear()
         {
-            head = count = 0;
-            receivedTotal = sentTotal = receivedSpeed = sentSpeed = 0;
-            Invalidate();
+            head = 0;
+            count = 0;
+            receivedSpeed = 0;
+            sentSpeed = 0;
+            ResetTotals();   // 누적량도 0으로 하고 다시 그린다
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics;
-            int w = ClientSize.Width, h = ClientSize.Height;
+            Size size = ClientSize;
+            int w = size.Width, h = size.Height;
             if (w < 4 || h < 4) return;
+            Font font = Font;
 
             // 표: 테두리(회색) 안에 구분선 5개 + 글 4줄. 표의 위 테두리가 그래프의 아래 테두리를 겸한다.
-            int rowHeight = Math.Max(Font.Height, TextRenderer.MeasureText(g, "수신", Font, Size.Empty, TextFlags).Height);
+            int rowHeight = Math.Max(font.Height, TextRenderer.MeasureText(g, "수신", font, Size.Empty, TextFlags).Height);
             int rowPitch = rowHeight + 1;
             int tableTop = Math.Max(4, h - 4 * rowPitch - 3);
             int innerWidth = w - 2;
@@ -98,18 +99,19 @@ namespace MacChanger
                 TrafficMonitor.FormatTotal(receivedTotal), TrafficMonitor.FormatSpeed(receivedSpeed),
                 TrafficMonitor.FormatTotal(sentTotal), TrafficMonitor.FormatSpeed(sentSpeed)
             };
-            int labelX = 5;
+            const int labelX = 5;
             int indent = rowHeight * 2 / 3;   // "--속도" 들여쓰기
-            int separatorX = labelX + indent + TextRenderer.MeasureText(g, Labels[1], Font, Size.Empty, TextFlags).Width + rowHeight / 2;   // 라벨 칸 | 값 칸 세로 구분선
+            int separatorX = labelX + indent + TextRenderer.MeasureText(g, "--속도", font, Size.Empty, TextFlags).Width + rowHeight / 2;   // 라벨 칸 | 값 칸 세로 구분선
             int valueX = separatorX + rowHeight / 2;
             int valueWidth = Math.Max(1, w - 1 - labelX - valueX);
             int y = tableTop + 1;
             for (int row = 0; row < 4; row++)
             {
                 g.DrawLine(TableLine, 1, y, w - 2, y);
-                Color color = row < 2 ? ReceivedText : SentText;
-                TextRenderer.DrawText(g, Labels[row], Font, new Point(labelX + (row % 2 == 1 ? indent : 0), y + 1), color, TextFlags);
-                TextRenderer.DrawText(g, values[row], Font, new Rectangle(valueX, y + 1, valueWidth, rowHeight), color, ValueFlags);
+                Color color = row < 2 ? Color.FromArgb(192, 0, 0) : Color.Green;   // 수신 줄은 빨강, 송신 줄은 초록 글자
+                bool speed = row % 2 == 1;   // 줄 순서: 수신, --속도, 송신, --속도
+                TextRenderer.DrawText(g, speed ? "--속도" : row < 2 ? "수신" : "송신", font, new Point(labelX + (speed ? indent : 0), y + 1), color, TextFlags);
+                TextRenderer.DrawText(g, values[row], font, new Rectangle(valueX, y + 1, valueWidth, rowHeight), color, ValueFlags);
                 y += rowPitch;
             }
             g.DrawLine(TableLine, 1, y, w - 2, y);
@@ -129,24 +131,19 @@ namespace MacChanger
             for (int i = 0; i < n; i++)
             {
                 int idx = (first + i) % Capacity;
-                if (received[idx] > max) max = received[idx];
-                if (sent[idx] > max) max = sent[idx];
+                max = Math.Max(max, Math.Max(received[idx], sent[idx]));
             }
             if (max == 0) return;   // 전부 0: 선이 테두리에 가려지므로 그릴 것이 없다
-            Point[] rx = new Point[n + 1];
-            Point[] tx = new Point[n + 1];
             int x0 = 1 + innerWidth - n * PixelsPerSample;   // 최신 샘플이 오른쪽 끝
-            for (int i = 0; i < n; i++)
+            for (int line = 0; line < 2; line++)   // 수신 선 먼저, 송신 선 나중 (보통 더 작은 송신 선이 가려지지 않도록)
             {
-                int idx = (first + i) % Capacity;
-                int x = x0 + i * PixelsPerSample;
-                rx[i] = new Point(x, baseline - (int)(received[idx] * graphHeight / max));
-                tx[i] = new Point(x, baseline - (int)(sent[idx] * graphHeight / max));
+                long[] values = line == 0 ? received : sent;
+                Point[] points = new Point[n + 1];
+                for (int i = 0; i < n; i++)
+                    points[i] = new Point(x0 + i * PixelsPerSample, baseline - (int)(values[(first + i) % Capacity] * graphHeight / max));
+                points[n] = new Point(innerWidth, points[n - 1].Y);   // 최신 샘플 값을 오른쪽 끝까지 이어 그린다
+                g.DrawLines(line == 0 ? Pens.Red : SentLine, points);   // 수신 선의 빨강은 Pens 가 만들어 두는 펜을 쓴다
             }
-            rx[n] = new Point(innerWidth, rx[n - 1].Y);   // 최신 샘플 값을 오른쪽 끝까지 이어 그린다
-            tx[n] = new Point(innerWidth, tx[n - 1].Y);
-            g.DrawLines(ReceivedLine, rx);
-            g.DrawLines(SentLine, tx);   // 보통 더 작은 송신 선이 가려지지 않도록 나중에 그린다
         }
     }
 }

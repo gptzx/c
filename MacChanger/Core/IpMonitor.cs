@@ -56,29 +56,32 @@ namespace MacChanger.Core
             IPInterfaceProperties props = ni.GetIPProperties();
             List<string> addresses = new List<string>();
             List<string> masks = new List<string>();
-            List<UnicastIPAddressInformation> unicast = new List<UnicastIPAddressInformation>();
-            foreach (UnicastIPAddressInformation u in props.UnicastAddresses)
-                if (u.Address.AddressFamily == AddressFamily.InterNetwork && !u.Address.Equals(IPAddress.Any) && IsUsable(u)) unicast.Add(u);   // 0.0.0.0 은 반환 뒤의 자리표시자
-            unicast.Sort(delegate(UnicastIPAddressInformation a, UnicastIPAddressInformation b)
+            UnicastIPAddressInformationCollection uc = props.UnicastAddresses;   // 인덱서로 읽는다 (foreach 와 같은 순서·같은 항목이고 실행 파일이 더 작다)
+            for (int i = 0; i < uc.Count; i++)
             {
-                return string.CompareOrdinal(a.Address.ToString(), b.Address.ToString());
-            });
-            foreach (UnicastIPAddressInformation u in unicast)
-            {
-                addresses.Add(u.Address.ToString());
-                masks.Add(u.IPv4Mask != null ? u.IPv4Mask.ToString() : "?");
+                UnicastIPAddressInformation u = uc[i];
+                if (u.Address.AddressFamily != AddressFamily.InterNetwork || u.Address.Equals(IPAddress.Any) || !IsUsable(u)) continue;   // 0.0.0.0 은 반환 뒤의 자리표시자
+                // 주소 문자열 순(서수 비교)으로 자리를 찾아 마스크와 함께 끼워 넣는다 — 한 어댑터의 주소는 서로 다르므로 정렬 결과가 하나로 정해진다
+                string address = u.Address.ToString();
+                int at = addresses.Count;
+                while (at > 0 && string.CompareOrdinal(addresses[at - 1], address) > 0) at--;
+                addresses.Insert(at, address);
+                masks.Insert(at, u.IPv4Mask != null ? u.IPv4Mask.ToString() : "?");
             }
             info.Addresses = string.Join(", ", addresses);
             info.Masks = string.Join(", ", masks);
 
+            // 게이트웨이·DNS 컬렉션은 인덱서로 읽는다 (foreach 와 같은 순서·같은 항목이고 실행 파일이 더 작다)
             List<string> gateways = new List<string>();
-            foreach (GatewayIPAddressInformation g in props.GatewayAddresses)
-                if (g.Address.AddressFamily == AddressFamily.InterNetwork) gateways.Add(g.Address.ToString());
+            GatewayIPAddressInformationCollection gc = props.GatewayAddresses;
+            for (int i = 0; i < gc.Count; i++)
+                if (gc[i].Address.AddressFamily == AddressFamily.InterNetwork) gateways.Add(gc[i].Address.ToString());
             info.Gateways = string.Join(", ", gateways);
 
             List<string> dns = new List<string>();
-            foreach (IPAddress d in props.DnsAddresses)
-                if (d.AddressFamily == AddressFamily.InterNetwork) dns.Add(d.ToString());
+            IPAddressCollection dc = props.DnsAddresses;
+            for (int i = 0; i < dc.Count; i++)
+                if (dc[i].AddressFamily == AddressFamily.InterNetwork) dns.Add(dc[i].ToString());
             info.Dns = string.Join(", ", dns);
             return info;
         }
@@ -121,7 +124,7 @@ namespace MacChanger.Core
             for (int i = 0; i < ips.Length; i++)
             {
                 string ip = ips[i].Trim();
-                if (ip.Length == 0 || ip.StartsWith("169.254.", StringComparison.Ordinal)) continue;
+                if (ip.Length == 0 || ip.IndexOf("169.254.", StringComparison.Ordinal) == 0) continue;   // 169.254. 로 시작
                 keepIps.Add(ip);
                 keepMasks.Add(i < ms.Length ? ms[i].Trim() : "?");
             }
@@ -136,9 +139,9 @@ namespace MacChanger.Core
             StringBuilder sb = new StringBuilder();
             if (includeTime) sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)).Append('\t');
             sb.Append(assignedIps);
-            if (includeMask) sb.Append('\t').Append(masks ?? string.Empty);
+            if (includeMask) sb.Append('\t').Append(masks);   // null 이면 아무것도 붙지 않는다 (Append(null) = 빈 문자열)
             if (includeGateway) sb.Append('\t').Append(string.IsNullOrEmpty(gateways) ? "(없음)" : gateways);
-            if (includeMac) sb.Append('\t').Append(MacAddressUtil.Format(mac ?? string.Empty));
+            if (includeMac) sb.Append('\t').Append(MacAddressUtil.Format(mac));   // Format(null) 도 빈 문자열
             return sb.ToString();
         }
 

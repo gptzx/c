@@ -57,8 +57,17 @@ class AutoTest
   static void Set(object o, string field, object v) { Fi(o.GetType(), field).SetValue(o, v); }
   static T Get<T>(object o, string field) { return (T)Fi(o.GetType(), field).GetValue(o); }
   static bool HasField(Type t, string field) { return Fi(t, field) != null; }
-  static void SetProp(object o, string prop, object v) { o.GetType().GetProperty(N("P", o.GetType(), prop, 0), All).SetValue(o, v, null); }
-  static object GetProp(object o, string prop) { return o.GetType().GetProperty(N("P", o.GetType(), prop, 0), All).GetValue(o, null); }
+  // a value the app exposes as a property, or as a plain public field (data classes use fields: no accessor methods, smaller EXE)
+  static void SetProp(object o, string prop, object v) { PropertyInfo pi = o.GetType().GetProperty(N("P", o.GetType(), prop, 0), All); if (pi != null) pi.SetValue(o, v, null); else Set(o, prop, v); }
+  static object GetProp(object o, string prop) { PropertyInfo pi = o.GetType().GetProperty(N("P", o.GetType(), prop, 0), All); return pi != null ? pi.GetValue(o, null) : Fi(o.GetType(), prop).GetValue(o); }
+  // subscribe to an event, or to a public delegate field used like one ("+=")
+  static void AddHandler(object o, string name, Delegate d)
+  {
+    EventInfo ev = o.GetType().GetEvent(N("E", o.GetType(), name, 0), All);
+    if (ev != null) { ev.AddEventHandler(o, d); return; }
+    FieldInfo fi = Fi(o.GetType(), name);
+    fi.SetValue(o, Delegate.Combine((Delegate)fi.GetValue(o), d));
+  }
   // controls are found through their private fields (the Designer no longer sets Control.Name); removed controls read as null
   static Control C(Form f, string field) { FieldInfo fi = Fi(f.GetType(), field); return fi == null ? null : (Control)fi.GetValue(f); }
   static object New(string origFull) { return Activator.CreateInstance(T(origFull), All, null, new object[0], null); }
@@ -200,8 +209,7 @@ class AutoTest
     Control sw = C(f, "modeSwitch");
     {
       int flips = 0;
-      EventInfo ev = sw.GetType().GetEvent(N("E", sw.GetType(), "CheckedChanged", 0), All);
-      ev.AddEventHandler(sw, new EventHandler(delegate { flips++; }));
+      AddHandler(sw, "CheckedChanged", new EventHandler(delegate { flips++; }));
       Check(sw.Size == new Size(44, 20) && sw.TabStop && !(bool)GetProp(sw, "Checked"), "switch: 44x20, tab stop, left (IP 할당 시) by default");
       SetProp(sw, "Checked", true); SetProp(sw, "Checked", true);
       Check((bool)GetProp(sw, "Checked") && flips == 1, "setting Checked raises CheckedChanged once per real change");

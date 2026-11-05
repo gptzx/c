@@ -183,7 +183,8 @@ namespace MacChanger.Native
         // ------------------------------------------------------------------
         // setupapi : 어댑터 재시작/비활성화/활성화 (DIF_PROPERTYCHANGE)
         // ------------------------------------------------------------------
-        public static readonly Guid GUID_DEVCLASS_NET = new Guid("4D36E972-E325-11CE-BFC1-08002BE10318");
+        /// <summary>{4D36E972-E325-11CE-BFC1-08002BE10318} (devguid.h 의 DEFINE_GUID 와 같은 숫자 형태 — 문자열을 해석하지 않는다)</summary>
+        public static readonly Guid GUID_DEVCLASS_NET = new Guid(0x4D36E972, 0xE325, 0x11CE, 0xBF, 0xC1, 0x08, 0x00, 0x2B, 0xE1, 0x03, 0x18);
 
         public const uint DIGCF_PRESENT = 0x00000002;
         public const uint SPDRP_DRIVER = 0x00000009;
