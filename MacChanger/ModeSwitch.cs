@@ -6,7 +6,7 @@ using System.Windows.Forms;
 namespace MacChanger
 {
     /// <summary>
-    /// 두 방식 가운데 하나를 고르는 토글 스위치 (자동 변경: 왼쪽 = IP 할당 시, 오른쪽 = 일정 시간마다).
+    /// 두 가지 가운데 하나를 고르는 토글 스위치 (자동 변경 방식: IP 할당 시 / 일정 시간마다, 자동 정지 기준: 시간 / 횟수).
     /// 둥근 홈(트랙) 위의 손잡이가 고른 쪽으로 옮겨 간다. 클릭·Space·Enter 는 반대쪽으로, ←/→ 는 그쪽으로.
     /// </summary>
     internal sealed class ModeSwitch : Control
@@ -15,13 +15,17 @@ namespace MacChanger
         private bool isChecked;
         /// <summary>Space/Enter 를 누르고 있는 상태 — 뗄 때 한 번만 토글한다 (누르고 있어도 반복되지 않고, 다른 창에서 넘어온 KeyUp 은 무시)</summary>
         private bool keyHeld;
+        /// <summary>왼쪽·오른쪽 이름 (양쪽 글자와 같은 문자열) — 화면 읽기 프로그램에는 고른 쪽 이름을 알린다 (글자가 없는 컨트롤이므로 직접 준다)</summary>
+        private readonly string leftName, rightName;
 
-        public ModeSwitch()
+        public ModeSwitch(string leftName, string rightName)
         {
+            this.leftName = leftName;
+            this.rightName = rightName;
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
             SetStyle(ControlStyles.StandardDoubleClick, false);   // 빠른 두 번 클릭도 두 번 토글 (체크박스처럼) — 켜 두면 둘째 클릭이 DoubleClick 으로 가서 OnClick 이 안 불린다
             Cursor = Cursors.Hand;
-            AccessibleName = "IP 할당 시";   // 화면 읽기 프로그램용 이름 = 고른 쪽 (글자가 없는 컨트롤이므로 직접 준다; 양쪽 글자와 같은 문자열)
+            AccessibleName = leftName;   // 처음에는 왼쪽
         }
 
         /// <summary>false = 왼쪽(기본), true = 오른쪽</summary>
@@ -32,7 +36,7 @@ namespace MacChanger
             {
                 if (isChecked == value) return;
                 isChecked = value;
-                AccessibleName = value ? "일정 시간마다" : "IP 할당 시";
+                AccessibleName = value ? rightName : leftName;
                 Invalidate();
                 if (CheckedChanged != null) CheckedChanged(this, EventArgs.Empty);
             }

@@ -487,12 +487,14 @@ class AutoTest
       System.Windows.Forms.Timer lt = Get<System.Windows.Forms.Timer>(f, "limitTimer");
       Check(nudLT.Minimum == 60 && nudLT.Maximum == 31536000 && nudLT.Value == 3600 && nudLC.Minimum == 1 && nudLC.Maximum == 10000000 && nudLC.Value == 100 && !lt.Enabled, "limit ranges: time 60..31536000 s (default 3600), count 1..10000000 (default 100); limit timer idle");
       Check(chkLimit.Enabled && limitSw.Enabled && !nudLT.Enabled && !nudLC.Enabled && Vis(nudLT) && !Vis(nudLC) && C(f, "lblLimitTime").Cursor == Cursors.Hand, "with 사용 ticked: 제한 and its switch open, value fields closed until 제한 is ticked; time field shown");
+      Check(limitSw.AccessibleName == "시간" && C(f, "modeSwitch").AccessibleName == "IP 할당 시", "limit switch accessible name = its own selected side (시간), the mode switch keeps its own: " + limitSw.AccessibleName);
       chkLimit.Checked = true;
       Check(nudLT.Enabled && !nudLC.Enabled, "ticking 제한 opens the time field (time mode)");
       Call(f, "lblLimit_Click", C(f, "lblLimitCount"), EventArgs.Empty);
       Check((bool)GetProp(limitSw, "Checked") && !nudLT.Enabled && nudLC.Enabled && Vis(nudLC) && !Vis(nudLT), "clicking 횟수: count field shown and open, time hidden");
+      Check(limitSw.AccessibleName == "횟수" && C(f, "modeSwitch").AccessibleName == "IP 할당 시", "limit switch accessible name follows it (횟수): " + limitSw.AccessibleName);
       Call(f, "lblLimit_Click", C(f, "lblLimitTime"), EventArgs.Empty);
-      Check(!(bool)GetProp(limitSw, "Checked") && nudLT.Enabled && Vis(nudLT), "clicking 시간 switches back");
+      Check(!(bool)GetProp(limitSw, "Checked") && nudLT.Enabled && Vis(nudLT) && limitSw.AccessibleName == "시간", "clicking 시간 switches back (accessible name too)");
       nudLT.Value = 60; t.Stop();
       Call(f, "StartAuto");
       Check(Get<bool>(f, "limitRun") && !Get<bool>(f, "limitByCount") && lt.Enabled && lt.Interval > 59000 && lt.Interval <= 60000 && !chkLimit.Enabled && !limitSw.Enabled && !nudLT.Enabled && status.Text.Contains("60초 뒤 정지"), "time limit 60 s: dedicated timer armed for the full 60 s, limit controls locked, status says 60초 뒤 정지: " + status.Text);
@@ -528,6 +530,13 @@ class AutoTest
       Check(!Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 2 && btn.Text == "시작" && status.Text.Contains("2번 적용해"), "second auto change reaches the limit: stops without scheduling the next: " + status.Text);
       Call(f, "StartAuto"); t.Stop();
       Check(Get<int>(f, "autoChanges") == 0, "the count restarts at 0 on 시작");
+      // an auto change of this run is still in flight when 정지 and then 시작 are pressed: it belongs to the old run and is not counted in the new one
+      Set(f, "busy", true); Set(f, "operationIsAuto", true); Set(f, "autoPending", false); btn.Text = "정지";
+      Call(f, "StopAuto"); Call(f, "StartAuto"); t.Stop();
+      Check(Get<bool>(f, "autoRunning") && !Get<bool>(f, "operationIsAuto") && Get<int>(f, "autoChanges") == 0, "정지 + 시작 during an auto change: the new run starts at 0 and does not claim the change in flight");
+      Set(f, "busy", false);
+      Call(f, "worker_RunWorkerCompleted", null, new System.ComponentModel.RunWorkerCompletedEventArgs(res, null, false));
+      Check(Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 0 && !status.Text.Contains("번 적용해"), "...and when that change finishes it is not counted toward the new run's limit: " + status.Text);
       Call(f, "StopAuto");
       chkLimit.Checked = false; Call(f, "lblLimit_Click", C(f, "lblLimitTime"), EventArgs.Empty);
       Set(f, "operationIsAuto", false);
