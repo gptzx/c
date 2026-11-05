@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
@@ -30,6 +31,8 @@ namespace MacChanger
             public bool ReleaseIp;
             /// <summary>작업을 시작한 이유 (예: "IP 할당 대기 30초 초과"). 시작·완료 상태 앞에 붙인다. 직접 누른 작업은 null.</summary>
             public string Reason;
+            /// <summary>자동 변경이 시작한 작업인지 (횟수 제한은 이것만 센다 — 시작 버튼을 누를 때 돌고 있던 직접 작업은 세지 않는다)</summary>
+            public bool Auto;
 
             public OperationArgs(OperationKind kind, NetworkAdapterInfo adapter)
             {
@@ -68,8 +71,15 @@ namespace MacChanger
         /// <summary>"IP 할당 대기 중"(링크는 올라왔지만 실제 IP 없음) 상태가 시작된 시각 — 할당 대기 초과 시 새 MAC 적용에 사용</summary>
         private bool waiting;
         private int waitingSinceTick;
-        /// <summary>진행 중인 작업의 이유(OperationArgs.Reason) — 완료 상태에도 붙인다</summary>
+        /// <summary>진행 중인 작업의 이유(OperationArgs.Reason) — 완료 상태에도 붙인다 / 자동 변경이 시작한 작업인지</summary>
         private string operationReason;
+        private bool operationIsAuto;
+        /// <summary>자동 정지 제한 (시작할 때 읽어 둔다): 쓰는지, 횟수 기준인지, 시간 기준의 마감(Stopwatch 틱 — 시스템 시계 변경에 영향받지 않고 1년도 넘치지 않는다),
+        /// 이번 실행에서 적용한 새 MAC 횟수, 작업 중에 시간이 다 돼 멈췄을 때 그 작업의 완료 메시지에 붙일 말</summary>
+        private bool limitRun, limitByCount;
+        private long limitDeadline;
+        private int autoChanges;
+        private string limitNote;
         /// <summary>트레이 아이콘의 오른쪽 클릭 메뉴 (처음 필요할 때 만든다)</summary>
         private TrayMenu trayMenu;
 
@@ -104,6 +114,7 @@ namespace MacChanger
                 modeSwitch, lblModeIp, lblModeTimer, nudAutoDelay, nudWaitTimeout, nudInterval,
                 btnAutoToggle, chkAutoStopIp, txtAutoStopIp, chkLogTime, chkLogMask, chkLogGateway,
                 chkLogMac, chkLogBox, chkIpLog, btnBackground, trafficGraph,
+                chkAutoLimit, limitSwitch, lblLimitTime, lblLimitCount, nudLimitTime, nudLimitCount,
             };
             string[] tips =
             {
@@ -124,14 +135,14 @@ namespace MacChanger
                 "로그 박스의 내용만 지웁니다. 파일에 저장된 로그는 그대로 남습니다.",
                 "변경 적용·IP 갱신·원상복구·자동 변경 때마다 쓰던 IP를 먼저 DHCP 서버(공유기 등)에 돌려줍니다.\n서버가 다른 IP를 줄 수도, 같은 IP를 다시 줄 수도 있습니다.",
                 "누르는 즉시 IP를 반환해 인터넷 연결이 끊어집니다.\n다시 연결하려면 IP 갱신 버튼을 누르면 됩니다.",
-                "자동 변경 기능을 쓸지 정합니다. 체크해야 시작 버튼과 고른 방식의 설정 칸이 열립니다.\n실제 동작은 시작을 눌러야 하며, 새 MAC은 매번 랜덤으로 만듭니다.",
+                "자동 변경 기능을 쓸지 정합니다. 체크해야 시작 버튼과 스위치, 설정 칸이 열립니다.\n실제 동작은 시작을 눌러야 하며, 새 MAC은 매번 랜덤으로 만듭니다.",
                 ModeTip,
                 ModeTip,
                 ModeTip,
                 "IP를 받고 이만큼 기다렸다가 새 MAC을 적용합니다.\n0이면 받는 즉시 적용하며, 최대 7일까지 정할 수 있습니다.",
                 "연결은 됐는데 이만큼 기다려도 IP를 못 받으면 새 MAC을 적용합니다.\nIP를 받을 때까지 같은 간격으로 되풀이합니다. 10~60초",
                 "IP가 있든 없든 이 간격마다 새 MAC을 적용합니다. 10초~7일, 1시간은 3600, 하루는 86400.\n너무 짧으면 IP를 받기 전에 또 바뀝니다.",
-                "자동 변경을 시작/정지합니다. 실행 중에는 정지·로그 비우기·백그라운드 실행만 쓸 수 있습니다.\n남은 초나 IP 대기 초가 버튼에 보이며, 변경 실패·재부팅 필요·지정 IP 할당 때는 스스로 멈춥니다.",
+                "자동 변경을 시작/정지합니다. 실행 중에는 정지·로그 비우기·백그라운드 실행만 쓸 수 있습니다.\n남은 초나 IP 대기 초가 버튼에 보이며, 변경 실패·재부팅 필요·지정 IP·정한 시간/횟수에 스스로 멈춥니다.",
                 "오른쪽 칸의 IP나 대역에 속하는 IP를 받는 순간 자동 변경이 멈춥니다.\n시작할 때와 매번 바꾸기 직전에도 확인합니다.",
                 "자동 변경을 멈출 IP나 대역. 앞부분만 적으면 그 숫자로 시작하는 IP 전부가 해당합니다.\n예: 123 → 123.*.*.*   123.123 → 123.123.*.*\n123.123.123 → 123.123.123.*   숫자 네 개를 다 적으면 그 주소 하나만 해당합니다.",
                 "로그 한 줄마다 기록한 날짜와 시각도 함께 적습니다.",
@@ -142,10 +153,20 @@ namespace MacChanger
                 "체크한 뒤부터 새로 받는 IP를 프로그램 폴더의 " + IpMonitor.LogFileName + " 파일에도 한 줄씩 저장합니다.\n로그 보기가 꺼져 있어도 저장되며, 파일은 프로그램을 닫아도 남습니다.",
                 "창을 숨기고 시계 옆 트레이 아이콘으로 계속 실행합니다. 자동 변경·그래프·로그는 그대로 돕니다.\n아이콘을 한 번 누르면 창이 다시 열리고, 마우스 오른쪽 버튼을 누르면 열기/종료 메뉴가 나옵니다.",
                 "통신 속도 그래프입니다. 빨강은 받는(수신) 속도, 초록은 보내는(송신) 속도입니다.\n아래는 누적량과 현재 속도입니다. 누적량은 변경 적용·IP 갱신·원상복구 뒤 0부터 다시 셉니다.",
+                "체크하면 정한 시간이 지나거나 정한 횟수만큼 바꾼 뒤 자동 변경이 스스로 멈춥니다.\n시간과 횟수 가운데 하나를 오른쪽 스위치로 고릅니다.",
+                LimitTip,
+                LimitTip,
+                LimitTip,
+                "시작하고 이 시간(초)이 지나면 자동 변경을 멈춥니다. 1분(60)~1년(31536000).\n1시간은 3600, 하루는 86400입니다. 바꾸는 중이면 그 변경을 마친 뒤 멈춥니다.",
+                "새 MAC을 이만큼 적용하면 자동 변경을 멈춥니다. 1~10000000번.\n실패한 변경은 세지 않으며, 변경이 실패하면 그 자리에서 멈춥니다.",
             };
             for (int i = 0; i < tipTargets.Length; i++) toolTip.SetToolTip(tipTargets[i], tips[i]);
             ApplyMode();
+            UpdateControlStates();   // 시작 버튼·설정 칸·스위치는 "사용"을 체크해야 열린다
         }
+
+        /// <summary>자동 정지 제한 스위치와 양쪽 글자가 함께 쓰는 툴팁</summary>
+        private const string LimitTip = "자동 변경을 언제 멈출지 고릅니다. 왼쪽 시간: 시작하고 정한 초가 지나면 멈춥니다.\n오른쪽 횟수: 새 MAC을 정한 횟수만큼 적용하면 멈춥니다. 양쪽 글자를 눌러도 바뀝니다.";
 
         /// <summary>방식 스위치와 양쪽 글자가 함께 쓰는 툴팁</summary>
         private const string ModeTip = "자동 변경을 언제 할지 고릅니다. 왼쪽 IP 할당 시: IP를 받을 때마다 정한 초 뒤에 바꿉니다.\n오른쪽 일정 시간마다: IP와 관계없이 정한 초마다 바꿉니다. 양쪽 글자를 눌러도 바뀝니다.";
@@ -583,6 +604,23 @@ namespace MacChanger
             if (!busy) SetStatus("준비", IntervalMode ? "자동 변경 방식: 일정 시간마다 (IP와 관계없이)" : "자동 변경 방식: IP 할당 시 (IP를 받은 뒤 지연 초가 지나면)");
         }
 
+        /// <summary>제한 스위치 양쪽 글자를 눌러도 그쪽 기준이 된다 (실행 중이거나 "사용"이 꺼져 있으면 스위치처럼 잠긴다)</summary>
+        private void lblLimit_Click(object sender, EventArgs e)
+        {
+            if (limitSwitch.Enabled) limitSwitch.Checked = sender == lblLimitCount;
+        }
+
+        private void chkAutoLimit_CheckedChanged(object sender, EventArgs e)
+        {
+            UpdateControlStates();   // 제한 값 칸은 체크해야 열린다
+        }
+
+        private void limitSwitch_CheckedChanged(object sender, EventArgs e)
+        {
+            ApplyMode();   // 고른 기준의 값 칸만 보인다
+            UpdateControlStates();
+        }
+
         /// <summary>고른 방식에 맞춘 표시: 스위치 양쪽 글자는 고른 쪽만 검정, 설정 줄은 고른 방식의 것만 보이고, IP 할당 시 방식에만 있는 할당 대기 줄은 다른 방식에서 회색.</summary>
         private void ApplyMode()
         {
@@ -593,6 +631,11 @@ namespace MacChanger
             lblDelayPrefix.Visible = nudAutoDelay.Visible = lblAutoSuffix.Visible = !interval;
             lblIntervalPrefix.Visible = nudInterval.Visible = lblIntervalSuffix.Visible = interval;
             lblWait.ForeColor = lblWaitPrefix.ForeColor = lblWaitSuffix.ForeColor = interval ? off : on;
+            bool count = limitSwitch.Checked;   // 자동 정지 제한: 시간 ↔ 횟수
+            lblLimitTime.ForeColor = count ? off : on;
+            lblLimitCount.ForeColor = count ? on : off;
+            nudLimitTime.Visible = lblLimitTimeSuffix.Visible = !count;
+            nudLimitCount.Visible = lblLimitCountSuffix.Visible = count;
         }
 
         private void btnAutoToggle_Click(object sender, EventArgs e)
@@ -612,19 +655,30 @@ namespace MacChanger
             waiting = false;   // 할당 대기 시간은 시작 시점부터 센다
             autoRunning = true;
             intervalRun = IntervalMode;
+            autoChanges = 0;
+            limitNote = null;
+            limitRun = chkAutoLimit.Checked;
+            limitByCount = limitSwitch.Checked;
             UpdateControlStates();   // 실행 중에는 정지·로그 비우기·백그라운드 실행 외의 조작을 잠근다
+            string limit = !limitRun ? "" : limitByCount ? " · " + nudLimitCount.Value + "번 바꾸면 정지" : " · " + FormatRemaining((int)nudLimitTime.Value) + " 뒤 정지";
+            if (limitRun && !limitByCount)
+            {
+                // 시간 제한: 지금부터 정한 초 뒤 마감 — 전용 일회성 타이머가 그 시각에 깨운다 (다른 타이머의 위상·주기와 무관)
+                limitDeadline = Stopwatch.GetTimestamp() + (long)nudLimitTime.Value * Stopwatch.Frequency;
+                ArmLimitTimer();
+            }
             if (intervalRun)
             {
                 // 일정 시간마다: IP 와 관계없이 지금부터 N초 뒤에 첫 변경, 그 뒤로는 직전 변경 예정 시각 + N초 (변경에 걸린 시간과 무관하게 N초마다; 작업 중이면 끝나는 대로)
                 int seconds = (int)nudInterval.Value;
                 autoDueTick = Environment.TickCount;   // 작업 중에 시작했으면 예약은 작업이 끝날 때 걸리고, 그 기준점은 지금
                 ScheduleIn(seconds);
-                if (!busy) SetStatus("준비", "자동 변경 시작 — IP와 관계없이 " + seconds + "초마다 새 MAC 적용");
+                if (!busy) SetStatus("준비", "자동 변경 시작 — IP와 관계없이 " + seconds + "초마다 새 MAC 적용" + limit);
             }
             else
             {
                 btnAutoToggle.Text = "정지 (IP 대기)";
-                if (!busy) SetStatus("준비", "자동 변경 시작 — IP 할당 " + nudAutoDelay.Value + "초 뒤, 또는 할당 대기 " + nudWaitTimeout.Value + "초 초과 시 새 MAC 적용");
+                if (!busy) SetStatus("준비", "자동 변경 시작 — IP 할당 " + nudAutoDelay.Value + "초 뒤, 또는 할당 대기 " + nudWaitTimeout.Value + "초 초과 시 새 MAC 적용" + limit);
             }
             RefreshIp();   // 지금 상태를 읽어 ApplyIpInfo 가 결정한다: (IP 할당 시) 이미 IP가 있으면 지금부터 세고, 링크만 올라와 있으면 할당 대기 시계가 이 순간부터 센다; 지정 IP 가 이미 할당되어 있으면 두 방식 모두 바로 정지
         }
@@ -632,10 +686,37 @@ namespace MacChanger
         private void StopAuto()
         {
             autoRunning = false;
+            limitTimer.Stop();
             CancelAuto();
             UpdateControlStates();
             btnAutoToggle.Text = "시작";
             if (!busy) SetStatus("준비", "자동 변경 정지");
+        }
+
+        /// <summary>
+        /// 시간 제한 타이머를 마감까지 건다. WinForms 타이머는 24.8일(int 밀리초)까지만 잡히므로 그보다 멀면 거기까지 걸고 깨어나서 남은 시간으로 다시 건다.
+        /// 마감이 이미 지났으면 바로 멈춘다 (작업 중이면 그 작업의 완료 메시지에 붙여 알린다).
+        /// </summary>
+        private void ArmLimitTimer()
+        {
+            long left = limitDeadline - Stopwatch.GetTimestamp();
+            if (left <= 0)
+            {
+                StopAuto();
+                string message = "정한 시간(" + FormatRemaining((int)nudLimitTime.Value) + ")이 지나 자동 변경을 정지했습니다.";
+                if (busy) limitNote = " " + message;
+                else SetStatus("완료", message);
+                return;
+            }
+            long ms = left / Stopwatch.Frequency * 1000 + left % Stopwatch.Frequency * 1000 / Stopwatch.Frequency;   // 1년치도 넘치지 않게 초·나머지로 나눠 계산
+            limitTimer.Interval = (int)Math.Min(Math.Max(ms, 1), int.MaxValue);
+            limitTimer.Start();
+        }
+
+        private void limitTimer_Tick(object sender, EventArgs e)
+        {
+            limitTimer.Stop();
+            if (autoRunning && limitRun && !limitByCount) ArmLimitTimer();
         }
 
         /// <summary>(IP 할당 시) 자동 변경 중이고 어댑터에 IP가 할당되어 있으면 지연 시간 뒤로 변경을 예약하고 남은 시간을 바로 버튼에 보여준다 (0초면 다음 1초 확인 때 바로).</summary>
@@ -728,6 +809,7 @@ namespace MacChanger
             OperationArgs args = new OperationArgs(OperationKind.Apply, adapter);
             args.NewMac = mac;
             args.Reason = reason;
+            args.Auto = true;
             StartOperation(args);
         }
 
@@ -1165,6 +1247,7 @@ namespace MacChanger
             args.ResetDns = chkResetDns.Checked;
             args.ReleaseIp = chkReleaseIp.Checked;
             operationReason = args.Reason;
+            operationIsAuto = args.Auto;
             ipEpoch++;
             SetBusy(true);
             SetStatus("진행", ReasonPrefix() + OperationLabel(args.Kind) + " 시작...");
@@ -1230,7 +1313,13 @@ namespace MacChanger
             }
             else if (autoRunning)
             {
-                if (intervalRun)
+                if (operationIsAuto) autoChanges++;
+                if (limitRun && limitByCount && autoChanges >= (int)nudLimitCount.Value)   // 횟수 제한: 정한 횟수를 채웠으면 다음 변경을 예약하지 않고 멈춘다
+                {
+                    StopAuto();
+                    finalMessage += " 새 MAC을 " + autoChanges + "번 적용해 자동 변경을 정지했습니다.";
+                }
+                else if (intervalRun)
                 {
                     // 직전 변경 예정 시각 + N초: 변경에 걸린 시간과 무관하게 N초마다. 변경이 N초보다 오래 걸려 그 시각이 이미 지났으면 지금 바로 한 번만 바꾸고
                     // 격자는 지금부터 다시 센다 (놓친 격자점을 연달아 몰아서 실행하지 않는다)
@@ -1262,6 +1351,11 @@ namespace MacChanger
                     if (result.PermanentMac != null) SetIfChanged(txtPermanentMac, MacAddressUtil.Format(result.PermanentMac));
                 }
                 RefreshIp();
+            }
+            if (limitNote != null)   // 작업 중에 정한 시간이 다 돼 멈췄다
+            {
+                finalMessage += limitNote;
+                limitNote = null;
             }
             SetStatus(finalState, finalMessage);
 
@@ -1311,12 +1405,16 @@ namespace MacChanger
             chkLogMac.Enabled = !autoRunning;
             chkLogBox.Enabled = !autoRunning;
             btnAutoToggle.Enabled = chkAuto.Checked;                     // 실행 중에도 정지할 수 있어야 하므로 잠그지 않는다
-            modeSwitch.Enabled = !autoRunning;                           // 방식은 정지한 뒤에만 바꿀 수 있다
-            lblModeIp.Cursor = lblModeTimer.Cursor = autoRunning ? Cursors.Default : Cursors.Hand;   // 잠긴 동안에는 양쪽 글자도 손 모양을 거둔다
+            bool armed = !autoRunning && chkAuto.Checked;                // "사용"을 체크하고 실행 중이 아닐 때만 방식·제한 스위치와 설정 칸이 열린다
+            modeSwitch.Enabled = limitSwitch.Enabled = chkAutoLimit.Enabled = armed;
+            lblModeIp.Cursor = lblModeTimer.Cursor = lblLimitTime.Cursor = lblLimitCount.Cursor = armed ? Cursors.Hand : Cursors.Default;   // 잠긴 동안에는 글자도 손 모양을 거둔다
             bool ipMode = !IntervalMode;
-            nudAutoDelay.Enabled = !autoRunning && chkAuto.Checked && ipMode;      // 지연 초와 할당 대기 초는 "사용"을 체크하고 IP 할당 시 방식일 때 열린다
-            nudWaitTimeout.Enabled = !autoRunning && chkAuto.Checked && ipMode;
-            nudInterval.Enabled = !autoRunning && chkAuto.Checked && !ipMode;    // 간격은 일정 시간마다 방식일 때
+            nudAutoDelay.Enabled = armed && ipMode;      // 지연 초와 할당 대기 초는 IP 할당 시 방식일 때
+            nudWaitTimeout.Enabled = armed && ipMode;
+            nudInterval.Enabled = armed && !ipMode;    // 간격은 일정 시간마다 방식일 때
+            bool limitOn = armed && chkAutoLimit.Checked;
+            nudLimitTime.Enabled = limitOn && !limitSwitch.Checked;
+            nudLimitCount.Enabled = limitOn && limitSwitch.Checked;
             chkAutoStopIp.Enabled = !autoRunning;
             txtAutoStopIp.Enabled = !autoRunning && chkAutoStopIp.Checked;   // 체크해야 입력 칸이 열린다
             chkResetDns.Enabled = !autoRunning;

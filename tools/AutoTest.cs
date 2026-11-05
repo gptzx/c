@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Reflection;
@@ -111,7 +112,7 @@ class AutoTest
     Form f = (Form)New("MacChanger.MainForm");
     IntPtr handle = f.Handle;   // handle needed for BeginInvoke-based tests
     // ---- layout ----
-    Check(f.ClientSize == new Size(560, 714), "client size 560x714 (one row more than before): " + f.ClientSize);
+    Check(f.ClientSize == new Size(560, 745), "client size 560x745 (two rows more than the original 683): " + f.ClientSize);
     Control graph = C(f, "trafficGraph"), logBox = C(f, "txtIpLog");
     Check(graph.Size == new Size(262, 167) && logBox.Size == new Size(262, 167) && graph.Top == logBox.Top && graph.Left > logBox.Right && logBox.Bottom + 12 == f.ClientSize.Height, "log box and graph 262x167 side by side with a 12 px bottom margin: " + logBox.Bounds + " / " + graph.Bounds);
     int overlaps = 0, outside = 0;
@@ -123,15 +124,15 @@ class AutoTest
       if (a.Right > f.ClientSize.Width || a.Bottom > f.ClientSize.Height || a.Left < 0 || a.Top < 0) { outside++; Console.WriteLine("  outside: " + all[i].GetType().Name + " " + a); }
       for (int j = i + 1; j < all.Count; j++) if (a.IntersectsWith(all[j].Bounds)) { overlaps++; Console.WriteLine("  overlap: " + a + " / " + all[j].Bounds); }
     }
-    Check(overlaps == 0 && outside == 0 && all.Count == 53, "no overlapping controls, all 53 visible controls (56 minus the hidden interval row) inside " + f.ClientSize + " (" + all.Count + " checked)");
+    Check(overlaps == 0 && outside == 0 && all.Count == 59, "no overlapping controls, all 59 visible controls (64 minus the hidden interval row and count pair) inside " + f.ClientSize + " (" + all.Count + " checked)");
     Check(C(f, "nudIpInterval") == null && C(f, "btnReleaseIp") != null && C(f, "chkReleaseIp") != null && C(f, "modeSwitch") != null && C(f, "nudInterval") != null, "IP 반환 and interval-mode controls present");
     Check(C(f, "btnReleaseIp").Text == "즉시 반환" && C(f, "chkReleaseIp").Text == "DHCP 서버에 IP 반환" && C(f, "btnClearLog").Text == "로그 비우기" && C(f, "chkLogBox").Text == "로그 보기" && C(f, "chkAuto").Text == "사용" && C(f, "lblModeIp").Text == "IP 할당 시" && C(f, "lblModeTimer").Text == "일정 시간마다" && C(f, "lblDelayPrefix").Text == "IP 할당 후", "button/checkbox/label texts");
     // tab order: row by row, the way the eye reads the window
     List<string> order = new List<string>();
     for (Control cur = f.GetNextControl(null, true); cur != null; cur = f.GetNextControl(cur, true)) if (cur.TabStop && Vis(cur)) order.Add(cur == C(f, "cboAdapters") ? "cbo" : cur.Text);
     string tabs = string.Join(",", order.ToArray());
-    Check(tabs == "cbo,새로 고침,,랜덤 MAC 주소,DNS 초기화,변경 적용,IP 갱신,원상복구,로그 비우기,사용,,시작,10,30,지정 IP/대역 할당 시 정지,,DHCP 서버에 IP 반환,즉시 반환,시간,서브넷 마스크,기본 게이트웨이,MAC,로그 보기,할당 IP 로그 저장,백그라운드 실행", "tab order follows the rows (switch after 사용; the hidden interval field is skipped): " + tabs);
-    Check(C(f, "lblModeIp").Cursor == Cursors.Hand && C(f, "lblModeTimer").Cursor == Cursors.Hand && C(f, "modeSwitch").AccessibleName == "IP 할당 시", "side labels show a hand cursor; the switch has an accessible name");
+    Check(tabs == "cbo,새로 고침,,랜덤 MAC 주소,DNS 초기화,변경 적용,IP 갱신,원상복구,로그 비우기,사용,,시작,10,30,지정 IP/대역 할당 시 정지,,제한,,3600,DHCP 서버에 IP 반환,즉시 반환,시간,서브넷 마스크,기본 게이트웨이,MAC,로그 보기,할당 IP 로그 저장,백그라운드 실행", "tab order follows the rows (switch after 사용; the hidden interval field is skipped): " + tabs);
+    Check(C(f, "lblModeIp").Cursor == Cursors.Default && !C(f, "modeSwitch").Enabled && C(f, "modeSwitch").AccessibleName == "IP 할당 시", "at start (사용 unticked) the switch is locked, side labels show no hand cursor; the switch has an accessible name");
     // ---- tooltips ----
     ToolTip tip = Get<ToolTip>(f, "toolTip");
     int tips = 0, longLines = 0;
@@ -223,19 +224,19 @@ class AutoTest
       Check(sw.AccessibleName == "IP 할당 시", "accessible name = the selected side: " + sw.AccessibleName);
       SetProp(sw, "Checked", true); bool accRight = sw.AccessibleName == "일정 시간마다"; SetProp(sw, "Checked", false); flips = 2;
       Check(accRight && sw.AccessibleName == "IP 할당 시", "accessible name follows the switch");
+      sw.Enabled = true;   // locked until 사용 is ticked; paint it as it looks when open
       using (Bitmap bmp = new Bitmap(44, 20))
       {
         using (Graphics g = Graphics.FromImage(bmp)) { g.Clear(Color.Magenta); Call(sw, "OnPaint", new PaintEventArgs(g, new Rectangle(0, 0, 44, 20))); }
         Color knobL = bmp.GetPixel(10, 10), trackR = bmp.GetPixel(33, 10), far = bmp.GetPixel(0, 0), mid = bmp.GetPixel(22, 10), bottom = bmp.GetPixel(22, 19), lastRow = bmp.GetPixel(22, 18);
         Check(knobL.R > 240 && knobL.G > 240 && knobL.B > 240 && trackR.ToArgb() == SystemColors.Highlight.ToArgb() && mid.ToArgb() == SystemColors.Highlight.ToArgb() && far.ToArgb() == Color.Magenta.ToArgb() && bottom.ToArgb() == Color.Magenta.ToArgb() && lastRow.ToArgb() == SystemColors.Highlight.ToArgb(), "paint (left): white knob at the left, highlight track at the right, rounded corner transparent, pill ends one row above the bottom like its caps: " + knobL + " / " + trackR + " / " + far + " / " + bottom);
-        SetProp(sw, "Checked", true);
+        SetProp(sw, "Checked", true); sw.Enabled = true;   // the change handler re-applies the lock (사용 is still unticked)
         using (Graphics g = Graphics.FromImage(bmp)) { g.Clear(Color.Magenta); Call(sw, "OnPaint", new PaintEventArgs(g, new Rectangle(0, 0, 44, 20))); }
         Color knobR = bmp.GetPixel(33, 10), trackL = bmp.GetPixel(10, 10);
         Check(knobR.R > 240 && knobR.G > 240 && trackL.ToArgb() == SystemColors.Highlight.ToArgb(), "paint (right): knob moved to the right");
         sw.Enabled = false;
         using (Graphics g = Graphics.FromImage(bmp)) { g.Clear(Color.Magenta); Call(sw, "OnPaint", new PaintEventArgs(g, new Rectangle(0, 0, 44, 20))); }
         Check(bmp.GetPixel(10, 10).ToArgb() == SystemColors.ControlDark.ToArgb(), "paint (disabled): grey track");
-        sw.Enabled = true;
         SetProp(sw, "Checked", false);
       }
     }
@@ -283,11 +284,11 @@ class AutoTest
     CheckBox chk = (CheckBox)C(f, "chkAuto"); NumericUpDown nud = (NumericUpDown)C(f, "nudAutoDelay"), waitNud = (NumericUpDown)C(f, "nudWaitTimeout"), nudInt = (NumericUpDown)C(f, "nudInterval");
     Button btn = (Button)C(f, "btnAutoToggle"); CheckBox stopChk = (CheckBox)C(f, "chkAutoStopIp"); TextBox stopBox = (TextBox)C(f, "txtAutoStopIp");
     Label lblModeIp = (Label)C(f, "lblModeIp"), lblModeTimer = (Label)C(f, "lblModeTimer"), lblDelayPrefix = (Label)C(f, "lblDelayPrefix"), lblIntervalPrefix = (Label)C(f, "lblIntervalPrefix"), lblWait = (Label)C(f, "lblWait"), status = (Label)C(f, "lblStatus");
-    Check(!chk.Checked && !btn.Enabled && !nud.Enabled && !waitNud.Enabled && !nudInt.Enabled && !stopBox.Enabled, "default: 사용 unchecked -> 시작, delay, wait seconds, interval and stop IP box locked");
+    Check(!chk.Checked && !btn.Enabled && !nud.Enabled && !waitNud.Enabled && !nudInt.Enabled && !stopBox.Enabled && !sw.Enabled && !C(f, "limitSwitch").Enabled && !C(f, "chkAutoLimit").Enabled && !C(f, "nudLimitTime").Enabled && lblModeIp.Cursor == Cursors.Default, "default: 사용 unchecked -> 시작, delay, wait seconds, interval, stop IP box, both switches and 제한 locked (no hand cursor)");
     Check(nudInt.Minimum == 10 && nudInt.Maximum == 604800 && nudInt.Value == 30 && nud.Minimum == 0 && nud.Maximum == 604800 && nud.Value == 10 && waitNud.Minimum == 10 && waitNud.Maximum == 60 && waitNud.Value == 30, "ranges: interval 10..604800 (default 30), delay 0..604800 (10), wait 10..60 (30)");
     Check(Vis(lblDelayPrefix) && Vis(nud) && !Vis(lblIntervalPrefix) && !Vis(nudInt) && lblWait.ForeColor == SystemColors.ControlText && lblModeIp.ForeColor == SystemColors.ControlText && lblModeTimer.ForeColor == SystemColors.GrayText && nud.Location == nudInt.Location && lblDelayPrefix.Location == lblIntervalPrefix.Location, "default mode IP 할당 시: the IP setting row is shown, the interval row hidden in the same place, left label black / right label grey");
     chk.Checked = true;
-    Check(btn.Enabled && nud.Enabled && waitNud.Enabled && !nudInt.Enabled && btn.Text == "시작" && status.Text.Contains("'시작'을 누르면"), "ticking 사용 (IP mode) enables 시작 + delay + wait seconds, interval stays locked, status explains that 시작 is still needed: " + status.Text);
+    Check(btn.Enabled && nud.Enabled && waitNud.Enabled && !nudInt.Enabled && btn.Text == "시작" && status.Text.Contains("'시작'을 누르면") && sw.Enabled && C(f, "limitSwitch").Enabled && C(f, "chkAutoLimit").Enabled && lblModeIp.Cursor == Cursors.Hand, "ticking 사용 (IP mode) enables 시작 + delay + wait seconds + both switches + 제한, interval stays locked, status explains that 시작 is still needed: " + status.Text);
     Call(f, "lblMode_Click", lblModeTimer, EventArgs.Empty);
     Check((bool)GetProp(sw, "Checked") && !nud.Enabled && !Vis(nud) && !waitNud.Enabled && nudInt.Enabled && Vis(nudInt) && Vis(lblIntervalPrefix) && !Vis(lblDelayPrefix) && lblWait.ForeColor == SystemColors.GrayText && lblModeTimer.ForeColor == SystemColors.ControlText && lblModeIp.ForeColor == SystemColors.GrayText && status.Text.Contains("일정 시간마다"), "clicking 일정 시간마다: interval row shown and enabled, IP row hidden, wait row grey, status names the mode: " + status.Text);
     Call(f, "lblMode_Click", lblModeIp, EventArgs.Empty);
@@ -322,7 +323,7 @@ class AutoTest
     stopBox.Text = "123.123";
     // ---- auto change: locks while running, deferred decision on the requested IP read ----
     Call(f, "StartAuto");
-    string[] locked = { "btnApply", "btnRenewIp", "btnRestore", "btnReleaseIp", "btnRandom", "btnRefresh", "cboAdapters", "txtNewMac", "nudAutoDelay", "nudWaitTimeout", "nudInterval", "modeSwitch", "txtAutoStopIp", "chkAutoStopIp", "chkResetDns", "chkReleaseIp", "chkAuto" };
+    string[] locked = { "btnApply", "btnRenewIp", "btnRestore", "btnReleaseIp", "btnRandom", "btnRefresh", "cboAdapters", "txtNewMac", "nudAutoDelay", "nudWaitTimeout", "nudInterval", "modeSwitch", "txtAutoStopIp", "chkAutoStopIp", "chkResetDns", "chkReleaseIp", "chkAuto", "chkAutoLimit", "limitSwitch", "nudLimitTime", "nudLimitCount" };
     string[] free = { "btnAutoToggle", "btnClearLog", "btnBackground" };
     int bad = 0;
     foreach (string n in locked) if (C(f, n).Enabled) { bad++; Console.WriteLine("  still enabled while running: " + n); }
@@ -479,6 +480,58 @@ class AutoTest
     Call(f, "RunAutoIfDue");
     Check(!Get<bool>(f, "autoRunning") && !Get<bool>(f, "autoPending") && btn.Text == "시작" && status.Text.Contains("어댑터를 선택"), "interval mode without an adapter: the due change stops auto-change and says so: " + status.Text);
     Set(f, "suppressSelectionChanged", true); cbo.SelectedItem = fake; Set(f, "suppressSelectionChanged", false);
+    // ---- auto-stop limit: time (dedicated one-shot timer on a monotonic clock) and count ----
+    {
+      Call(f, "lblMode_Click", lblModeIp, EventArgs.Empty);   // IP mode for these checks
+      CheckBox chkLimit = (CheckBox)C(f, "chkAutoLimit"); Control limitSw = C(f, "limitSwitch"); NumericUpDown nudLT = (NumericUpDown)C(f, "nudLimitTime"), nudLC = (NumericUpDown)C(f, "nudLimitCount");
+      System.Windows.Forms.Timer lt = Get<System.Windows.Forms.Timer>(f, "limitTimer");
+      Check(nudLT.Minimum == 60 && nudLT.Maximum == 31536000 && nudLT.Value == 3600 && nudLC.Minimum == 1 && nudLC.Maximum == 10000000 && nudLC.Value == 100 && !lt.Enabled, "limit ranges: time 60..31536000 s (default 3600), count 1..10000000 (default 100); limit timer idle");
+      Check(chkLimit.Enabled && limitSw.Enabled && !nudLT.Enabled && !nudLC.Enabled && Vis(nudLT) && !Vis(nudLC) && C(f, "lblLimitTime").Cursor == Cursors.Hand, "with 사용 ticked: 제한 and its switch open, value fields closed until 제한 is ticked; time field shown");
+      chkLimit.Checked = true;
+      Check(nudLT.Enabled && !nudLC.Enabled, "ticking 제한 opens the time field (time mode)");
+      Call(f, "lblLimit_Click", C(f, "lblLimitCount"), EventArgs.Empty);
+      Check((bool)GetProp(limitSw, "Checked") && !nudLT.Enabled && nudLC.Enabled && Vis(nudLC) && !Vis(nudLT), "clicking 횟수: count field shown and open, time hidden");
+      Call(f, "lblLimit_Click", C(f, "lblLimitTime"), EventArgs.Empty);
+      Check(!(bool)GetProp(limitSw, "Checked") && nudLT.Enabled && Vis(nudLT), "clicking 시간 switches back");
+      nudLT.Value = 60; t.Stop();
+      Call(f, "StartAuto");
+      Check(Get<bool>(f, "limitRun") && !Get<bool>(f, "limitByCount") && lt.Enabled && lt.Interval > 59000 && lt.Interval <= 60000 && !chkLimit.Enabled && !limitSw.Enabled && !nudLT.Enabled && status.Text.Contains("60초 뒤 정지"), "time limit 60 s: dedicated timer armed for the full 60 s, limit controls locked, status says 60초 뒤 정지: " + status.Text);
+      Check(!t.Enabled && !g2.Enabled, "arming the limit timer leaves the countdown and graph timers alone");
+      Set(f, "limitDeadline", Stopwatch.GetTimestamp() + 30L * 86400 * Stopwatch.Frequency); lt.Stop();
+      Call(f, "ArmLimitTimer");
+      Check(lt.Enabled && lt.Interval == int.MaxValue, "deadline 30 days away: timer armed for the maximum 24.8 days (re-armed on wake)");
+      lt.Stop();
+      Call(f, "limitTimer_Tick", null, EventArgs.Empty);
+      Check(lt.Enabled && lt.Interval == int.MaxValue && Get<bool>(f, "autoRunning"), "a wake before the deadline re-arms with the remaining time, still running");
+      lt.Stop();
+      Set(f, "limitDeadline", Stopwatch.GetTimestamp() - 1);
+      Call(f, "limitTimer_Tick", null, EventArgs.Empty);
+      Check(!Get<bool>(f, "autoRunning") && !lt.Enabled && btn.Text == "시작" && status.Text.Contains("정한 시간") && status.Text.Contains("정지했습니다") && chkLimit.Enabled, "deadline reached: auto-change stops with the time-limit message and unlocks: " + status.Text);
+      Call(f, "StartAuto"); lt.Stop(); t.Stop();
+      Set(f, "busy", true); Set(f, "limitDeadline", Stopwatch.GetTimestamp() - 1);
+      Call(f, "limitTimer_Tick", null, EventArgs.Empty);
+      Check(!Get<bool>(f, "autoRunning") && Get<string>(f, "limitNote") != null && !lt.Enabled, "deadline during an operation: stopped at once, note kept for the completion message");
+      Set(f, "busy", false);
+      Call(f, "worker_RunWorkerCompleted", null, new System.ComponentModel.RunWorkerCompletedEventArgs(res, null, false));
+      Check(status.Text.Contains("정한 시간") && Get<string>(f, "limitNote") == null, "the completion message carries the time-limit note: " + status.Text);
+      Call(f, "lblLimit_Click", C(f, "lblLimitCount"), EventArgs.Empty); nudLC.Value = 2;
+      Call(f, "StartAuto"); t.Stop();
+      Check(Get<bool>(f, "limitRun") && Get<bool>(f, "limitByCount") && !lt.Enabled && status.Text.Contains("2번 바꾸면 정지"), "count limit 2: no limit timer, status says 2번 바꾸면 정지: " + status.Text);
+      Set(f, "operationIsAuto", false); Set(f, "autoPending", false); btn.Text = "정지";
+      Call(f, "worker_RunWorkerCompleted", null, new System.ComponentModel.RunWorkerCompletedEventArgs(res, null, false));
+      Check(Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 0, "a manual operation finishing while auto-change runs is not counted");
+      Set(f, "operationIsAuto", true); Set(f, "autoPending", false); btn.Text = "정지";
+      Call(f, "worker_RunWorkerCompleted", null, new System.ComponentModel.RunWorkerCompletedEventArgs(res, null, false));
+      Check(Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 1 && btn.Text == "정지 (IP 대기)", "first auto change counted, still running");
+      Set(f, "autoPending", false); btn.Text = "정지";
+      Call(f, "worker_RunWorkerCompleted", null, new System.ComponentModel.RunWorkerCompletedEventArgs(res, null, false));
+      Check(!Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 2 && btn.Text == "시작" && status.Text.Contains("2번 적용해"), "second auto change reaches the limit: stops without scheduling the next: " + status.Text);
+      Call(f, "StartAuto"); t.Stop();
+      Check(Get<int>(f, "autoChanges") == 0, "the count restarts at 0 on 시작");
+      Call(f, "StopAuto");
+      chkLimit.Checked = false; Call(f, "lblLimit_Click", C(f, "lblLimitTime"), EventArgs.Empty);
+      Set(f, "operationIsAuto", false);
+    }
     // adapter list apply: same list -> nothing; new adapter added -> selection kept (same object); selected adapter gone -> auto stops, first adapter chosen
     {
       Call(f, "StopAuto"); t.Stop();
@@ -557,7 +610,7 @@ class AutoTest
     t.Stop(); Set(f, "busy", false); Set(f, "autoRunning", false); Set(f, "waiting", false); Call(f, "TrackWaiting", true, t0, true);
     Check(!(bool)Call(f, "TrackWaiting", true, t0 + 60000, true) && !t.Enabled, "auto-change not running: tracks but never fires and does not touch the timer");
     t.Stop(); Set(f, "waiting", false); waitNud.Value = 30; chk.Checked = false; stopChk.Checked = false;
-    Check(!nud.Enabled && !waitNud.Enabled && !nudInt.Enabled && !btn.Enabled && sw.Enabled, "unticking 사용 locks delay, wait seconds, interval and 시작 again (the switch stays usable)");
+    Check(!nud.Enabled && !waitNud.Enabled && !nudInt.Enabled && !btn.Enabled && !sw.Enabled && !C(f, "limitSwitch").Enabled && !C(f, "chkAutoLimit").Enabled, "unticking 사용 locks delay, wait seconds, interval, 시작 and both switches again");
     f.Dispose();
     Console.WriteLine(fails == 0 ? "ALL PASSED" : fails + " FAILED");
     return fails == 0 ? 0 : 1;

@@ -15,7 +15,8 @@
 
         // 이 파일은 손으로 관리한다 (Visual Studio 디자이너용 아님): 컨트롤의 위치·크기는 아래 표(layout)에 네 값씩(x, y, 너비, 높이; 너비 0 = AutoSize) 적고
         // 한 루프가 적용한다. 표의 순서 = Controls 추가 순서 = 탭 순서 (Controls.Add 가 TabIndex 를 추가 순서대로 매긴다). 두 배열(all, layout)은 같은 순서.
-        // 자동 변경 설정 줄(y=324)에는 두 방식의 세 컨트롤씩이 같은 자리에 놓이고, 스위치에 따라 한쪽만 보인다 (MainForm.ApplyMode).
+        // 자동 변경 설정 줄(y=324)과 자동 정지 제한 줄(y=417)에는 두 방식의 컨트롤이 같은 자리에 놓이고, 스위치에 따라 한쪽만 보인다 (MainForm.ApplyMode).
+        // 처음 Enabled 상태(시작 버튼·설정 칸·스위치·커서)는 생성자가 UpdateControlStates 로 한 번에 맞춘다.
         private void InitializeComponent()
         {
             components = new System.ComponentModel.Container();
@@ -61,6 +62,14 @@
             lblAutoStop = new System.Windows.Forms.Label();
             chkAutoStopIp = new System.Windows.Forms.CheckBox();
             txtAutoStopIp = new System.Windows.Forms.TextBox();
+            chkAutoLimit = new System.Windows.Forms.CheckBox();
+            lblLimitTime = new System.Windows.Forms.Label();
+            limitSwitch = new ModeSwitch();
+            lblLimitCount = new System.Windows.Forms.Label();
+            nudLimitTime = new System.Windows.Forms.NumericUpDown();
+            lblLimitTimeSuffix = new System.Windows.Forms.Label();
+            nudLimitCount = new System.Windows.Forms.NumericUpDown();
+            lblLimitCountSuffix = new System.Windows.Forms.Label();
             lblRelease = new System.Windows.Forms.Label();
             chkReleaseIp = new System.Windows.Forms.CheckBox();
             btnReleaseIp = new System.Windows.Forms.Button();
@@ -80,6 +89,7 @@
             graphTimer = new System.Windows.Forms.Timer(components);
             secondTimer = new System.Windows.Forms.Timer(components);
             adapterTimer = new System.Windows.Forms.Timer(components);
+            limitTimer = new System.Windows.Forms.Timer(components);
             worker = new System.ComponentModel.BackgroundWorker();
             notifyIcon = new System.Windows.Forms.NotifyIcon(components);
             SuspendLayout();
@@ -126,13 +136,10 @@
             chkAuto.Text = "사용";
             chkAuto.CheckedChanged += new System.EventHandler(chkAuto_CheckedChanged);
             lblModeIp.Text = "IP 할당 시";
-            lblModeIp.Cursor = System.Windows.Forms.Cursors.Hand;
             lblModeIp.Click += new System.EventHandler(lblMode_Click);
             modeSwitch.CheckedChanged += new System.EventHandler(modeSwitch_CheckedChanged);
             lblModeTimer.Text = "일정 시간마다";
-            lblModeTimer.Cursor = System.Windows.Forms.Cursors.Hand;
             lblModeTimer.Click += new System.EventHandler(lblMode_Click);
-            btnAutoToggle.Enabled = false;
             btnAutoToggle.Text = "시작";
             btnAutoToggle.Click += new System.EventHandler(btnAutoToggle_Click);
             // NumericUpDown: BeginInit/EndInit 를 쓰지 않으므로 Maximum → Minimum → Value 순서를 지켜야 한다 (Value 는 그때의 범위 안이어야 함)
@@ -151,17 +158,28 @@
             nudInterval.Minimum = 10M;
             nudInterval.Value = 30M;
             lblIntervalSuffix.Text = "초마다 새 MAC 적용";
-            foreach (System.Windows.Forms.NumericUpDown nud in new System.Windows.Forms.NumericUpDown[] { nudAutoDelay, nudWaitTimeout, nudInterval })
-            {
-                nud.Enabled = false;
+            nudLimitTime.Maximum = 31536000M;
+            nudLimitTime.Minimum = 60M;
+            nudLimitTime.Value = 3600M;
+            nudLimitCount.Maximum = 10000000M;
+            nudLimitCount.Minimum = 1M;
+            nudLimitCount.Value = 100M;
+            foreach (System.Windows.Forms.NumericUpDown nud in new System.Windows.Forms.NumericUpDown[] { nudAutoDelay, nudWaitTimeout, nudInterval, nudLimitTime, nudLimitCount })
                 nud.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
-            }
             lblAutoStop.Text = "자동 정지:";
             chkAutoStopIp.Text = "지정 IP/대역 할당 시 정지";
             chkAutoStopIp.CheckedChanged += new System.EventHandler(chkAutoStopIp_CheckedChanged);
-            txtAutoStopIp.Enabled = false;
             txtAutoStopIp.Font = mono;
             txtAutoStopIp.MaxLength = 15;
+            chkAutoLimit.Text = "제한";
+            chkAutoLimit.CheckedChanged += new System.EventHandler(chkAutoLimit_CheckedChanged);
+            lblLimitTime.Text = "시간";
+            lblLimitTime.Click += new System.EventHandler(lblLimit_Click);
+            limitSwitch.CheckedChanged += new System.EventHandler(limitSwitch_CheckedChanged);
+            lblLimitCount.Text = "횟수";
+            lblLimitCount.Click += new System.EventHandler(lblLimit_Click);
+            lblLimitTimeSuffix.Text = "초 뒤 정지";
+            lblLimitCountSuffix.Text = "번 바꾸면 정지";
             lblRelease.Text = "IP 반환:";
             chkReleaseIp.Text = "DHCP 서버에 IP 반환";
             btnReleaseIp.Text = "즉시 반환";
@@ -200,6 +218,7 @@
                 lblDelayPrefix, nudAutoDelay, lblAutoSuffix, lblIntervalPrefix, nudInterval, lblIntervalSuffix,
                 lblWait, lblWaitPrefix, nudWaitTimeout, lblWaitSuffix,
                 lblAutoStop, chkAutoStopIp, txtAutoStopIp,
+                chkAutoLimit, lblLimitTime, limitSwitch, lblLimitCount, nudLimitTime, lblLimitTimeSuffix, nudLimitCount, lblLimitCountSuffix,
                 lblRelease, chkReleaseIp, btnReleaseIp,
                 lblLogOptions, chkLogTime, chkLogMask, chkLogGateway, chkLogMac,
                 chkLogBox, chkIpLog, btnBackground,
@@ -215,10 +234,11 @@
                 118, 328, 0, 0,   210, 324, 72, 23,   288, 328, 0, 0,   118, 328, 0, 0,   210, 324, 72, 23,   288, 328, 0, 0,
                 12, 359, 0, 0,   118, 359, 0, 0,   210, 355, 60, 23,   276, 359, 0, 0,
                 12, 390, 0, 0,   118, 388, 0, 0,   292, 386, 130, 23,
-                12, 420, 0, 0,   118, 418, 0, 0,   404, 415, 144, 25,
-                12, 450, 0, 0,   118, 448, 0, 0,   180, 448, 0, 0,   297, 448, 0, 0,   426, 448, 0, 0,
-                118, 479, 0, 0,   258, 479, 0, 0,   440, 475, 108, 25,
-                12, 508, 536, 20,   12, 535, 262, 167,   286, 535, 262, 167
+                118, 419, 0, 0,   176, 421, 0, 0,   218, 418, 44, 20,   268, 421, 0, 0,   304, 417, 80, 23,   390, 421, 0, 0,   304, 417, 80, 23,   390, 421, 0, 0,
+                12, 451, 0, 0,   118, 449, 0, 0,   404, 446, 144, 25,
+                12, 481, 0, 0,   118, 479, 0, 0,   180, 479, 0, 0,   297, 479, 0, 0,   426, 479, 0, 0,
+                118, 510, 0, 0,   258, 510, 0, 0,   440, 506, 108, 25,
+                12, 539, 536, 20,   12, 566, 262, 167,   286, 566, 262, 167
             };
             for (int i = 0; i < all.Length; i++)
             {
@@ -241,6 +261,7 @@
             secondTimer.Tick += new System.EventHandler(secondTimer_Tick);
             adapterTimer.Interval = 500;
             adapterTimer.Tick += new System.EventHandler(adapterTimer_Tick);
+            limitTimer.Tick += new System.EventHandler(limitTimer_Tick);
             worker.WorkerReportsProgress = true;
             worker.DoWork += new System.ComponentModel.DoWorkEventHandler(worker_DoWork);
             worker.ProgressChanged += new System.ComponentModel.ProgressChangedEventHandler(worker_ProgressChanged);
@@ -250,7 +271,7 @@
             //
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            ClientSize = new System.Drawing.Size(560, 714);
+            ClientSize = new System.Drawing.Size(560, 745);
             Font = new System.Drawing.Font("맑은 고딕", 9F);
             FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             MaximizeBox = false;
@@ -304,6 +325,14 @@
         private System.Windows.Forms.Label lblAutoStop;
         private System.Windows.Forms.CheckBox chkAutoStopIp;
         private System.Windows.Forms.TextBox txtAutoStopIp;
+        private System.Windows.Forms.CheckBox chkAutoLimit;
+        private System.Windows.Forms.Label lblLimitTime;
+        private ModeSwitch limitSwitch;
+        private System.Windows.Forms.Label lblLimitCount;
+        private System.Windows.Forms.NumericUpDown nudLimitTime;
+        private System.Windows.Forms.Label lblLimitTimeSuffix;
+        private System.Windows.Forms.NumericUpDown nudLimitCount;
+        private System.Windows.Forms.Label lblLimitCountSuffix;
         private System.Windows.Forms.Label lblRelease;
         private System.Windows.Forms.CheckBox chkReleaseIp;
         private System.Windows.Forms.Button btnReleaseIp;
@@ -323,6 +352,7 @@
         private System.Windows.Forms.Timer graphTimer;
         private System.Windows.Forms.Timer secondTimer;
         private System.Windows.Forms.Timer adapterTimer;
+        private System.Windows.Forms.Timer limitTimer;
         private System.ComponentModel.BackgroundWorker worker;
         private System.Windows.Forms.NotifyIcon notifyIcon;
     }
