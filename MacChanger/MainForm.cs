@@ -92,7 +92,6 @@ namespace MacChanger
         /// <summary>트레이 아이콘의 오른쪽 클릭 메뉴 (처음 필요할 때 만든다)</summary>
         private TrayMenu trayMenu;
 
-        /// <summary>알림을 쓸 때의 안전망 폴링 주기 / 알림 직후 한 번 더 읽는 간격(게이트웨이·DNS 는 주소보다 조금 늦게 기록된다) / 알림을 못 쓰는 OS 에서의 폴링 주기 (ms)</summary>
         /// <summary>ipTimer 주기: 알림을 쓸 때 놓친 변화를 메우는 안전망 3초, 알림 직후 한 번 더 읽는 settle 1초, 알림을 못 쓰는 OS 의 폴링 1초.
         /// 그래프를 돌리는 graphTimer, 카운트다운·할당 대기 숫자를 돌리는 secondTimer 와 분리해 둔다 — graphTimer 는 어디서도 재시작하지 않아야 그래프가 정확히 1초마다 갱신된다.</summary>
         private const int IpSafetyPollMs = 3000, IpSettleMs = 1000, IpFallbackPollMs = 1000;
