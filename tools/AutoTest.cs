@@ -121,7 +121,7 @@ class AutoTest
     Form f = (Form)New("MacChanger.MainForm");
     IntPtr handle = f.Handle;   // handle needed for BeginInvoke-based tests
     // ---- layout ----
-    Check(f.ClientSize == new Size(560, 745), "client size 560x745 (two rows more than the original 683): " + f.ClientSize);
+    Check(f.ClientSize == new Size(560, 775), "client size 560x775 (three rows more than the original 683): " + f.ClientSize);
     Control graph = C(f, "trafficGraph"), logBox = C(f, "txtIpLog");
     Check(graph.Size == new Size(262, 167) && logBox.Size == new Size(262, 167) && graph.Top == logBox.Top && graph.Left > logBox.Right && logBox.Bottom + 12 == f.ClientSize.Height, "log box and graph 262x167 side by side with a 12 px bottom margin: " + logBox.Bounds + " / " + graph.Bounds);
     int overlaps = 0, outside = 0;
@@ -133,7 +133,9 @@ class AutoTest
       if (a.Right > f.ClientSize.Width || a.Bottom > f.ClientSize.Height || a.Left < 0 || a.Top < 0) { outside++; Console.WriteLine("  outside: " + all[i].GetType().Name + " " + a); }
       for (int j = i + 1; j < all.Count; j++) if (a.IntersectsWith(all[j].Bounds)) { overlaps++; Console.WriteLine("  overlap: " + a + " / " + all[j].Bounds); }
     }
-    Check(overlaps == 0 && outside == 0 && all.Count == 59, "no overlapping controls, all 59 visible controls (64 minus the hidden interval row and count pair) inside " + f.ClientSize + " (" + all.Count + " checked)");
+    Check(overlaps == 0 && outside == 0 && all.Count == 59, "no overlapping controls, all 59 visible controls (65 minus the hidden interval row and count pair and the empty remaining label) inside " + f.ClientSize + " (" + all.Count + " checked)");
+    Control leftLbl = C(f, "lblLimitLeft");
+    Check(leftLbl != null && Vis(leftLbl) && leftLbl.Text.Length == 0 && leftLbl.AutoSize && leftLbl.Location == new Point(118, 451) && !leftLbl.TabStop, "remaining time/count label: present, empty while idle, its own row at (118,451), no tab stop");
     Check(C(f, "nudIpInterval") == null && C(f, "btnReleaseIp") != null && C(f, "chkReleaseIp") != null && C(f, "modeSwitch") != null && C(f, "nudInterval") != null, "IP 반환 and interval-mode controls present");
     Check(C(f, "btnReleaseIp").Text == "즉시 반환" && C(f, "chkReleaseIp").Text == "DHCP 서버에 IP 반환" && C(f, "btnClearLog").Text == "로그 비우기" && C(f, "chkLogBox").Text == "로그 보기" && C(f, "chkAuto").Text == "사용" && C(f, "lblModeIp").Text == "IP 할당 시" && C(f, "lblModeTimer").Text == "일정 시간마다" && C(f, "lblDelayPrefix").Text == "IP 할당 후", "button/checkbox/label texts");
     // tab order: row by row, the way the eye reads the window
@@ -488,7 +490,7 @@ class AutoTest
     Call(f, "RunAutoIfDue");
     Check(!Get<bool>(f, "autoRunning") && !Get<bool>(f, "autoPending") && btn.Text == "시작" && status.Text.Contains("어댑터를 선택"), "interval mode without an adapter: the due change stops auto-change and says so: " + status.Text);
     Set(f, "suppressSelectionChanged", true); cbo.SelectedItem = fake; Set(f, "suppressSelectionChanged", false);
-    // ---- auto-stop limit: time (dedicated one-shot timer on a monotonic clock) and count ----
+    // ---- auto-stop limit: time (dedicated timer re-armed at each second boundary of the remaining time, monotonic clock, live display) and count ----
     {
       Call(f, "lblMode_Click", lblModeIp, EventArgs.Empty);   // IP mode for these checks
       CheckBox chkLimit = (CheckBox)C(f, "chkAutoLimit"); Control limitSw = C(f, "limitSwitch"); NumericUpDown nudLT = (NumericUpDown)C(f, "nudLimitTime"), nudLC = (NumericUpDown)C(f, "nudLimitCount");
@@ -505,46 +507,69 @@ class AutoTest
       Check(!(bool)GetProp(limitSw, "Checked") && nudLT.Enabled && Vis(nudLT) && limitSw.AccessibleName == "시간", "clicking 시간 switches back (accessible name too)");
       nudLT.Value = 60; t.Stop();
       Call(f, "StartAuto");
-      Check(Get<bool>(f, "limitRun") && !Get<bool>(f, "limitByCount") && lt.Enabled && lt.Interval > 59000 && lt.Interval <= 60000 && !chkLimit.Enabled && !limitSw.Enabled && !nudLT.Enabled && status.Text.Contains("60초 뒤 정지"), "time limit 60 s: dedicated timer armed for the full 60 s, limit controls locked, status says 60초 뒤 정지: " + status.Text);
+      Check(Get<bool>(f, "limitRun") && !Get<bool>(f, "limitByCount") && lt.Enabled && lt.Interval >= 1 && lt.Interval <= 1000 && !chkLimit.Enabled && !limitSw.Enabled && !nudLT.Enabled && status.Text.Contains("60초 뒤 정지") && leftLbl.Text == "남은 시간: 0년 0개월 0일 0시간 1분 0초", "time limit 60 s: remaining shown as 1분 0초, dedicated timer armed for the next second boundary (" + lt.Interval + " ms), limit controls locked, status says 60초 뒤 정지: " + status.Text + " / " + leftLbl.Text);
       Check(!t.Enabled && !g2.Enabled, "arming the limit timer leaves the countdown and graph timers alone");
-      Set(f, "limitDeadline", Stopwatch.GetTimestamp() + 30L * 86400 * Stopwatch.Frequency); lt.Stop();
+      Set(f, "limitDeadline", Stopwatch.GetTimestamp() + 30L * 86400 * Stopwatch.Frequency + Stopwatch.Frequency / 2); lt.Stop();
       Call(f, "ArmLimitTimer");
-      Check(lt.Enabled && lt.Interval == int.MaxValue, "deadline 30 days away: timer armed for the maximum 24.8 days (re-armed on wake)");
+      Check(lt.Enabled && lt.Interval >= 450 && lt.Interval <= 500 && leftLbl.Text == "남은 시간: 0년 1개월 0일 0시간 0분 1초", "deadline 30 days + 0.5 s away: shows 1개월 … 1초 (ceiling), timer armed for the 0.5 s to the next second boundary (" + lt.Interval + " ms): " + leftLbl.Text);
       lt.Stop();
       Call(f, "limitTimer_Tick", null, EventArgs.Empty);
-      Check(lt.Enabled && lt.Interval == int.MaxValue && Get<bool>(f, "autoRunning"), "a wake before the deadline re-arms with the remaining time, still running");
+      Check(lt.Enabled && lt.Interval >= 1 && lt.Interval <= 500 && Get<bool>(f, "autoRunning") && leftLbl.Text == "남은 시간: 0년 1개월 0일 0시간 0분 1초", "a tick before the boundary re-arms for the rest of the second, still running, display unchanged (" + lt.Interval + " ms)");
       lt.Stop();
+      Set(f, "limitDeadline", Stopwatch.GetTimestamp() + 31536000L * Stopwatch.Frequency + Stopwatch.Frequency / 2);
+      Call(f, "ArmLimitTimer"); lt.Stop();
+      Check(leftLbl.Text == "남은 시간: 1년 0개월 0일 0시간 0분 1초", "one year + 0.5 s: 1년 0개월 0일 0시간 0분 1초: " + leftLbl.Text);
+      Set(f, "limitDeadline", Stopwatch.GetTimestamp() + 31535998L * Stopwatch.Frequency + Stopwatch.Frequency / 2);
+      Call(f, "ArmLimitTimer"); lt.Stop();
+      Check(leftLbl.Text == "남은 시간: 0년 12개월 4일 23시간 59분 59초", "364 d 23:59:58.5 left: 12개월 4일 23시간 59분 59초 (365-day year, 30-day months): " + leftLbl.Text);
+      Check((string)Call(f, "FormatLimitLeft", 0) == "0년 0개월 0일 0시간 0분 0초" && (string)Call(f, "FormatLimitLeft", 3661) == "0년 0개월 0일 1시간 1분 1초" && (string)Call(f, "FormatLimitLeft", 86399) == "0년 0개월 0일 23시간 59분 59초" && (string)Call(f, "FormatLimitLeft", 2592000) == "0년 1개월 0일 0시간 0분 0초" && (string)Call(f, "FormatLimitLeft", 2678400) == "0년 1개월 1일 0시간 0분 0초" && (string)Call(f, "FormatLimitLeft", 31536000) == "1년 0개월 0일 0시간 0분 0초", "FormatLimitLeft: 0 s, 1:01:01, 23:59:59, 30 days, 31 days, 365 days");
       Set(f, "limitDeadline", Stopwatch.GetTimestamp() - 1);
       Call(f, "limitTimer_Tick", null, EventArgs.Empty);
-      Check(!Get<bool>(f, "autoRunning") && !lt.Enabled && btn.Text == "시작" && status.Text.Contains("정한 시간") && status.Text.Contains("정지했습니다") && chkLimit.Enabled, "deadline reached: auto-change stops with the time-limit message and unlocks: " + status.Text);
+      Check(!Get<bool>(f, "autoRunning") && !lt.Enabled && btn.Text == "시작" && status.Text.Contains("정한 시간") && status.Text.Contains("정지했습니다") && chkLimit.Enabled && leftLbl.Text.Length == 0, "deadline reached: auto-change stops with the time-limit message, unlocks, remaining label cleared: " + status.Text);
+      // real time: the display changes exactly at the second boundaries of the remaining time (no drift, one step per second) and the run stops at the deadline, 2.3 s ahead
+      {
+        Call(f, "StartAuto"); t.Stop(); lt.Stop(); bool ipWas = ip.Enabled; ip.Stop();
+        List<string> trace = new List<string>(); Stopwatch clock = Stopwatch.StartNew();
+        EventHandler rec = delegate { trace.Add(clock.ElapsedMilliseconds + "@" + leftLbl.Text); };
+        leftLbl.TextChanged += rec;
+        Set(f, "limitDeadline", Stopwatch.GetTimestamp() + 23L * Stopwatch.Frequency / 10);
+        Call(f, "ArmLimitTimer");
+        while (Get<bool>(f, "autoRunning") && clock.ElapsedMilliseconds < 4000) { Application.DoEvents(); System.Threading.Thread.Sleep(1); }
+        leftLbl.TextChanged -= rec;
+        if (ipWas) ip.Start();
+        int[] atMs = new int[trace.Count]; for (int i = 0; i < trace.Count; i++) atMs[i] = int.Parse(trace[i].Substring(0, trace[i].IndexOf('@')));
+        bool ok = trace.Count == 4 && trace[0].EndsWith("@남은 시간: 0년 0개월 0일 0시간 0분 3초") && trace[1].EndsWith("@남은 시간: 0년 0개월 0일 0시간 0분 2초") && trace[2].EndsWith("@남은 시간: 0년 0개월 0일 0시간 0분 1초") && trace[3].EndsWith("@")
+          && atMs[0] <= 50 && Math.Abs(atMs[1] - 300) <= 150 && Math.Abs(atMs[2] - 1300) <= 150 && Math.Abs(atMs[3] - 2300) <= 150;
+        Check(ok && !Get<bool>(f, "autoRunning") && !lt.Enabled && status.Text.Contains("정한 시간"), "live countdown 2.3 s: 3초 at once, 2초 at ~0.3 s, 1초 at ~1.3 s, stop + clear at ~2.3 s (±150 ms): " + string.Join(" | ", trace.ToArray()));
+      }
       Call(f, "StartAuto"); lt.Stop(); t.Stop();
       Set(f, "busy", true); Set(f, "limitDeadline", Stopwatch.GetTimestamp() - 1);
       Call(f, "limitTimer_Tick", null, EventArgs.Empty);
-      Check(!Get<bool>(f, "autoRunning") && Get<string>(f, "limitNote") != null && !lt.Enabled, "deadline during an operation: stopped at once, note kept for the completion message");
+      Check(!Get<bool>(f, "autoRunning") && Get<string>(f, "limitNote") != null && !lt.Enabled && leftLbl.Text.Length == 0, "deadline during an operation: stopped at once, note kept for the completion message, label cleared");
       Set(f, "busy", false);
       Call(f, "worker_RunWorkerCompleted", null, new System.ComponentModel.RunWorkerCompletedEventArgs(res, null, false));
       Check(status.Text.Contains("정한 시간") && Get<string>(f, "limitNote") == null, "the completion message carries the time-limit note: " + status.Text);
       Call(f, "lblLimit_Click", C(f, "lblLimitCount"), EventArgs.Empty); nudLC.Value = 2;
       Call(f, "StartAuto"); t.Stop();
-      Check(Get<bool>(f, "limitRun") && Get<bool>(f, "limitByCount") && !lt.Enabled && status.Text.Contains("2번 바꾸면 정지"), "count limit 2: no limit timer, status says 2번 바꾸면 정지: " + status.Text);
+      Check(Get<bool>(f, "limitRun") && Get<bool>(f, "limitByCount") && !lt.Enabled && status.Text.Contains("2번 바꾸면 정지") && leftLbl.Text == "남은 횟수: 2번", "count limit 2: no limit timer, status says 2번 바꾸면 정지, label shows 남은 횟수: 2번: " + status.Text + " / " + leftLbl.Text);
       Set(f, "operationIsAuto", false); Set(f, "autoPending", false); btn.Text = "정지";
       Call(f, "worker_RunWorkerCompleted", null, new System.ComponentModel.RunWorkerCompletedEventArgs(res, null, false));
-      Check(Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 0, "a manual operation finishing while auto-change runs is not counted");
+      Check(Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 0 && leftLbl.Text == "남은 횟수: 2번", "a manual operation finishing while auto-change runs is not counted (label still 2번)");
       Set(f, "operationIsAuto", true); Set(f, "autoPending", false); btn.Text = "정지";
       Call(f, "worker_RunWorkerCompleted", null, new System.ComponentModel.RunWorkerCompletedEventArgs(res, null, false));
-      Check(Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 1 && btn.Text == "정지 (IP 대기)", "first auto change counted, still running");
+      Check(Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 1 && btn.Text == "정지 (IP 대기)" && leftLbl.Text == "남은 횟수: 1번", "first auto change counted, still running, label 남은 횟수: 1번: " + leftLbl.Text);
       Set(f, "autoPending", false); btn.Text = "정지";
       Call(f, "worker_RunWorkerCompleted", null, new System.ComponentModel.RunWorkerCompletedEventArgs(res, null, false));
-      Check(!Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 2 && btn.Text == "시작" && status.Text.Contains("2번 적용해"), "second auto change reaches the limit: stops without scheduling the next: " + status.Text);
+      Check(!Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 2 && btn.Text == "시작" && status.Text.Contains("2번 적용해") && leftLbl.Text.Length == 0, "second auto change reaches the limit: stops without scheduling the next, label cleared: " + status.Text);
       Call(f, "StartAuto"); t.Stop();
-      Check(Get<int>(f, "autoChanges") == 0, "the count restarts at 0 on 시작");
+      Check(Get<int>(f, "autoChanges") == 0 && leftLbl.Text == "남은 횟수: 2번", "the count restarts at 0 on 시작 (label 2번 again)");
       // an auto change of this run is still in flight when 정지 and then 시작 are pressed: it belongs to the old run and is not counted in the new one
       Set(f, "busy", true); Set(f, "operationIsAuto", true); Set(f, "autoPending", false); btn.Text = "정지";
       Call(f, "StopAuto"); Call(f, "StartAuto"); t.Stop();
       Check(Get<bool>(f, "autoRunning") && !Get<bool>(f, "operationIsAuto") && Get<int>(f, "autoChanges") == 0, "정지 + 시작 during an auto change: the new run starts at 0 and does not claim the change in flight");
       Set(f, "busy", false);
       Call(f, "worker_RunWorkerCompleted", null, new System.ComponentModel.RunWorkerCompletedEventArgs(res, null, false));
-      Check(Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 0 && !status.Text.Contains("번 적용해"), "...and when that change finishes it is not counted toward the new run's limit: " + status.Text);
+      Check(Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 0 && !status.Text.Contains("번 적용해") && leftLbl.Text == "남은 횟수: 2번", "...and when that change finishes it is not counted toward the new run's limit (label still 2번): " + status.Text);
       Call(f, "StopAuto");
       chkLimit.Checked = false; Call(f, "lblLimit_Click", C(f, "lblLimitTime"), EventArgs.Empty);
       Set(f, "operationIsAuto", false);

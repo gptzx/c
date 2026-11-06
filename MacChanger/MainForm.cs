@@ -603,10 +603,11 @@ namespace MacChanger
             string limit = !limitRun ? "" : limitByCount ? " · " + nudLimitCount.Value + "번 바꾸면 정지" : " · " + FormatRemaining((int)nudLimitTime.Value) + " 뒤 정지";
             if (limitRun && !limitByCount)
             {
-                // 시간 제한: 지금부터 정한 초 뒤 마감 — 전용 일회성 타이머가 그 시각에 깨운다 (다른 타이머의 위상·주기와 무관)
+                // 시간 제한: 지금부터 정한 초 뒤 마감 — 전용 타이머가 남은 시간을 보여 주며 그 시각에 깨운다 (다른 타이머의 위상·주기와 무관)
                 limitDeadline = Stopwatch.GetTimestamp() + (long)nudLimitTime.Value * Stopwatch.Frequency;
                 ArmLimitTimer();
             }
+            else ShowCountLeft();   // 횟수 제한이면 남은 횟수 (제한이 없으면 아무것도 쓰지 않는다)
             if (intervalRun)
             {
                 // 일정 시간마다: IP 와 관계없이 지금부터 N초 뒤에 첫 변경, 그 뒤로는 직전 변경 예정 시각 + N초 (변경에 걸린 시간과 무관하게 N초마다; 작업 중이면 끝나는 대로)
@@ -627,6 +628,7 @@ namespace MacChanger
         {
             autoRunning = false;
             limitTimer.Stop();
+            lblLimitLeft.Text = "";   // 남은 시간/횟수 표시는 실행 중에만
             CancelAuto();
             UpdateControlStates();
             btnAutoToggle.Text = "시작";
@@ -634,8 +636,8 @@ namespace MacChanger
         }
 
         /// <summary>
-        /// 시간 제한 타이머를 마감까지 건다. WinForms 타이머는 24.8일(int 밀리초)까지만 잡히므로 그보다 멀면 거기까지 걸고 깨어나서 남은 시간으로 다시 건다.
-        /// 마감이 이미 지났으면 바로 멈춘다 (작업 중이면 그 작업의 완료 메시지에 붙여 알린다).
+        /// 시간 제한: 마감까지 남은 시간을 보여 주고, 전용 타이머를 남은 시간의 다음 초 경계(남은 초가 1 줄어드는 순간)에 건다. 틱마다 마감 시각에서 다시 계산하므로
+        /// 타이머 오차가 쌓이지 않고 숫자가 정확히 1초마다 하나씩 바뀌며, 마감이 지난 첫 틱에 멈춘다 (작업 중이면 그 작업의 완료 메시지에 붙여 알린다).
         /// </summary>
         private void ArmLimitTimer()
         {
@@ -648,9 +650,22 @@ namespace MacChanger
                 else SetStatus(StatusKind.Done, message);
                 return;
             }
-            long ms = left / Stopwatch.Frequency * 1000 + left % Stopwatch.Frequency * 1000 / Stopwatch.Frequency;   // 1년치도 넘치지 않게 초·나머지로 나눠 계산
-            limitTimer.Interval = (int)Math.Min(Math.Max(ms, 1), int.MaxValue);
+            long ms = Math.Max(left / Stopwatch.Frequency * 1000 + left % Stopwatch.Frequency * 1000 / Stopwatch.Frequency, 1);   // 남은 밀리초 (1년치도 넘치지 않게 초·나머지로 나눠 계산; 1ms 미만도 1)
+            lblLimitLeft.Text = "남은 시간: " + FormatLimitLeft((int)((ms + 999) / 1000));   // 올림 — 버튼의 카운트다운과 같은 기준이라 시작 순간에 정한 값 그대로 보인다
+            limitTimer.Interval = (int)((ms - 1) % 1000) + 1;   // 다음 초 경계까지 (1~1000ms)
             limitTimer.Start();
+        }
+
+        /// <summary>남은 초를 "n년 n개월 n일 n시간 n분 n초" 로 — 1년 = 365일, 1개월 = 30일 (그래서 360~364일은 "12개월 n일")</summary>
+        private static string FormatLimitLeft(int seconds)
+        {
+            return string.Format("{0}년 {1}개월 {2}일 {3}시간 {4}분 {5}초", seconds / 31536000, seconds % 31536000 / 2592000, seconds % 31536000 % 2592000 / 86400, seconds % 86400 / 3600, seconds % 3600 / 60, seconds % 60);
+        }
+
+        /// <summary>횟수 제한이면 남은 횟수(정한 횟수 − 이번 실행에서 적용한 횟수)를 보여 준다 — 시작할 때와 자동 변경을 하나 마쳐 셀 때마다</summary>
+        private void ShowCountLeft()
+        {
+            if (limitRun && limitByCount) lblLimitLeft.Text = "남은 횟수: " + ((int)nudLimitCount.Value - autoChanges) + "번";
         }
 
         private void limitTimer_Tick(object sender, EventArgs e)
@@ -1253,6 +1268,7 @@ namespace MacChanger
             else if (autoRunning)
             {
                 if (operationIsAuto) autoChanges++;
+                ShowCountLeft();
                 if (limitRun && limitByCount && autoChanges >= (int)nudLimitCount.Value)   // 횟수 제한: 정한 횟수를 채웠으면 다음 변경을 예약하지 않고 멈춘다
                 {
                     StopAuto();

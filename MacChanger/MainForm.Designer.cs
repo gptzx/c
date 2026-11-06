@@ -13,6 +13,7 @@
         // 이 파일은 손으로 관리한다 (Visual Studio 디자이너용 아님): 컨트롤의 위치·크기는 아래 표(layout)에 네 값씩(x, y, 너비, 높이; 너비 0 = AutoSize) 적고
         // 한 루프가 적용한다. 표의 순서 = Controls 추가 순서 = 탭 순서 (Controls.Add 가 TabIndex 를 추가 순서대로 매긴다). 네 표(all, layout, 글자 text, 툴팁 tips)는 같은 순서.
         // 자동 변경 설정 줄(y=324)과 자동 정지 제한 줄(y=417)에는 두 방식의 컨트롤이 같은 자리에 놓이고, 스위치에 따라 한쪽만 보인다 (MainForm.ApplyMode).
+        // 그 아래 줄(y=451)의 글자(lblLimitLeft)는 제한을 걸고 실행 중일 때만 남은 시간/횟수를 보여 주고 평소에는 비어 있다.
         // 처음 Enabled 상태(시작 버튼·설정 칸·스위치·커서)는 생성자가 UpdateControlStates 로 한 번에 맞춘다.
         private void InitializeComponent()
         {
@@ -67,6 +68,7 @@
             lblLimitTimeSuffix = new System.Windows.Forms.Label();
             nudLimitCount = new System.Windows.Forms.NumericUpDown();
             lblLimitCountSuffix = new System.Windows.Forms.Label();
+            lblLimitLeft = new System.Windows.Forms.Label();
             lblRelease = new System.Windows.Forms.Label();
             chkReleaseIp = new System.Windows.Forms.CheckBox();
             btnReleaseIp = new System.Windows.Forms.Button();
@@ -161,6 +163,7 @@
                 lblWait, lblWaitPrefix, nudWaitTimeout, lblWaitSuffix,
                 lblAutoStop, chkAutoStopIp, txtAutoStopIp,
                 chkAutoLimit, lblLimitTime, limitSwitch, lblLimitCount, nudLimitTime, lblLimitTimeSuffix, nudLimitCount, lblLimitCountSuffix,
+                lblLimitLeft,
                 lblRelease, chkReleaseIp, btnReleaseIp,
                 lblLogOptions, chkLogTime, chkLogMask, chkLogGateway, chkLogMac,
                 chkLogBox, chkIpLog, btnBackground,
@@ -177,10 +180,11 @@
                 12, 359, 0, 0,   118, 359, 0, 0,   210, 355, 60, 23,   276, 359, 0, 0,
                 12, 390, 0, 0,   118, 388, 0, 0,   292, 386, 130, 23,
                 118, 419, 0, 0,   176, 421, 0, 0,   218, 418, 44, 20,   268, 421, 0, 0,   304, 417, 80, 23,   390, 421, 0, 0,   304, 417, 80, 23,   390, 421, 0, 0,
-                12, 451, 0, 0,   118, 449, 0, 0,   404, 446, 144, 25,
-                12, 481, 0, 0,   118, 479, 0, 0,   180, 479, 0, 0,   297, 479, 0, 0,   426, 479, 0, 0,
-                118, 510, 0, 0,   258, 510, 0, 0,   440, 506, 108, 25,
-                12, 539, 536, 20,   12, 566, 262, 167,   286, 566, 262, 167
+                118, 451, 0, 0,
+                12, 481, 0, 0,   118, 479, 0, 0,   404, 476, 144, 25,
+                12, 511, 0, 0,   118, 509, 0, 0,   180, 509, 0, 0,   297, 509, 0, 0,   426, 509, 0, 0,
+                118, 540, 0, 0,   258, 540, 0, 0,   440, 536, 108, 25,
+                12, 569, 536, 20,   12, 596, 262, 167,   286, 596, 262, 167
             };
             // 글자: all 의 한 줄 = 아래 한 줄, 칸은 '|' 로 나눈다 (빈 칸 = 글자를 넣지 않는 컨트롤)
             string[] text = (
@@ -193,6 +197,7 @@
                 "할당 대기:|IP 할당 대기가||초를 넘으면 새 MAC 적용|" +
                 "자동 정지:|지정 IP/대역 할당 시 정지||" +
                 "제한|시간||횟수||초 뒤 정지||번 바꾸면 정지|" +
+                "|" +
                 "IP 반환:|DHCP 서버에 IP 반환|즉시 반환|" +
                 "로그:|시간|서브넷 마스크|기본 게이트웨이|MAC|" +
                 "로그 보기|할당 IP 로그 저장|백그라운드 실행|" +
@@ -251,6 +256,7 @@
                 "|" +   // lblLimitTimeSuffix
                 "새 MAC을 이만큼 적용하면 자동 변경을 멈춥니다. 1~10000000번.\n실패한 변경은 세지 않으며, 변경이 실패하면 그 자리에서 멈춥니다.|" +   // nudLimitCount
                 "|" +   // lblLimitCountSuffix
+                "자동 변경이 멈출 때까지 남은 시간이나 횟수입니다 (실행 중에만 보입니다).\n1년은 365일, 1개월은 30일로 셉니다.|" +   // lblLimitLeft
                 "|" +   // lblRelease
                 "변경 적용·IP 갱신·원상복구·자동 변경 때마다 쓰던 IP를 먼저 DHCP 서버(공유기 등)에 돌려줍니다.\n서버가 다른 IP를 줄 수도, 같은 IP를 다시 줄 수도 있습니다.|" +   // chkReleaseIp
                 "누르는 즉시 IP를 반환해 인터넷 연결이 끊어집니다.\n다시 연결하려면 IP 갱신 버튼을 누르면 됩니다.|" +   // btnReleaseIp
@@ -301,7 +307,7 @@
             //
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            ClientSize = new System.Drawing.Size(560, 745);
+            ClientSize = new System.Drawing.Size(560, 775);
             Font = new System.Drawing.Font("맑은 고딕", 9F);
             FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             MaximizeBox = false;
@@ -372,6 +378,7 @@
         private System.Windows.Forms.Label lblLimitTimeSuffix;
         private System.Windows.Forms.NumericUpDown nudLimitCount;
         private System.Windows.Forms.Label lblLimitCountSuffix;
+        private System.Windows.Forms.Label lblLimitLeft;
         private System.Windows.Forms.Label lblRelease;
         private System.Windows.Forms.CheckBox chkReleaseIp;
         private System.Windows.Forms.Button btnReleaseIp;
