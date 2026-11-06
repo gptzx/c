@@ -522,7 +522,17 @@ class AutoTest
       Set(f, "limitDeadline", Stopwatch.GetTimestamp() + 31535998L * Stopwatch.Frequency + Stopwatch.Frequency / 2);
       Call(f, "ArmLimitTimer"); lt.Stop();
       Check(leftLbl.Text == "남은 시간: 0년 12개월 4일 23시간 59분 59초", "364 d 23:59:58.5 left: 12개월 4일 23시간 59분 59초 (365-day year, 30-day months): " + leftLbl.Text);
-      Check((string)Call(f, "FormatLimitLeft", 0) == "0년 0개월 0일 0시간 0분 0초" && (string)Call(f, "FormatLimitLeft", 3661) == "0년 0개월 0일 1시간 1분 1초" && (string)Call(f, "FormatLimitLeft", 86399) == "0년 0개월 0일 23시간 59분 59초" && (string)Call(f, "FormatLimitLeft", 2592000) == "0년 1개월 0일 0시간 0분 0초" && (string)Call(f, "FormatLimitLeft", 2678400) == "0년 1개월 1일 0시간 0분 0초" && (string)Call(f, "FormatLimitLeft", 31536000) == "1년 0개월 0일 0시간 0분 0초", "FormatLimitLeft: 0 s, 1:01:01, 23:59:59, 30 days, 31 days, 365 days");
+      // the breakdown for several remaining times: a deadline V − 0.5 s ahead shows V (ceiling) and arms 500 ms to the boundary
+      string[] fmt = { "3661|0년 0개월 0일 1시간 1분 1초", "86399|0년 0개월 0일 23시간 59분 59초", "2592000|0년 1개월 0일 0시간 0분 0초", "2678400|0년 1개월 1일 0시간 0분 0초", "31535999|0년 12개월 4일 23시간 59분 59초", "31536000|1년 0개월 0일 0시간 0분 0초", "1|0년 0개월 0일 0시간 0분 1초" };
+      int fmtOk = 0;
+      foreach (string c in fmt)
+      {
+        string[] kv = c.Split('|');
+        Set(f, "limitDeadline", Stopwatch.GetTimestamp() + long.Parse(kv[0]) * Stopwatch.Frequency - Stopwatch.Frequency / 2);
+        Call(f, "ArmLimitTimer"); lt.Stop();
+        if (leftLbl.Text == "남은 시간: " + kv[1] && lt.Interval >= 450 && lt.Interval <= 500) fmtOk++; else Console.WriteLine("  breakdown " + kv[0] + " s: " + leftLbl.Text + " interval " + lt.Interval);
+      }
+      Check(fmtOk == fmt.Length && Get<bool>(f, "autoRunning"), "remaining-time breakdown: 1:01:01, 23:59:59, 30 days, 31 days, 364 d 23:59:59, 365 days, 1 s (" + fmtOk + "/" + fmt.Length + ")");
       Set(f, "limitDeadline", Stopwatch.GetTimestamp() - 1);
       Call(f, "limitTimer_Tick", null, EventArgs.Empty);
       Check(!Get<bool>(f, "autoRunning") && !lt.Enabled && btn.Text == "시작" && status.Text.Contains("정한 시간") && status.Text.Contains("정지했습니다") && chkLimit.Enabled && leftLbl.Text.Length == 0, "deadline reached: auto-change stops with the time-limit message, unlocks, remaining label cleared: " + status.Text);

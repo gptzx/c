@@ -650,16 +650,11 @@ namespace MacChanger
                 else SetStatus(StatusKind.Done, message);
                 return;
             }
-            long ms = Math.Max(left / Stopwatch.Frequency * 1000 + left % Stopwatch.Frequency * 1000 / Stopwatch.Frequency, 1);   // 남은 밀리초 (1년치도 넘치지 않게 초·나머지로 나눠 계산; 1ms 미만도 1)
-            lblLimitLeft.Text = "남은 시간: " + FormatLimitLeft((int)((ms + 999) / 1000));   // 올림 — 버튼의 카운트다운과 같은 기준이라 시작 순간에 정한 값 그대로 보인다
-            limitTimer.Interval = (int)((ms - 1) % 1000) + 1;   // 다음 초 경계까지 (1~1000ms)
+            long f = Stopwatch.Frequency, seconds = (left + f - 1) / f;   // 남은 초, 올림 (1 이상; 1년치 틱도 넘치지 않는다) — 버튼의 카운트다운과 같은 기준이라 시작 순간에 정한 값 그대로 보이고 마지막은 1초
+            int s = (int)seconds;   // "n년 n개월 n일 n시간 n분 n초" — 1년 = 365일, 1개월 = 30일 (그래서 360~364일은 "12개월 n일")
+            lblLimitLeft.Text = string.Format("남은 시간: {0}년 {1}개월 {2}일 {3}시간 {4}분 {5}초", s / 31536000, s % 31536000 / 2592000, s % 31536000 % 2592000 / 86400, s % 86400 / 3600, s % 3600 / 60, s % 60);
+            limitTimer.Interval = (int)(((left - (seconds - 1) * f) * 1000 + f - 1) / f);   // 다음 초 경계(남은 초가 1 줄어드는 순간)까지, 올림 — 1~1000ms, 경계보다 먼저 깨지 않는다
             limitTimer.Start();
-        }
-
-        /// <summary>남은 초를 "n년 n개월 n일 n시간 n분 n초" 로 — 1년 = 365일, 1개월 = 30일 (그래서 360~364일은 "12개월 n일")</summary>
-        private static string FormatLimitLeft(int seconds)
-        {
-            return string.Format("{0}년 {1}개월 {2}일 {3}시간 {4}분 {5}초", seconds / 31536000, seconds % 31536000 / 2592000, seconds % 31536000 % 2592000 / 86400, seconds % 86400 / 3600, seconds % 3600 / 60, seconds % 60);
         }
 
         /// <summary>횟수 제한이면 남은 횟수(정한 횟수 − 이번 실행에서 적용한 횟수)를 보여 준다 — 시작할 때와 자동 변경을 하나 마쳐 셀 때마다</summary>
@@ -1267,8 +1262,11 @@ namespace MacChanger
             }
             else if (autoRunning)
             {
-                if (operationIsAuto) autoChanges++;
-                ShowCountLeft();
+                if (operationIsAuto)
+                {
+                    autoChanges++;
+                    ShowCountLeft();
+                }
                 if (limitRun && limitByCount && autoChanges >= (int)nudLimitCount.Value)   // 횟수 제한: 정한 횟수를 채웠으면 다음 변경을 예약하지 않고 멈춘다
                 {
                     StopAuto();
