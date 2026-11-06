@@ -1367,7 +1367,7 @@ namespace MacChanger
             chkLogMac.Enabled = stopped;
             chkLogBox.Enabled = stopped;
             btnAutoToggle.Enabled = chkAuto.Checked;                     // 실행 중에도 정지할 수 있어야 하므로 잠그지 않는다
-            bool armed = stopped && chkAuto.Checked;                     // "사용"을 체크하고 실행 중이 아닐 때만 방식·제한 스위치와 설정 칸이 열린다
+            bool armed = stopped && chkAuto.Checked;                     // "사용"을 체크하고 실행 중이 아닐 때만 방식·제한 스위치와 설정 칸, 지정 IP 정지 체크가 열린다
             // 아래 세 칸은 이 순서로 바꾼다 (포커스가 있는 칸을 잠그면 포커스가 다음 칸으로 옮겨 가므로, 순서가 바뀌면 포커스가 가는 곳이 달라질 수 있다)
             chkAutoLimit.Enabled = armed;
             limitSwitch.Enabled = armed;
@@ -1384,8 +1384,8 @@ namespace MacChanger
             bool limitOn = armed && chkAutoLimit.Checked;
             nudLimitTime.Enabled = limitOn && !limitSwitch.Checked;
             nudLimitCount.Enabled = limitOn && limitSwitch.Checked;
-            chkAutoStopIp.Enabled = stopped;
-            txtAutoStopIp.Enabled = stopped && chkAutoStopIp.Checked;   // 체크해야 입력 칸이 열린다
+            chkAutoStopIp.Enabled = armed;
+            txtAutoStopIp.Enabled = armed && chkAutoStopIp.Checked;   // 체크해야 입력 칸이 열린다
             chkResetDns.Enabled = stopped;
             chkReleaseIp.Enabled = stopped;
             UseWaitCursor = busy;
