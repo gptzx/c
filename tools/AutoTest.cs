@@ -507,23 +507,23 @@ class AutoTest
       Check(!(bool)GetProp(limitSw, "Checked") && nudLT.Enabled && Vis(nudLT) && limitSw.AccessibleName == "시간", "clicking 시간 switches back (accessible name too)");
       nudLT.Value = 60; t.Stop();
       Call(f, "StartAuto");
-      Check(Get<bool>(f, "limitRun") && !Get<bool>(f, "limitByCount") && lt.Enabled && lt.Interval >= 1 && lt.Interval <= 1000 && !chkLimit.Enabled && !limitSw.Enabled && !nudLT.Enabled && status.Text.Contains("60초 뒤 정지") && leftLbl.Text == "남은 시간: 0년 0개월 0일 0시간 1분 0초", "time limit 60 s: remaining shown as 1분 0초, dedicated timer armed for the next second boundary (" + lt.Interval + " ms), limit controls locked, status says 60초 뒤 정지: " + status.Text + " / " + leftLbl.Text);
+      Check(Get<bool>(f, "limitRun") && !Get<bool>(f, "limitByCount") && lt.Enabled && lt.Interval >= 1 && lt.Interval <= 1000 && !chkLimit.Enabled && !limitSw.Enabled && !nudLT.Enabled && status.Text.Contains("60초 뒤 정지") && leftLbl.Text == "남은 시간: 1분", "time limit 60 s: remaining shown as 1분 (zero units omitted), dedicated timer armed for the next second boundary (" + lt.Interval + " ms), limit controls locked, status says 60초 뒤 정지: " + status.Text + " / " + leftLbl.Text);
       Check(!t.Enabled && !g2.Enabled, "arming the limit timer leaves the countdown and graph timers alone");
       Set(f, "limitDeadline", Stopwatch.GetTimestamp() + 30L * 86400 * Stopwatch.Frequency + Stopwatch.Frequency / 2); lt.Stop();
       Call(f, "ArmLimitTimer");
-      Check(lt.Enabled && lt.Interval >= 450 && lt.Interval <= 500 && leftLbl.Text == "남은 시간: 0년 1개월 0일 0시간 0분 1초", "deadline 30 days + 0.5 s away: shows 1개월 … 1초 (ceiling), timer armed for the 0.5 s to the next second boundary (" + lt.Interval + " ms): " + leftLbl.Text);
+      Check(lt.Enabled && lt.Interval >= 450 && lt.Interval <= 500 && leftLbl.Text == "남은 시간: 1개월 1초", "deadline 30 days + 0.5 s away: shows 1개월 1초 (ceiling, zero units omitted), timer armed for the 0.5 s to the next second boundary (" + lt.Interval + " ms): " + leftLbl.Text);
       lt.Stop();
       Call(f, "limitTimer_Tick", null, EventArgs.Empty);
-      Check(lt.Enabled && lt.Interval >= 1 && lt.Interval <= 500 && Get<bool>(f, "autoRunning") && leftLbl.Text == "남은 시간: 0년 1개월 0일 0시간 0분 1초", "a tick before the boundary re-arms for the rest of the second, still running, display unchanged (" + lt.Interval + " ms)");
+      Check(lt.Enabled && lt.Interval >= 1 && lt.Interval <= 500 && Get<bool>(f, "autoRunning") && leftLbl.Text == "남은 시간: 1개월 1초", "a tick before the boundary re-arms for the rest of the second, still running, display unchanged (" + lt.Interval + " ms)");
       lt.Stop();
       Set(f, "limitDeadline", Stopwatch.GetTimestamp() + 31536000L * Stopwatch.Frequency + Stopwatch.Frequency / 2);
       Call(f, "ArmLimitTimer"); lt.Stop();
-      Check(leftLbl.Text == "남은 시간: 1년 0개월 0일 0시간 0분 1초", "one year + 0.5 s: 1년 0개월 0일 0시간 0분 1초: " + leftLbl.Text);
+      Check(leftLbl.Text == "남은 시간: 1년 1초", "one year + 0.5 s: 1년 1초: " + leftLbl.Text);
       Set(f, "limitDeadline", Stopwatch.GetTimestamp() + 31535998L * Stopwatch.Frequency + Stopwatch.Frequency / 2);
       Call(f, "ArmLimitTimer"); lt.Stop();
-      Check(leftLbl.Text == "남은 시간: 0년 12개월 4일 23시간 59분 59초", "364 d 23:59:58.5 left: 12개월 4일 23시간 59분 59초 (365-day year, 30-day months): " + leftLbl.Text);
+      Check(leftLbl.Text == "남은 시간: 12개월 4일 23시간 59분 59초", "364 d 23:59:58.5 left: 12개월 4일 23시간 59분 59초 (365-day year, 30-day months): " + leftLbl.Text);
       // the breakdown for several remaining times: a deadline V − 0.5 s ahead shows V (ceiling) and arms 500 ms to the boundary
-      string[] fmt = { "3661|0년 0개월 0일 1시간 1분 1초", "86399|0년 0개월 0일 23시간 59분 59초", "2592000|0년 1개월 0일 0시간 0분 0초", "2678400|0년 1개월 1일 0시간 0분 0초", "31535999|0년 12개월 4일 23시간 59분 59초", "31536000|1년 0개월 0일 0시간 0분 0초", "1|0년 0개월 0일 0시간 0분 1초" };
+      string[] fmt = { "3661|1시간 1분 1초", "3605|1시간 5초", "3600|1시간", "86399|23시간 59분 59초", "90000|1일 1시간", "2592000|1개월", "2678400|1개월 1일", "31535999|12개월 4일 23시간 59분 59초", "31536000|1년", "31536060|1년 1분", "60|1분", "1|1초" };
       int fmtOk = 0;
       foreach (string c in fmt)
       {
@@ -532,7 +532,7 @@ class AutoTest
         Call(f, "ArmLimitTimer"); lt.Stop();
         if (leftLbl.Text == "남은 시간: " + kv[1] && lt.Interval >= 450 && lt.Interval <= 500) fmtOk++; else Console.WriteLine("  breakdown " + kv[0] + " s: " + leftLbl.Text + " interval " + lt.Interval);
       }
-      Check(fmtOk == fmt.Length && Get<bool>(f, "autoRunning"), "remaining-time breakdown: 1:01:01, 23:59:59, 30 days, 31 days, 364 d 23:59:59, 365 days, 1 s (" + fmtOk + "/" + fmt.Length + ")");
+      Check(fmtOk == fmt.Length && Get<bool>(f, "autoRunning"), "remaining-time breakdown with zero units omitted: 1:01:01, 1:00:05, 1:00:00, 23:59:59, 25 h, 30 days, 31 days, 364 d 23:59:59, 365 days, 365 d + 60 s, 60 s, 1 s (" + fmtOk + "/" + fmt.Length + ")");
       Set(f, "limitDeadline", Stopwatch.GetTimestamp() - 1);
       Call(f, "limitTimer_Tick", null, EventArgs.Empty);
       Check(!Get<bool>(f, "autoRunning") && !lt.Enabled && btn.Text == "시작" && status.Text.Contains("정한 시간") && status.Text.Contains("정지했습니다") && chkLimit.Enabled && leftLbl.Text.Length == 0, "deadline reached: auto-change stops with the time-limit message, unlocks, remaining label cleared: " + status.Text);
@@ -548,7 +548,7 @@ class AutoTest
         leftLbl.TextChanged -= rec;
         if (ipWas) ip.Start();
         int[] atMs = new int[trace.Count]; for (int i = 0; i < trace.Count; i++) atMs[i] = int.Parse(trace[i].Substring(0, trace[i].IndexOf('@')));
-        bool ok = trace.Count == 4 && trace[0].EndsWith("@남은 시간: 0년 0개월 0일 0시간 0분 3초") && trace[1].EndsWith("@남은 시간: 0년 0개월 0일 0시간 0분 2초") && trace[2].EndsWith("@남은 시간: 0년 0개월 0일 0시간 0분 1초") && trace[3].EndsWith("@")
+        bool ok = trace.Count == 4 && trace[0].EndsWith("@남은 시간: 3초") && trace[1].EndsWith("@남은 시간: 2초") && trace[2].EndsWith("@남은 시간: 1초") && trace[3].EndsWith("@")
           && atMs[0] <= 50 && Math.Abs(atMs[1] - 300) <= 150 && Math.Abs(atMs[2] - 1300) <= 150 && Math.Abs(atMs[3] - 2300) <= 150;
         Check(ok && !Get<bool>(f, "autoRunning") && !lt.Enabled && status.Text.Contains("정한 시간"), "live countdown 2.3 s: 3초 at once, 2초 at ~0.3 s, 1초 at ~1.3 s, stop + clear at ~2.3 s (±150 ms): " + string.Join(" | ", trace.ToArray()));
       }
