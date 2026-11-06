@@ -652,7 +652,7 @@ namespace MacChanger
             }
             long f = Stopwatch.Frequency;
             int s = (int)((left + f - 1) / f), d = s % 31536000 / 86400;   // 남은 초, 올림 (1 이상; 1년치 틱도 넘치지 않는다 — 버튼의 카운트다운과 같은 기준이라 시작 순간에 정한 값 그대로 보이고 마지막은 1초) / 그중 1년 미만의 날 수
-            // "n년 n개월 n일 n시간 n분 n초" 에서 0 인 단위는 뺀다 (예: "1시간 23분 45초", "1분 23초") — 1년 = 365일, 1개월 = 30일 (그래서 360~364일은 "12개월 n일")
+            // "n년 n개월 n일 n시간 n분 n초" 에서 앞쪽의 0 인 단위는 뺀다 (예: "1시간 23분 45초", "1분 0초") — 1년 = 365일, 1개월 = 30일 (그래서 360~364일은 "12개월 n일")
             string text = "남은 시간:";
             Unit(ref text, s / 31536000, "년");
             Unit(ref text, d / 30, "개월");
@@ -665,10 +665,10 @@ namespace MacChanger
             limitTimer.Start();
         }
 
-        /// <summary>남은 시간의 한 단위를 " 값단위" 로 덧붙인다 — 0 이면 적지 않는다</summary>
+        /// <summary>"남은 시간:" 뒤에 한 단위를 " 값단위" 로 덧붙인다 — 앞쪽의 0 은 적지 않고, 0 이 아닌 단위가 한 번 나온 뒤로는 0 도 적는다 ("1시간 0분 5초")</summary>
         private static void Unit(ref string text, int value, string name)
         {
-            if (value != 0) text += " " + value + name;
+            if (value != 0 || text.Length > 6) text += " " + value + name;   // 6 = "남은 시간:" 의 글자 수 (그보다 길면 이미 단위가 하나 적혔다)
         }
 
         /// <summary>횟수 제한이면 남은 횟수(정한 횟수 − 이번 실행에서 적용한 횟수)를 보여 준다 — 시작할 때와 자동 변경을 하나 마쳐 셀 때마다</summary>
