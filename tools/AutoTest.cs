@@ -298,7 +298,7 @@ class AutoTest
     Check(nudInt.Minimum == 10 && nudInt.Maximum == 604800 && nudInt.Value == 30 && nud.Minimum == 0 && nud.Maximum == 604800 && nud.Value == 10 && waitNud.Minimum == 10 && waitNud.Maximum == 60 && waitNud.Value == 30, "ranges: interval 10..604800 (default 30), delay 0..604800 (10), wait 10..60 (30)");
     Check(Vis(lblDelayPrefix) && Vis(nud) && !Vis(lblIntervalPrefix) && !Vis(nudInt) && lblWait.ForeColor == SystemColors.ControlText && lblModeIp.ForeColor == SystemColors.ControlText && lblModeTimer.ForeColor == SystemColors.GrayText && nud.Location == nudInt.Location && lblDelayPrefix.Location == lblIntervalPrefix.Location, "default mode IP 할당 시: the IP setting row is shown, the interval row hidden in the same place, left label black / right label grey");
     chk.Checked = true;
-    Check(btn.Enabled && nud.Enabled && waitNud.Enabled && !nudInt.Enabled && btn.Text == "시작" && status.Text.Contains("'시작'을 누르면") && sw.Enabled && C(f, "limitSwitch").Enabled && C(f, "chkAutoLimit").Enabled && lblModeIp.Cursor == Cursors.Hand && stopChk.Enabled, "ticking 사용 (IP mode) enables 시작 + delay + wait seconds + both switches + 제한, interval stays locked, status explains that 시작 is still needed: " + status.Text);
+    Check(btn.Enabled && nud.Enabled && waitNud.Enabled && !nudInt.Enabled && btn.Text == "시작" && status.Text.Contains("'시작'을 누르면") && sw.Enabled && !C(f, "limitSwitch").Enabled && C(f, "lblLimitTime").Cursor == Cursors.Default && C(f, "chkAutoLimit").Enabled && lblModeIp.Cursor == Cursors.Hand && stopChk.Enabled, "ticking 사용 (IP mode) enables 시작 + delay + wait seconds + the mode switch + 제한 (the 시간/횟수 switch stays locked until 제한 is ticked), interval stays locked, status explains that 시작 is still needed: " + status.Text);
     Call(f, "lblMode_Click", lblModeTimer, EventArgs.Empty);
     Check((bool)GetProp(sw, "Checked") && !nud.Enabled && !Vis(nud) && !waitNud.Enabled && nudInt.Enabled && Vis(nudInt) && Vis(lblIntervalPrefix) && !Vis(lblDelayPrefix) && lblWait.ForeColor == SystemColors.GrayText && lblModeTimer.ForeColor == SystemColors.ControlText && lblModeIp.ForeColor == SystemColors.GrayText && status.Text.Contains("일정 시간마다"), "clicking 일정 시간마다: interval row shown and enabled, IP row hidden, wait row grey, status names the mode: " + status.Text);
     Call(f, "lblMode_Click", lblModeIp, EventArgs.Empty);
@@ -496,10 +496,20 @@ class AutoTest
       CheckBox chkLimit = (CheckBox)C(f, "chkAutoLimit"); Control limitSw = C(f, "limitSwitch"); NumericUpDown nudLT = (NumericUpDown)C(f, "nudLimitTime"), nudLC = (NumericUpDown)C(f, "nudLimitCount");
       System.Windows.Forms.Timer lt = Get<System.Windows.Forms.Timer>(f, "limitTimer");
       Check(nudLT.Minimum == 60 && nudLT.Maximum == 31536000 && nudLT.Value == 3600 && nudLC.Minimum == 1 && nudLC.Maximum == 10000000 && nudLC.Value == 100 && !lt.Enabled, "limit ranges: time 60..31536000 s (default 3600), count 1..10000000 (default 100); limit timer idle");
-      Check(chkLimit.Enabled && limitSw.Enabled && !nudLT.Enabled && !nudLC.Enabled && Vis(nudLT) && !Vis(nudLC) && C(f, "lblLimitTime").Cursor == Cursors.Hand, "with 사용 ticked: 제한 and its switch open, value fields closed until 제한 is ticked; time field shown");
+      Control lblLT = C(f, "lblLimitTime"), lblLC = C(f, "lblLimitCount");
+      Check(chkLimit.Enabled && !limitSw.Enabled && !nudLT.Enabled && !nudLC.Enabled && Vis(nudLT) && !Vis(nudLC) && lblLT.Cursor == Cursors.Default && lblLC.Cursor == Cursors.Default && sw.Enabled && lblModeIp.Cursor == Cursors.Hand, "with 사용 ticked and 제한 unticked: 제한 open, the 시간/횟수 switch locked (no hand cursor on its labels), value fields closed; the mode switch and its labels stay open; time field shown");
+      Call(f, "lblLimit_Click", lblLC, EventArgs.Empty);
+      Check(!(bool)GetProp(limitSw, "Checked") && Vis(nudLT) && !Vis(nudLC), "clicking 횟수 while 제한 is unticked does nothing (the switch is locked)");
       Check(limitSw.AccessibleName == "시간" && C(f, "modeSwitch").AccessibleName == "IP 할당 시", "limit switch accessible name = its own selected side (시간), the mode switch keeps its own: " + limitSw.AccessibleName);
       chkLimit.Checked = true;
-      Check(nudLT.Enabled && !nudLC.Enabled, "ticking 제한 opens the time field (time mode)");
+      Check(nudLT.Enabled && !nudLC.Enabled && limitSw.Enabled && lblLT.Cursor == Cursors.Hand && lblLC.Cursor == Cursors.Hand, "ticking 제한 opens the 시간/횟수 switch (hand cursor on its labels) and the time field (time mode)");
+      chkLimit.Checked = false;
+      Check(!limitSw.Enabled && lblLT.Cursor == Cursors.Default && lblLC.Cursor == Cursors.Default && !nudLT.Enabled && chkLimit.Enabled && sw.Enabled && lblModeIp.Cursor == Cursors.Hand, "unticking 제한 locks the 시간/횟수 switch and the value field again; the mode switch is not affected");
+      chkLimit.Checked = true;
+      chk.Checked = false;
+      Check(!limitSw.Enabled && !chkLimit.Enabled && chkLimit.Checked && lblLT.Cursor == Cursors.Default && !nudLT.Enabled, "unticking 사용 locks 제한 (it stays ticked) and the 시간/횟수 switch");
+      chk.Checked = true;
+      Check(limitSw.Enabled && chkLimit.Enabled && lblLT.Cursor == Cursors.Hand && nudLT.Enabled && !nudLC.Enabled, "ticking 사용 again with 제한 still ticked reopens the switch and the time field");
       Call(f, "lblLimit_Click", C(f, "lblLimitCount"), EventArgs.Empty);
       Check((bool)GetProp(limitSw, "Checked") && !nudLT.Enabled && nudLC.Enabled && Vis(nudLC) && !Vis(nudLT), "clicking 횟수: count field shown and open, time hidden");
       Check(limitSw.AccessibleName == "횟수" && C(f, "modeSwitch").AccessibleName == "IP 할당 시", "limit switch accessible name follows it (횟수): " + limitSw.AccessibleName);
@@ -581,7 +591,8 @@ class AutoTest
       Call(f, "worker_RunWorkerCompleted", null, new System.ComponentModel.RunWorkerCompletedEventArgs(res, null, false));
       Check(Get<bool>(f, "autoRunning") && Get<int>(f, "autoChanges") == 0 && !status.Text.Contains("번 적용해") && leftLbl.Text == "남은 횟수: 2번", "...and when that change finishes it is not counted toward the new run's limit (label still 2번): " + status.Text);
       Call(f, "StopAuto");
-      chkLimit.Checked = false; Call(f, "lblLimit_Click", C(f, "lblLimitTime"), EventArgs.Empty);
+      Call(f, "lblLimit_Click", lblLT, EventArgs.Empty); chkLimit.Checked = false;   // back to 시간 first — once 제한 is unticked the switch is locked
+      Check(!(bool)GetProp(limitSw, "Checked") && !limitSw.Enabled && !chkLimit.Checked && Vis(nudLT) && !nudLT.Enabled, "limit checks leave the switch on 시간 and 제한 unticked (switch locked again)");
       Set(f, "operationIsAuto", false);
     }
     // adapter list apply: same list -> nothing; new adapter added -> selection kept (same object); selected adapter gone -> auto stops, first adapter chosen

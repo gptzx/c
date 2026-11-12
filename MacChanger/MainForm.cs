@@ -533,7 +533,7 @@ namespace MacChanger
             if (!busy) SetStatus(StatusKind.Ready, IntervalMode() ? "자동 변경 방식: 일정 시간마다 (IP와 관계없이)" : "자동 변경 방식: IP 할당 시 (IP를 받은 뒤 지연 초가 지나면)");
         }
 
-        /// <summary>제한 스위치 양쪽 글자를 눌러도 그쪽 기준이 된다 (실행 중이거나 "사용"이 꺼져 있으면 스위치처럼 잠긴다)</summary>
+        /// <summary>제한 스위치 양쪽 글자를 눌러도 그쪽 기준이 된다 (실행 중이거나 "사용"·"제한"이 꺼져 있으면 스위치처럼 잠긴다)</summary>
         private void lblLimit_Click(object sender, EventArgs e)
         {
             if (limitSwitch.Enabled) limitSwitch.Checked = sender == lblLimitCount;
@@ -541,7 +541,7 @@ namespace MacChanger
 
         private void chkAutoLimit_CheckedChanged(object sender, EventArgs e)
         {
-            UpdateControlStates();   // 제한 값 칸은 체크해야 열린다
+            UpdateControlStates();   // 시간/횟수 스위치와 값 칸은 체크해야 열린다
         }
 
         private void limitSwitch_CheckedChanged(object sender, EventArgs e)
@@ -1366,22 +1366,24 @@ namespace MacChanger
             chkLogGateway.Enabled = stopped;
             chkLogMac.Enabled = stopped;
             chkLogBox.Enabled = stopped;
-            btnAutoToggle.Enabled = chkAuto.Checked;                     // 실행 중에도 정지할 수 있어야 하므로 잠그지 않는다
-            bool armed = stopped && chkAuto.Checked;                     // "사용"을 체크하고 실행 중이 아닐 때만 방식·제한 스위치와 설정 칸, 지정 IP 정지 체크가 열린다
+            bool armed = chkAuto.Checked;                                // "사용"을 체크했는가
+            btnAutoToggle.Enabled = armed;                               // 시작/정지 버튼은 "사용"만 본다 — 실행 중에도 정지할 수 있어야 하므로 잠그지 않는다
+            armed &= stopped;                                            // 여기부터 armed = "사용"을 체크했고 실행 중이 아니다: 방식 스위치와 제한 체크, 설정 칸, 지정 IP 정지 체크가 열린다
+            bool limitOn = armed && chkAutoLimit.Checked;                // 시간/횟수 스위치와 그 값 칸은 "제한"도 체크해야 열린다
             // 아래 세 칸은 이 순서로 바꾼다 (포커스가 있는 칸을 잠그면 포커스가 다음 칸으로 옮겨 가므로, 순서가 바뀌면 포커스가 가는 곳이 달라질 수 있다)
             chkAutoLimit.Enabled = armed;
-            limitSwitch.Enabled = armed;
+            limitSwitch.Enabled = limitOn;
             modeSwitch.Enabled = armed;
-            Cursor hand = armed ? Cursors.Hand : Cursors.Default;   // 잠긴 동안에는 글자도 손 모양을 거둔다
-            lblLimitCount.Cursor = hand;
-            lblLimitTime.Cursor = hand;
+            Cursor hand = armed ? Cursors.Hand : Cursors.Default;   // 잠긴 동안에는 글자도 손 모양을 거둔다 (스위치마다 따로)
+            Cursor limitHand = limitOn ? hand : Cursors.Default;
+            lblLimitCount.Cursor = limitHand;
+            lblLimitTime.Cursor = limitHand;
             lblModeTimer.Cursor = hand;
             lblModeIp.Cursor = hand;
             bool ipMode = !IntervalMode();
             nudAutoDelay.Enabled = armed && ipMode;      // 지연 초와 할당 대기 초는 IP 할당 시 방식일 때
             nudWaitTimeout.Enabled = armed && ipMode;
             nudInterval.Enabled = armed && !ipMode;    // 간격은 일정 시간마다 방식일 때
-            bool limitOn = armed && chkAutoLimit.Checked;
             nudLimitTime.Enabled = limitOn && !limitSwitch.Checked;
             nudLimitCount.Enabled = limitOn && limitSwitch.Checked;
             chkAutoStopIp.Enabled = armed;
