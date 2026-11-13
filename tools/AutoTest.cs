@@ -495,7 +495,7 @@ class AutoTest
       Call(f, "lblMode_Click", lblModeIp, EventArgs.Empty);   // IP mode for these checks
       CheckBox chkLimit = (CheckBox)C(f, "chkAutoLimit"); Control limitSw = C(f, "limitSwitch"); NumericUpDown nudLT = (NumericUpDown)C(f, "nudLimitTime"), nudLC = (NumericUpDown)C(f, "nudLimitCount");
       System.Windows.Forms.Timer lt = Get<System.Windows.Forms.Timer>(f, "limitTimer");
-      Check(nudLT.Minimum == 60 && nudLT.Maximum == 31536000 && nudLT.Value == 3600 && nudLC.Minimum == 1 && nudLC.Maximum == 10000000 && nudLC.Value == 100 && !lt.Enabled, "limit ranges: time 60..31536000 s (default 3600), count 1..10000000 (default 100); limit timer idle");
+      Check(nudLT.Minimum == 60 && nudLT.Maximum == 31536000 && nudLT.Value == 3600 && nudLC.Minimum == 1 && nudLC.Maximum == 10000000 && nudLC.Value == 1000 && !lt.Enabled, "limit ranges: time 60..31536000 s (default 3600), count 1..10000000 (default 1000); limit timer idle");
       Control lblLT = C(f, "lblLimitTime"), lblLC = C(f, "lblLimitCount");
       Check(chkLimit.Enabled && !limitSw.Enabled && !nudLT.Enabled && !nudLC.Enabled && Vis(nudLT) && !Vis(nudLC) && lblLT.Cursor == Cursors.Default && lblLC.Cursor == Cursors.Default && sw.Enabled && lblModeIp.Cursor == Cursors.Hand, "with 사용 ticked and 제한 unticked: 제한 open, the 시간/횟수 switch locked (no hand cursor on its labels), value fields closed; the mode switch and its labels stay open; time field shown");
       Call(f, "lblLimit_Click", lblLC, EventArgs.Empty);

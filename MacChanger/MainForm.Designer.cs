@@ -126,7 +126,7 @@
             SetNumber(nudWaitTimeout, 60, 10, 30);
             SetNumber(nudInterval, 604800, 10, 30);
             SetNumber(nudLimitTime, 31536000, 60, 3600);
-            SetNumber(nudLimitCount, 10000000, 1, 100);
+            SetNumber(nudLimitCount, 10000000, 1, 1000);
             chkAutoStopIp.CheckedChanged += new System.EventHandler(chkAutoStopIp_CheckedChanged);
             txtAutoStopIp.Font = mono;
             txtAutoStopIp.MaxLength = 15;
@@ -277,7 +277,7 @@
             {
                 System.Windows.Forms.Control c = all[i];
                 int j = i * 4;
-                if (text[i].Length > 0) c.Text = text[i];
+                if (text[i].Length != 0) c.Text = text[i];
                 c.Location = new System.Drawing.Point(layout[j], layout[j + 1]);
                 if (layout[j + 2] > 0) c.Size = new System.Drawing.Size(layout[j + 2], layout[j + 3]);
                 else c.AutoSize = true;
